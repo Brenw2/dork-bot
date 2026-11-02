@@ -1,0 +1,11 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; }
+main { max-width: 40rem; margin: 4rem auto; padding: 0 1rem; }
+h1 { margin-bottom: 0.25rem; }
+.tag { opacity: 0.7; margin-top: 0; }
+.status { list-style: none; padding: 0; }
+.status li { padding: 0.4rem 0; }
+.dot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; margin-right: 0.5rem; }
+.ok .dot { background: #2e9d5b; }
+.bad .dot { background: #d14b3c; }
+p.bad { color: #d14b3c; }
