@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.expo/
+ios/
+android/
+*.ipa
+build.ipa
+eas-artifacts/
+.env
+.env.*
+*.p8
+*.log
+.DS_Store
+coverage/
+expo-env.d.ts

@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Dork Bot",
+    "slug": "dork-bot",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "dorkbot",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F1012",
+    "ios": {
+      "bundleIdentifier": "com.brenw2.dorkbot",
+      "appleTeamId": "C7Z2H37BVG",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-system-ui",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e19b3c18-96ee-45f3-8f71-0c6d52950c21"
+      }
+    },
+    "owner": "brenw2"
+  }
+}
