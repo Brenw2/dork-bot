@@ -32,3 +32,33 @@ export function validateConnection(c: Partial<BotConnection>): string | null {
   if (!c.key || c.key.length < 16) return 'The key is too short (it should be 16+ characters).';
   return null;
 }
+
+// Hermes sign-in link: dorkbot://connect?admin=<hermes serve>&chat=<API server>&rt=<refresh token>
+// scripts/pair-hermes.sh prints it as a QR code. It lets the app create and delete bots.
+export interface ManagerLink {
+  adminUrl: string;
+  chatUrl: string;
+  refreshToken: string;
+}
+
+export function managerLink(m: ManagerLink): string {
+  const q = new URLSearchParams({ admin: normalizeUrl(m.adminUrl), chat: normalizeUrl(m.chatUrl), rt: m.refreshToken });
+  return `dorkbot://connect?${q.toString()}`;
+}
+
+export function managerFromParams(params: Record<string, string | string[] | undefined>): ManagerLink | null {
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)?.trim() || '';
+  const m = { adminUrl: one(params.admin), chatUrl: one(params.chat), refreshToken: one(params.rt) };
+  if (!m.adminUrl || !m.chatUrl || m.refreshToken.length < 16) return null;
+  const otherScheme = (u: string) => /^[a-z][a-z0-9+.-]*:\/\//i.test(u) && !/^https?:\/\//i.test(u);
+  if (otherScheme(m.adminUrl) || otherScheme(m.chatUrl)) return null;
+  try {
+    for (const u of [m.adminUrl, m.chatUrl]) {
+      const p = new URL(normalizeUrl(u)).protocol;
+      if (p !== 'https:' && p !== 'http:') return null;
+    }
+  } catch {
+    return null;
+  }
+  return { adminUrl: normalizeUrl(m.adminUrl), chatUrl: normalizeUrl(m.chatUrl), refreshToken: m.refreshToken };
+}

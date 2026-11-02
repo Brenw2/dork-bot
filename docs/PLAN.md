@@ -24,9 +24,11 @@ A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like pe
  Ollama (Dork)
 ```
 
-- **No Dork Bot server.** The app talks straight to the Hermes API server over Tailscale. Hermes stays bound to `127.0.0.1`; `tailscale serve` (`scripts/expose-hermes.sh`) shares it with Brennan's own devices only, over HTTPS.
+- **No Dork Bot server.** The app talks straight to Hermes over Tailscale. Hermes stays bound to `127.0.0.1`; `tailscale serve` shares it with Brennan's own devices only, over HTTPS:
+  - `https://b-lab.tail7e27a7.ts.net` → the gateway's API server (8642): chat, history, routines. Each bot's own key. (`scripts/expose-hermes.sh`)
+  - `https://b-lab.tail7e27a7.ts.net:8443` → `hermes serve` (9119), the backend the Hermes desktop app uses: create, list and delete profiles, set their keys. Behind Hermes's login gate (username/password provider); the app holds a refresh token and uses short-lived bearer tokens. (`scripts/setup-bot-manager.sh`, a user service)
 - **A bot is a Hermes profile.** Each profile has its own `API_SERVER_KEY` and accepts only that key at `/p/<bot>/`. The app keeps each key in the iOS Keychain (expo-secure-store).
-- **Adding a bot to the app:** Hermes has no API for creating or listing profiles, so profiles are made on b-lab (`hermes profile create <bot>`), then `scripts/pair-bot.sh <bot>` shows a QR code. Scanning it with the iPhone camera opens `dorkbot://add?url=…&bot=…&key=…` and the app saves the bot.
+- **Making a bot in the app:** sign the app in to Hermes once (`scripts/pair-hermes.sh` → `dorkbot://connect?admin=…&chat=…&rt=…`). Then New bot (name + job) clones the Dork-pinned `assistant` profile (model, tools, skills and API keys; not its memory), writes SOUL.md from the job, generates the bot's own `API_SERVER_KEY` on the phone and sets it through Hermes, and waits until the gateway accepts it (a few seconds; no restart). New bot also lists profiles already on Hermes and adds them with their existing key. Long-press → Delete bot deletes the profile (typed confirm). `scripts/pair-bot.sh <bot>` still adds a single bot by QR code.
 - **Chat:** one ongoing Hermes session per bot, id `dork-bot-<bot>`. Replies stream over SSE (`expo/fetch`), tool calls show inline and collapsed, and Stop calls `/v1/runs/<id>/stop`.
 - **Group chat** is orchestrated in the app: it works out who's addressed (@-mentions, or everyone) and runs each bot's turn in order through that bot's own session. Each bot sees the room transcript and can reply or stay silent (`[SILENT]`).
 - **Storage:** Hermes keeps the bot chats. The app keeps only its own state (saved bots, rooms, avatars) on the phone.
@@ -43,7 +45,7 @@ A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like pe
 
 ## Out of scope for milestone 1
 
-Creating or deleting Hermes profiles from the phone (no Hermes API for it), a memory editor (no Hermes API for it; "remember X" in chat still works), voice, computer use, sharing bots, Android, and the App Store.
+Renaming bots (Hermes supports it, but the chat's session id is tied to the name), a memory editor (no Hermes API for it; "remember X" in chat still works), voice, computer use, sharing bots, Android, and the App Store.
 
 ## Known constraints
 

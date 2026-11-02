@@ -14,7 +14,30 @@ scripts/expose-hermes.sh                                                       #
 
 Hermes refuses to restart its gateway from inside one of its own sessions, so the restart is always Brennan's step.
 
-## Adding a bot
+## Bot manager (`hermes serve`)
+
+The app creates and deletes bots through `hermes serve`, the backend the Hermes desktop app uses. It runs as the user service `dork-bot-hermes-serve` on `127.0.0.1:9119`, shared at `https://b-lab.tail7e27a7.ts.net:8443`.
+
+```bash
+scripts/setup-bot-manager.sh   # once (safe to re-run): login, service, Tailscale share
+scripts/pair-hermes.sh         # QR code that signs the app in
+```
+
+- Hermes rejects any Host header other than its bind address unless `HERMES_DASHBOARD_PUBLIC_URL` is set, and setting it turns on the login gate. So the service runs with the username/password provider. The login, its signing secret and the public URL live in `~/.config/dork-bot/serve.env` (mode 600), not in `~/.hermes`.
+- Sign-in: `POST /auth/password-login` sets cookies; the refresh token from the cookie goes into the QR code. The app trades it at `POST /auth/native/refresh` `{refresh_token, provider: "basic"}` for `{access_token (12 h), refresh_token (30 days, renewed on every refresh)}` and sends `Authorization: Bearer <access_token>`. Tokens are stateless; to sign every device out, change `HERMES_DASHBOARD_BASIC_AUTH_SECRET` and restart the service.
+- Endpoints the app uses:
+
+| What | Call |
+|---|---|
+| List bots | `GET /api/profiles` → `{profiles: [{name, model, provider, description, is_default}]}` |
+| Create | `POST /api/profiles` `{name, clone_from: "assistant", description, soul}` (400 if it exists or the name is invalid) |
+| Give it a key | `PUT /api/env?profile=<bot>` `{key: "API_SERVER_KEY", value}`. The running gateway accepts it within ~5 s. |
+| Read its key | `POST /api/env/reveal?profile=<bot>` `{key: "API_SERVER_KEY"}` (404 if none; 5 per 30 s) |
+| Delete | `DELETE /api/profiles/<bot>` (also removes its `~/.local/bin` alias; the gateway keeps running) |
+
+- With this service running, `hermes dashboard` on the same machine may refuse to start (one backend per host). Stop it with `scripts/setup-bot-manager.sh off`.
+
+## Adding a bot by hand
 
 ```bash
 hermes profile create <bot>      # pin it to Dork like the assistant profile

@@ -2,6 +2,7 @@
 // iOS Keychain through expo-secure-store; keys never leave the device.
 import * as SecureStore from 'expo-secure-store';
 import type { BotConnection } from './hermes';
+import type { ManagerAuth } from './manager';
 
 export interface SavedBot {
   bot: string;
@@ -40,4 +41,25 @@ export async function removeBot(bot: string): Promise<void> {
   await SecureStore.deleteItemAsync(keyName(bot));
   const bots = (await listBots()).filter((b) => b.bot !== bot);
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
+}
+
+// The Hermes sign-in (from scripts/pair-hermes.sh) that lets the app create bots.
+const MANAGER = 'dork-hermes-manager';
+
+export async function getManagerAuth(): Promise<ManagerAuth | null> {
+  const raw = await SecureStore.getItemAsync(MANAGER);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ManagerAuth;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveManagerAuth(auth: ManagerAuth): Promise<void> {
+  await SecureStore.setItemAsync(MANAGER, JSON.stringify(auth));
+}
+
+export async function forgetManagerAuth(): Promise<void> {
+  await SecureStore.deleteItemAsync(MANAGER);
 }

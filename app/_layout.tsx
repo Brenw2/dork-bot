@@ -20,7 +20,9 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ title: 'Dork Bot' }} />
-        <Stack.Screen name="add" options={{ title: 'Add a bot', presentation: 'modal' }} />
+        <Stack.Screen name="new" options={{ title: 'New bot', presentation: 'modal' }} />
+        <Stack.Screen name="add" options={{ title: 'Add with a code', presentation: 'modal' }} />
+        <Stack.Screen name="connect" options={{ title: 'Hermes', presentation: 'modal' }} />
         <Stack.Screen name="chat/[bot]" options={{ title: '' }} />
       </Stack>
     </>
