@@ -1,5 +1,7 @@
 # TestFlight
 
+**Release gate: nothing goes to TestFlight until Brennan has used the app on his iPhone Duo (folded and open) and says it's usable.** Until then, test with a direct install on the Duo (an internal / ad hoc build, not TestFlight). Don't run the workflow below or `--auto-submit` before that.
+
 Same pipeline as Sports Week: Expo SDK 58, built on GitHub's `xcode-27` macOS runner with `eas build --local`, uploaded with `eas submit`. Workflow: `.github/workflows/ios-testflight.yml` (manual only).
 
 | Field | Value |
