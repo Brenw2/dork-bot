@@ -2,50 +2,52 @@
 
 ## What it is
 
-A personal Grok Bot. You message AI teammates ("bots") like people: each has a job, its own memory and routines, and they can work together in a group chat. Everything runs on this machine:
+A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like people: each has a job, its own memory and routines, and they can work together in a group chat. The brains run at home:
 
-- **Brain:** Dork, the local model in Ollama (now `gemma4:31b` on the Radeon 7900, `http://localhost:11434/v1`).
-- **Engine:** Hermes. It handles tool use, memory, skills, scheduling and approvals.
-- **App:** Dork Bot, this repo. It has its own UI and name, and is built for one user (Brennan).
+- **Brain:** Dork, the local model in Ollama on b-lab (now `gemma4:31b` on the Radeon 7900).
+- **Engine:** Hermes on b-lab. It handles tool use, memory, skills, scheduling and approvals.
+- **App:** Dork Bot, this repo. A React Native (Expo) iPhone app, shipped through TestFlight, built for one user (Brennan).
 
 ## Architecture
 
 ```
- Browser / phone (PWA)
-        │  HTTP + SSE
+ iPhone: Dork Bot app (Expo / React Native)
+        │  HTTPS + SSE, only over Tailscale
         ▼
- dork-bot server  (Node + TypeScript, localhost)
+ tailscale serve  https://b-lab.tail7e27a7.ts.net  →  127.0.0.1:8642
         │
-        ├── Hermes API server  ──►  /p/<bot>/v1/runs   (chat; one Hermes profile per bot)
-        ├── hermes CLI         ──►  profile create/list/delete, cron add/list/remove
-        └── ~/.hermes/profiles/<bot>/  (read-only: SOUL.md, memory files, avatar metadata)
-                                   │
-                                   ▼
-                           Ollama (Dork)
+        ▼
+ Hermes API server (gateway, multiplex_profiles: true)
+        │   /p/<bot>/api/sessions/...   chat, one Hermes profile per bot
+        │   /p/<bot>/api/jobs           routines (cron)
+        ▼
+ Ollama (Dork)
 ```
 
-- **A bot is a Hermes profile.** Hermes Bot Mode makes the same choice, so `hermes -p <bot> chat` and Hermes Desktop see the same bots. Bot Mode is the reference for behaviour; Dork Bot is a separate UI, not a fork.
-- **Chat** goes through the Hermes API server. The gateway runs with `multiplex_profiles: true`, so every profile is served at `/p/<profile>/`, and each profile needs its own `API_SERVER_KEY` in its `.env`.
-- **Bot lifecycle and routines** go through the `hermes` CLI. The server wraps it with argument arrays, never shell strings.
-- **Group chat** is orchestrated by the dork-bot server. It takes a message, works out who's addressed (@-mentions, or everyone), and runs each bot's turn in order. Each bot sees the room transcript and can reply or stay silent (`[SILENT]`). A round ends when everyone passes or after N rounds.
-- **Storage:** Hermes keeps the bot chats. The dork-bot server keeps only app state (group rooms and their transcripts, avatars and UI prefs) in one SQLite file under `~/.dork-bot/`.
-- **Phone:** the UI is a PWA. Reaching it from the phone means exposing the server over Tailscale. That's not part of milestone 1.
+- **No Dork Bot server.** The app talks straight to the Hermes API server over Tailscale. Hermes stays bound to `127.0.0.1`; `tailscale serve` (`scripts/expose-hermes.sh`) shares it with Brennan's own devices only, over HTTPS.
+- **A bot is a Hermes profile.** Each profile has its own `API_SERVER_KEY` and accepts only that key at `/p/<bot>/`. The app keeps each key in the iOS Keychain (expo-secure-store).
+- **Adding a bot to the app:** Hermes has no API for creating or listing profiles, so profiles are made on b-lab (`hermes profile create <bot>`), then `scripts/pair-bot.sh <bot>` shows a QR code. Scanning it with the iPhone camera opens `dorkbot://add?url=…&bot=…&key=…` and the app saves the bot.
+- **Chat:** one ongoing Hermes session per bot, id `dork-bot-<bot>`. Replies stream over SSE (`expo/fetch`), tool calls show inline and collapsed, and Stop calls `/v1/runs/<id>/stop`.
+- **Group chat** is orchestrated in the app: it works out who's addressed (@-mentions, or everyone) and runs each bot's turn in order through that bot's own session. Each bot sees the room transcript and can reply or stay silent (`[SILENT]`).
+- **Storage:** Hermes keeps the bot chats. The app keeps only its own state (saved bots, rooms, avatars) on the phone.
+- **iPhone Duo:** built with the iOS 27.1 SDK (Xcode 27.1 on the CI runner) so it runs natively, not in compatibility mode. Layout is decided from the window size with Sports Week's classes (`lib/layoutClass.ts`): compact (every iPhone, folded Duo, Split View) is one pane and portrait-locked; open Duo in portrait is one pane with a 640 pt chat column; open Duo in landscape is bot list | 40 pt fold gutter | chat. The open chat carries across fold and unfold.
 
 ## Milestone 1: done when
 
-1. **Bot list.** Shows every Dork Bot bot with its name, title and avatar (shape + color). You can create a bot (name, title, job description). That makes a Hermes profile pinned to Dork, with its SOUL.md written from the job description. You can rename it, change the avatar or delete it (with a confirm step).
-2. **One chat per bot.** Each bot has one ongoing conversation. Replies stream in, and tool calls show inline (collapsed). The chat survives restarts.
-3. **Memory per bot.** "Remember X" persists across chats. A Memory panel shows what the bot remembers and can edit it.
-4. **Group chat.** Make a room with 2–6 bots. @-mentions direct a message, and with no mention every bot decides for itself. Each reply shows which bot said it. There's a Stop button.
-5. **Routines.** Each bot has a list of scheduled tasks (Hermes cron jobs named `[bot:<name>] <routine>`) that you can add, pause or delete. Results land in that bot's chat.
+1. **TestFlight build.** The app installs from TestFlight and connects to Hermes on b-lab over Tailscale. ✅ code, ⏳ first build needs Brennan's Apple login once (docs/TESTFLIGHT.md).
+2. **Bot list.** Shows every bot added to the app with its name, avatar color and connection status. Add a bot by scanning a pairing QR code (or by hand), remove it with a confirm step.
+3. **One chat per bot.** Each bot has one ongoing conversation. Replies stream in, and tool calls show inline (collapsed). The chat survives app restarts. There's a Stop button.
+4. **Routines.** Each bot has a list of scheduled tasks (`/api/jobs`) that you can add, pause or delete. Results land in that bot's chat.
+5. **Group chat.** Make a room with 2–6 bots. @-mentions direct a message, and with no mention every bot decides for itself. Each reply shows which bot said it.
 6. **All on Dork.** No cloud model calls. Every bot profile is pinned to the Ollama endpoint.
 
 ## Out of scope for milestone 1
 
-Phone access, voice, computer use, "show a bot how it's done", sharing bots, and multi-machine.
+Creating or deleting Hermes profiles from the phone (no Hermes API for it), a memory editor (no Hermes API for it; "remember X" in chat still works), voice, computer use, sharing bots, Android, and the App Store.
 
 ## Known constraints
 
-- One 20 GB model fits in VRAM, so bots take turns and group rounds run one at a time. Expect about 15 s per reply once the model is warm, and about 50 s on a cold start.
+- One 20 GB model fits in VRAM, so bots take turns and group rounds run one at a time. Measured: about 8 s to the first word for a short warm turn, about 50 s when the turn uses tools or the model is cold. The app shows a "thinking… Ns" timer.
 - Gemma's tool calling is decent but not perfect. Keep each bot's toolset small (memory, files and web; terminal only if needed).
-- Turning on the API server means restarting the Hermes gateway once.
+- The phone only reaches Hermes while it's on Tailscale and b-lab is awake.
+- A brand-new profile key may need one gateway restart before the API server accepts it (not verified yet).

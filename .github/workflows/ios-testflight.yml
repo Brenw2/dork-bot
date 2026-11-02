@@ -1,0 +1,100 @@
+name: iOS build + TestFlight
+
+# Manual only. Builds on GitHub's macOS runner (NOT an EAS cloud build) and
+# submits the IPA to TestFlight. See docs/TESTFLIGHT.md.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    # GitHub-hosted arm64 image "Xcode 27" (actions/runner-images images/macos/xcode-27-arm64-Readme.md):
+    # Xcode 27.1 (default, /Applications/Xcode_27.1.app, iOS 27.1 SDK), 27.2 RC, 27.0; Node 24.22.1,
+    # CocoaPods 1.17.0, fastlane 2.241.2, jq. Preview image. macos-15 / macos-26 only ship Xcode 26.x.
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Same eas-cli the repo used before (it was a devDependency; expo-doctor forbids that). Bump here.
+      EAS_CLI_VERSION: 23.2.0
+      EXPO_APPLE_TEAM_ID: C7Z2H37BVG
+      EAS_LOCAL_BUILD_ARTIFACTS_DIR: ${{ github.workspace }}/eas-artifacts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Expo SDK 58 + the iOS 27.1 SDK: apps built with it run natively (resizable, full-bleed) on
+      # iPhone Duo instead of in compatibility mode. Xcode 27.1 is the image default; pin it anyway.
+      - name: Select Xcode 27.1
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '27.1'
+
+      # Expo SDK 58 tooling needs Node 22.13+ / 24.3+. The image has 24.22.1; pin the major.
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Check toolchain (fastlane + CocoaPods are preinstalled on the xcode-27 image)
+        run: |
+          xcodebuild -version
+          xcodebuild -version | grep -q '^Xcode 27\.1' || { echo '::error::Expected Xcode 27.1'; exit 1; }
+          xcrun --sdk iphoneos --show-sdk-version
+          node --version
+          pod --version
+          fastlane --version | tail -1
+
+      # Signing: EAS-managed credentials (cert + profile) are downloaded
+      # from EAS with EXPO_TOKEN. EAS env vars for environment "production"
+      # (eas.json build.production.environment) are pulled too, except "Secret" ones.
+      - name: Build IPA locally
+        run: npx --yes eas-cli@${EAS_CLI_VERSION} build -p ios --profile production --local --non-interactive --output build.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: dork-bot-ios-${{ github.run_number }}
+          path: build.ipa
+          retention-days: 7
+
+      # eas submit reads an ASC API key only from eas.json (ascApiKeyPath/Id/IssuerId)
+      # or from the key stored on EAS. To avoid committing key paths, the eas.json
+      # fields are injected into the runner's working copy only, from secrets.
+      # If ASC_API_KEY_P8 is empty, the EAS-stored key is used instead.
+      - name: Submit to TestFlight
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: |
+          if [ -n "$ASC_API_KEY_P8" ]; then
+            KEY_PATH="$RUNNER_TEMP/asc_api_key.p8"
+            printf '%s' "$ASC_API_KEY_P8" > "$KEY_PATH"
+            chmod 600 "$KEY_PATH"
+            export EXPO_ASC_API_KEY_PATH="$KEY_PATH" EXPO_ASC_KEY_ID="$ASC_API_KEY_ID" EXPO_ASC_ISSUER_ID="$ASC_API_ISSUER_ID"
+            jq --arg p "$KEY_PATH" --arg k "$ASC_API_KEY_ID" --arg i "$ASC_API_ISSUER_ID" \
+              '.submit.production.ios += {ascApiKeyPath: $p, ascApiKeyId: $k, ascApiKeyIssuerId: $i}' \
+              eas.json > "$RUNNER_TEMP/eas.json" && cp "$RUNNER_TEMP/eas.json" eas.json
+          fi
+          npx --yes eas-cli@${EAS_CLI_VERSION} submit -p ios --profile production --path build.ipa --non-interactive
+
+      - name: Remove ASC key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc_api_key.p8"
