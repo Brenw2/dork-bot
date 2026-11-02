@@ -21,6 +21,10 @@ if ! tailscale serve --bg --https=443 "$HERMES" 2>&1; then
 fi
 
 HOST=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')
+IP=$(tailscale ip -4 | head -n1)
 echo
 echo "Checking https://$HOST/health ..."
-curl -fsS -m 20 "https://$HOST/health" && echo && echo "OK: the app can use https://$HOST"
+# Pin the name to our own Tailscale IP: b-lab may not use MagicDNS itself
+# (--accept-dns=false), but the phone does. The first call can be slow while
+# Tailscale fetches the HTTPS certificate.
+curl -fsS -m 60 --resolve "$HOST:443:$IP" "https://$HOST/health" && echo && echo "OK: the app can use https://$HOST"
