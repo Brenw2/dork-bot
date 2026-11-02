@@ -42,4 +42,4 @@ Minutes: the free plan's 2,000 minutes a month (macOS billed at 10x) apply to pr
 ## Phone setup
 
 1. `scripts/expose-hermes.sh` once on b-lab (needs `sudo tailscale set --operator=$USER` the first time).
-2. `scripts/pair-bot.sh <bot>` and scan the QR code with the iPhone camera.
+2. `scripts/setup-bot-manager.sh` once, then `scripts/pair-hermes.sh` and scan the QR code with the iPhone camera. Create bots in the app.

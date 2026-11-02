@@ -2,6 +2,7 @@ import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fetch } from 'expo/fetch';
+import { loadManager } from '@/components/manager';
 import { getConnection, listBots, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { botColor, colors } from '@/lib/theme';
@@ -34,10 +35,44 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
   }, []);
   useFocusEffect(load);
 
-  const confirmRemove = (bot: string) =>
-    Alert.alert(`Remove ${bot}?`, 'This removes it from the app only. The bot stays in Hermes.', [
+  const removeFromApp = (bot: string) =>
+    Alert.alert(`Remove ${bot} from the app?`, 'The bot stays on Hermes. You can add it back from New bot.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => removeBot(bot).then(load) },
+    ]);
+
+  // Deleting a Hermes profile wipes its memory, chats and routines, so make him type the name.
+  const deleteFromHermes = (bot: string) =>
+    Alert.prompt(
+      `Delete ${bot}?`,
+      `This deletes the bot on Hermes for good: its memory, chats and routines. Type ${bot} to confirm.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async (typed?: string) => {
+            if (typed?.trim().toLowerCase() !== bot) return Alert.alert('Not deleted', "The name didn't match.");
+            try {
+              const manager = await loadManager();
+              if (!manager) return Alert.alert('Connect to Hermes first', 'Run scripts/pair-hermes.sh on b-lab and scan the code.');
+              await manager.deleteBot(bot);
+              await removeBot(bot);
+              load();
+            } catch (e) {
+              Alert.alert(`Couldn't delete ${bot}`, (e as Error).message);
+            }
+          },
+        },
+      ],
+      'plain-text',
+    );
+
+  const showActions = (bot: string) =>
+    Alert.alert(bot, undefined, [
+      { text: 'Remove from app', onPress: () => removeFromApp(bot) },
+      ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),
+      { text: 'Cancel', style: 'cancel' },
     ]);
 
   if (bots === null) return <View style={styles.screen} />;
@@ -51,11 +86,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyTitle}>No bots yet</Text>
-            <Text style={styles.emptyText}>
-              On your computer run{'\n'}
-              <Text style={styles.code}>scripts/pair-bot.sh assistant</Text>
-              {'\n'}and scan the QR code with the iPhone camera.
-            </Text>
+            <Text style={styles.emptyText}>Tap New bot to make one, or to add a bot that's already on Hermes.</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -64,7 +95,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
             <Pressable
               style={({ pressed }) => [styles.row, item.bot === selected && styles.rowSelected, pressed && { opacity: 0.6 }]}
               onPress={() => onSelect(item.bot)}
-              onLongPress={() => confirmRemove(item.bot)}
+              onLongPress={() => showActions(item.bot)}
             >
               <View style={[styles.avatar, { backgroundColor: botColor(item.bot) }]}>
                 <Text style={styles.avatarText}>{item.bot[0]?.toUpperCase()}</Text>
@@ -80,9 +111,9 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
           );
         }}
       />
-      <Link href="/add" asChild>
+      <Link href="/new" asChild>
         <Pressable style={styles.add}>
-          <Text style={styles.addText}>Add a bot</Text>
+          <Text style={styles.addText}>New bot</Text>
         </Pressable>
       </Link>
     </View>
