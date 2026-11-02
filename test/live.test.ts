@@ -13,9 +13,9 @@ const bot = process.env.DORK_BOT ?? 'assistant';
 const url = process.env.DORK_HERMES_URL ?? 'http://127.0.0.1:8642';
 
 describe.skipIf(!live)(`live: ${bot} at ${url}`, () => {
-  const env = readFileSync(join(homedir(), '.hermes', 'profiles', bot, '.env'), 'utf8');
-  const key = env.match(/^API_SERVER_KEY=["']?([^"'\n]+)/m)?.[1] ?? '';
-  const client = new HermesClient({ url, bot, key }, fetch as unknown as FetchLike);
+  // Read the key lazily: describe bodies run at collection time even when skipped (CI has no Hermes).
+  const key = () =>
+    readFileSync(join(homedir(), '.hermes', 'profiles', bot, '.env'), 'utf8').match(/^API_SERVER_KEY=["']?([^"'\n]+)/m)?.[1] ?? '';
   const sessionId = `dork-bot-live-${Date.now()}`;
 
   it('rejects a wrong key', async () => {
@@ -24,6 +24,7 @@ describe.skipIf(!live)(`live: ${bot} at ${url}`, () => {
   });
 
   it('streams a real reply from Dork and it lands in the history', async () => {
+    const client = new HermesClient({ url, bot, key: key() }, fetch as unknown as FetchLike);
     await client.check();
     await client.ensureSession(sessionId, 'Dork Bot live test');
     await client.ensureSession(sessionId, 'Dork Bot live test'); // second call: 409 is fine
