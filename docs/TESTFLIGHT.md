@@ -29,7 +29,7 @@ Same pipeline as Sports Week: Expo SDK 58, built on GitHub's `xcode-27` macOS ru
 
    The ASC secrets (`ASC_API_KEY_P8`, `ASC_API_KEY_ID`, `ASC_API_ISSUER_ID`) are optional if the key is assigned to the app on EAS (step 1 does that).
 
-3. Put the App Store Connect app ID (App Store Connect → Dork Bot → App Information → Apple ID) in `eas.json` under `submit.production.ios.ascAppId`.
+3. ~~Put the App Store Connect app ID in `eas.json`~~ Done: `submit.production.ios.ascAppId` is `6829938917`.
 
 ## Every release after that
 
