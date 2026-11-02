@@ -16,7 +16,7 @@ Same pipeline as Sports Week: Expo SDK 58, built on GitHub's `xcode-27` macOS ru
 1. First build, which also creates everything on Apple's side. It asks you to log in with your Apple ID, then registers the bundle ID, makes the certificate and profile, stores them on EAS, creates the "Dork Bot" app in App Store Connect and uploads to TestFlight. It uses one EAS cloud build.
 
    ```bash
-   cd ~/Work/dork-bot && npx eas-cli@23.2.0 build -p ios --profile production --auto-submit
+   cd ~/Work/dork-bot && npx eas-cli@27.2.0 build -p ios --profile production --auto-submit
    ```
 
    Pick team `C7Z2H37BVG` if asked. When it asks about an App Store Connect API key, reuse the existing one.
