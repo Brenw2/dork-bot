@@ -18,8 +18,8 @@ jobs:
     timeout-minutes: 60
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      # Same eas-cli the repo used before (it was a devDependency; expo-doctor forbids that). Bump here.
-      EAS_CLI_VERSION: 23.2.0
+      # eas-cli 24.4.1+ is required: older versions fail Apple login with "iTunes service key is empty" (expo/eas-cli#4392).
+      EAS_CLI_VERSION: 27.2.0
       EXPO_APPLE_TEAM_ID: C7Z2H37BVG
       EAS_LOCAL_BUILD_ARTIFACTS_DIR: ${{ github.workspace }}/eas-artifacts
     steps:
