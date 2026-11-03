@@ -1,12 +1,14 @@
-import { Link, useFocusEffect } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from 'expo/fetch';
+import { BotSprite } from '@/components/BotSprite';
 import { loadManager } from '@/components/manager';
+import { useBotMood } from '@/components/useBotMood';
 import { getConnection, listBots, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
-import { botColor, colors } from '@/lib/theme';
+import { colors } from '@/lib/theme';
 
 type Status = 'checking' | 'ok' | string;
 
@@ -72,6 +74,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
 
   const showActions = (bot: string) =>
     Alert.alert(bot, undefined, [
+      { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
       { text: 'Remove from app', onPress: () => removeFromApp(bot) },
       ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),
       { text: 'Cancel', style: 'cancel' },
@@ -102,14 +105,10 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
               accessibilityLabel={`${item.bot}, ${s === 'ok' ? 'connected' : s === 'checking' || !s ? 'checking' : s}`}
               accessibilityHint="Opens the chat. Long-press for more."
             >
-              <View style={[styles.avatar, { backgroundColor: botColor(item.bot) }]}>
-                <Text style={styles.avatarText}>{item.bot[0]?.toUpperCase()}</Text>
-              </View>
+              <BotSprite bot={item.bot} size={48} mood={s && s !== 'ok' && s !== 'checking' ? 'sleeping' : undefined} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.bot}</Text>
-                <Text style={styles.sub} numberOfLines={1}>
-                  {s === 'ok' ? 'Connected' : s === 'checking' || !s ? 'Checking…' : s}
-                </Text>
+                <StatusLine bot={item.bot} status={s} />
               </View>
               <View style={[styles.dot, { backgroundColor: s === 'ok' ? colors.ok : s === 'checking' ? colors.dim : colors.bad }]} />
             </Pressable>
@@ -122,6 +121,19 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
         </Pressable>
       </Link>
     </View>
+  );
+}
+
+const DOING: Record<string, string> = { thinking: 'Thinking…', working: 'Working…', talking: 'Replying…', done: 'Done', error: 'Hit an error' };
+
+/** "Connected", or what the bot is doing right now while it works. */
+function StatusLine({ bot, status }: { bot: string; status: Status | undefined }) {
+  const mood = useBotMood(bot);
+  const text = status === 'ok' ? (DOING[mood] ?? 'Connected') : status === 'checking' || !status ? 'Checking…' : status;
+  return (
+    <Text style={[styles.sub, status === 'ok' && DOING[mood] ? { color: colors.text } : null]} numberOfLines={1}>
+      {text}
+    </Text>
   );
 }
 
@@ -144,8 +156,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   rowSelected: { borderColor: colors.accent, borderWidth: 1.5 },
-  avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#111', fontSize: 18, fontWeight: '700' },
   name: { color: colors.text, fontSize: 17, fontWeight: '600' },
   sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
   dot: { width: 9, height: 9, borderRadius: 5 },

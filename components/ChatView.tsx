@@ -3,10 +3,14 @@ import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from 'expo/fetch';
+import { BotSprite } from '@/components/BotSprite';
+import { activity } from '@/lib/activity';
 import { getConnection } from '@/lib/bots';
 import { activityLine, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
-import { botColor, colors, mono } from '@/lib/theme';
+import { moodFromChat } from '@/lib/sprites';
+import { useBotLook } from '@/components/useBotLook';
+import { colors, mono } from '@/lib/theme';
 
 /** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
 export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWidth?: number; inPane?: boolean }) {
@@ -43,6 +47,13 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     };
   }, [bot, sessionId]);
 
+  // Tell the rest of the app what this bot is doing, so its character animates everywhere.
+  const mood = moodFromChat(state);
+  useEffect(() => {
+    activity.set(bot, mood);
+  }, [bot, mood]);
+  useEffect(() => () => activity.set(bot, 'idle'), [bot]);
+
   // Local models can take a while before the first word; show a timer.
   const running = state.pending !== null;
   useEffect(() => {
@@ -77,6 +88,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
   const rows = useMemo(() => chatRows(state).reverse(), [state]);
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = !!draft.trim() && !!client;
+  const { color } = useBotLook(bot);
 
   return (
     <KeyboardAvoidingView
@@ -86,7 +98,8 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     >
       {inPane ? (
         <View style={styles.paneHeader}>
-          <Text style={[styles.paneTitle, { color: botColor(bot) }]}>{bot}</Text>
+          <BotSprite bot={bot} size={30} />
+          <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
         </View>
       ) : null}
       <FlatList
@@ -152,15 +165,23 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
     case 'activity':
       return <Activity tools={row.tools} live={row.live} />;
     case 'pending':
-      return row.text ? <Bubble role="assistant" text={row.text} bot={bot} /> : <Text style={styles.hint}>{thinking}</Text>;
+      return row.text ? (
+        <Bubble role="assistant" text={row.text} bot={bot} />
+      ) : (
+        <View style={styles.thinkingRow}>
+          <BotSprite bot={bot} size={28} />
+          <Text style={styles.thinkingText}>{thinking}</Text>
+        </View>
+      );
   }
 }
 
 function Bubble({ role, text, bot }: { role: ChatMessage['role']; text: string; bot: string }) {
   const mine = role === 'user';
+  const { color } = useBotLook(bot);
   return (
     <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-      {!mine ? <Text style={[styles.who, { color: botColor(bot) }]}>{bot}</Text> : null}
+      {!mine ? <Text style={[styles.who, { color }]}>{bot}</Text> : null}
       <Text style={styles.text} selectable>
         {text}
       </Text>
@@ -200,7 +221,17 @@ function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  paneHeader: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  paneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
+  thinkingText: { color: colors.dim, fontSize: 14 },
   paneTitle: { fontSize: 17, fontWeight: '600' },
   list: { flex: 1 },
   listBody: { flexGrow: 1, padding: 14, gap: 10 },
