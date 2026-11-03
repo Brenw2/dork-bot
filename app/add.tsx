@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fetch } from 'expo/fetch';
+import { useColumnStyle } from '@/components/Column';
 import { saveBot } from '@/lib/bots';
 import { HermesClient, normalizeUrl, type FetchLike } from '@/lib/hermes';
 import { connectionFromParams, validateConnection } from '@/lib/pairing';
@@ -16,6 +17,7 @@ export default function AddBot() {
   const [key, setKey] = useState(fromLink.key ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const column = useColumnStyle();
 
   const submit = async () => {
     const conn = { url: normalizeUrl(url), bot: bot.trim().toLowerCase(), key: key.trim() };
@@ -35,13 +37,19 @@ export default function AddBot() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
       {fromLink.key ? <Text style={styles.note}>Filled in from the pairing code. Tap Add to connect.</Text> : null}
       <Field label="Hermes address" value={url} onChangeText={setUrl} keyboardType="url" />
       <Field label="Bot (Hermes profile)" value={bot} onChangeText={setBot} placeholder="assistant" />
       <Field label="Key (that profile's API_SERVER_KEY)" value={key} onChangeText={setKey} secureTextEntry />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={[styles.button, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy}>
+      <Pressable
+        style={[styles.button, busy && { opacity: 0.6 }]}
+        onPress={submit}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Add"
+      >
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Add</Text>}
       </Pressable>
     </ScrollView>
@@ -53,13 +61,7 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        autoCorrect={false}
-        placeholderTextColor={colors.dim}
-        {...input}
-      />
+      <TextInput style={styles.input} autoCapitalize="none" autoCorrect={false} placeholderTextColor={colors.dim} {...input} />
     </View>
   );
 }

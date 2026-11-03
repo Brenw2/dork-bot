@@ -13,3 +13,5 @@ eas-artifacts/
 .DS_Store
 coverage/
 expo-env.d.ts
+dist-web/
+artifacts/

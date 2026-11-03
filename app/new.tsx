@@ -1,6 +1,7 @@
 import { Link, router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Column, useColumnStyle } from '@/components/Column';
 import { loadManager, randomKey } from '@/components/manager';
 import { listBots, saveBot } from '@/lib/bots';
 import type { HermesManager, Profile } from '@/lib/manager';
@@ -14,6 +15,7 @@ export default function NewBot() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [others, setOthers] = useState<Profile[]>([]);
+  const column = useColumnStyle();
 
   useEffect(() => {
     loadManager().then(setManager);
@@ -36,13 +38,15 @@ export default function NewBot() {
   if (manager === undefined) return <View style={styles.screen} />;
   if (manager === null) {
     return (
-      <View style={[styles.screen, styles.center]}>
-        <Text style={styles.title}>Connect to Hermes first</Text>
-        <Text style={styles.text}>
-          On b-lab run{'\n'}
-          <Text style={styles.code}>scripts/pair-hermes.sh</Text>
-          {'\n'}and scan the QR code with the iPhone camera. You only do this once.
-        </Text>
+      <View style={styles.screen}>
+        <Column style={styles.center}>
+          <Text style={styles.title}>Connect to Hermes first</Text>
+          <Text style={styles.text}>
+            On b-lab run{'\n'}
+            <Text style={styles.code}>scripts/pair-hermes.sh</Text>
+            {'\n'}and scan the QR code with the iPhone camera. You only do this once.
+          </Text>
+        </Column>
       </View>
     );
   }
@@ -76,7 +80,7 @@ export default function NewBot() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
       <Field label="Name" value={name} onChangeText={(t) => setName(t.toLowerCase())} placeholder="scout" maxLength={64} />
       <Field
         label="What does it do?"
@@ -86,9 +90,17 @@ export default function NewBot() {
         multiline
         style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
       />
-      <Text style={styles.hint}>It runs on Dork, with the same tools as {'"'}assistant{'"'} but its own memory and chat.</Text>
+      <Text style={styles.hint}>
+        It runs on Dork, with the same tools as {'"'}assistant{'"'} but its own memory and chat.
+      </Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={[styles.button, (!!busy || !name || !job.trim()) && { opacity: 0.5 }]} onPress={create} disabled={!!busy || !name || !job.trim()}>
+      <Pressable
+        style={[styles.button, (!!busy || !name || !job.trim()) && { opacity: 0.5 }]}
+        onPress={create}
+        disabled={!!busy || !name || !job.trim()}
+        accessibilityRole="button"
+        accessibilityLabel="Create bot"
+      >
         {busy ? (
           <View style={styles.busyRow}>
             <ActivityIndicator color="#fff" />
@@ -103,7 +115,14 @@ export default function NewBot() {
         <View style={{ gap: 10, marginTop: 12 }}>
           <Text style={styles.label}>Already on Hermes</Text>
           {others.map((p) => (
-            <Pressable key={p.name} style={styles.row} onPress={() => connect(p.name)} disabled={!!busy}>
+            <Pressable
+              key={p.name}
+              style={styles.row}
+              onPress={() => connect(p.name)}
+              disabled={!!busy}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${p.name}`}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{p.name}</Text>
                 {p.description ? (

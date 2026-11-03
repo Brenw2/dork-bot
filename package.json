@@ -12,9 +12,11 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "bundle:ios": "expo export --platform ios --output-dir dist",
-    "smoke": "node scripts/smoke-chat.mjs"
+    "smoke": "node scripts/smoke-chat.mjs",
+    "test:layout": "node scripts/test-layout.mjs"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~58.0.16",
     "babel-preset-expo": "~58.0.0",
     "expo": "~58.0.21",
     "expo-constants": "~58.0.14",
@@ -29,11 +31,13 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-safe-area-context": "~5.10.1",
-    "react-native-screens": "~4.30.0"
+    "react-native-screens": "~4.30.0",
+    "react-native-web": "^0.21.4"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/react": "~19.3.0",
+    "playwright-core": "^1.64.1",
     "typescript": "~6.0.3",
     "vitest": "^5.1.0"
   }

@@ -71,7 +71,8 @@ export class HermesManager {
 
   private async raw(path: string, init: Parameters<FetchLike>[1] = {}): Promise<FetchResponse> {
     try {
-      return await this.fetchImpl(`${normalizeUrl(this.auth.adminUrl)}${path}`, init);
+      const fetchImpl = this.fetchImpl; // unbound, see HermesClient.request
+      return await fetchImpl(`${normalizeUrl(this.auth.adminUrl)}${path}`, init);
     } catch (err) {
       throw new HermesError(`Can't reach Hermes at ${normalizeUrl(this.auth.adminUrl)}: ${err instanceof Error ? err.message : String(err)}`);
     }

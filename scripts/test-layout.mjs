@@ -1,0 +1,307 @@
+#!/usr/bin/env node
+// Layout tests: renders every screen of the web build in Chromium at the real
+// iPhone / iPhone Duo window sizes and safe areas, with Hermes faked, and
+// fails if any text or control is drawn where it can't be seen or used:
+//   - outside the safe area left/right (the closed Duo's 84 pt status rail),
+//   - on a keep-out region (the fold on the open Duo, the Dynamic Island),
+//   - fixed controls (message box, Send, New bot) under the home indicator.
+// Screenshots go to artifacts/layout/ for a look by eye.
+//
+//   npm run test:layout              # builds the web bundle first
+//   node scripts/test-layout.mjs --no-build [--only duo-closed]
+//
+// Sizes: grok-export/design-comps/iphone-duo-2026-10-30 (PLAN.md §1, RESEARCH.md §2; Xcode 27.1 data).
+import { createServer } from 'node:http';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { extname, join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { chromium } from 'playwright-core';
+
+const ROOT = resolve(import.meta.dirname, '..');
+const DIST = join(ROOT, 'dist-web');
+const OUT = join(ROOT, 'artifacts', 'layout');
+const args = process.argv.slice(2);
+const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
+
+export const POSTURES = {
+  iphone: { width: 402, height: 874, insets: { top: 62, right: 0, bottom: 34, left: 0 }, keepOut: [] },
+  'duo-closed': {
+    width: 466,
+    height: 678,
+    insets: { top: 0, right: 84, bottom: 34, left: 0 },
+    keepOut: [{ name: 'status rail', x: 382, y: 0, width: 84, height: 678 }],
+  },
+  'duo-open-portrait': {
+    width: 669,
+    height: 951,
+    insets: { top: 82, right: 0, bottom: 34, left: 0 },
+    keepOut: [{ name: 'Dynamic Island', x: 525, y: 0, width: 144, height: 82 }],
+  },
+  'duo-open-landscape': {
+    width: 951,
+    height: 669,
+    insets: { top: 0, right: 84, bottom: 34, left: 0 },
+    keepOut: [
+      { name: 'status rail', x: 867, y: 0, width: 84, height: 669 },
+      { name: 'fold', x: 455.5, y: 0, width: 40, height: 669 },
+    ],
+  },
+};
+
+const HERMES = 'https://hermes.test';
+const ADMIN = 'https://hermes.test:8443';
+const KEY = 'k'.repeat(40);
+const BOTS = ['assistant', 'scout', 'a-bot-with-a-really-long-name-for-testing'];
+
+const LONG_REPLY = [
+  "Here's what I found. The Mets play the Braves at 7:10 tonight, and the forecast says rain after 9.",
+  '',
+  'Sources: https://www.mlb.com/mets/schedule/2026/fullseason?a_very_long_query_string_that_never_breaks=1234567890abcdefghijklmnop',
+  '',
+  'Command I ran:',
+  'curl -s "https://api.weather.gov/gridpoints/OKX/33,35/forecast/hourly?units=us" | jq ".properties.periods[0:6]"',
+].join('\n');
+
+const MESSAGES = [
+  { id: 1, role: 'user', content: 'what time is the mets game tonight and will it rain' },
+  { id: 2, role: 'assistant', content: '', tool_name: null },
+  { id: 3, role: 'tool', content: '{"ok":true}', tool_name: 'skill_view' },
+  { id: 31, role: 'tool', content: 'ls ~/notes', tool_name: 'terminal' },
+  { id: 32, role: 'tool', content: '{"results":[]}', tool_name: 'web_search' },
+  { id: 33, role: 'tool', content: 'curl -s https://api.weather.gov', tool_name: 'terminal' },
+  { id: 4, role: 'assistant', content: LONG_REPLY },
+  { id: 5, role: 'user', content: 'thanks' },
+  { id: 6, role: 'assistant', content: 'Any time.' },
+];
+
+const PROFILES = [
+  { name: 'default', is_default: true, model: 'claude', provider: 'anthropic', description: '' },
+  {
+    name: 'assistant',
+    model: 'gemma4:31b',
+    provider: 'custom',
+    description: 'Personal assistant for Brennan: email, calendar, morning digest, reminders, family.',
+  },
+  {
+    name: 'chief',
+    model: 'gemma4:31b',
+    provider: 'custom',
+    description: 'Chief of staff: manages all of the products and the other agents assigned to them.',
+  },
+];
+
+function seedFor(screen) {
+  const store = {};
+  if (screen.bots !== false) {
+    store['dork-bots'] = JSON.stringify(BOTS.map((bot, i) => ({ bot, url: HERMES, addedAt: i })));
+    for (const bot of BOTS) store[`dork-bot-key.${bot}`] = KEY;
+  }
+  if (screen.paired) store['dork-hermes-manager'] = JSON.stringify({ adminUrl: ADMIN, chatUrl: HERMES, refreshToken: 'r'.repeat(40) });
+  return store;
+}
+
+// Each screen: a path per layout (the open Duo in landscape shows the chat in the right pane).
+const SCREENS = [
+  { name: 'bots', path: () => '/', waitFor: 'assistant' },
+  { name: 'bots-empty', bots: false, path: () => '/', waitFor: 'No bots yet' },
+  { name: 'chat', path: (p) => (p === 'duo-open-landscape' ? '/?bot=assistant' : '/chat/assistant'), waitFor: 'Any time.' },
+  { name: 'new-unpaired', path: () => '/new', waitFor: 'Connect to Hermes first' },
+  { name: 'new', paired: true, path: () => '/new', waitFor: 'Already on Hermes' },
+  { name: 'add', path: () => '/add', waitFor: 'Hermes address' },
+];
+
+async function fakeHermes(route) {
+  const req = route.request();
+  const url = new URL(req.url());
+  const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  const p = url.pathname;
+  // Gateway API server, one bot per /p/<bot>/.
+  const bot = p.match(/^\/p\/([^/]+)\//)?.[1];
+  if (bot === 'scout' && p.endsWith('/api/sessions')) return json(401, { error: 'unauthorized' }); // shows a red status
+  if (/\/api\/sessions$/.test(p) && req.method() === 'GET') return json(200, { data: [] });
+  if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
+  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: MESSAGES });
+  // hermes serve.
+  if (p === '/auth/native/refresh')
+    return json(200, { access_token: 'a'.repeat(40), refresh_token: 'r'.repeat(40), expires_at: Date.now() / 1000 + 3600 });
+  if (p === '/api/profiles') return json(200, { profiles: PROFILES });
+  return json(404, { error: `no fake for ${req.method()} ${p}` });
+}
+
+// Runs in the page: every visible glyph box and control, checked against the posture's safe area and keep-outs.
+function audit({ insets, keepOut, fixed, seen }) {
+  const W = innerWidth;
+  const H = innerHeight;
+  const problems = [];
+  const label = (el) =>
+    (el.getAttribute('aria-label') || el.textContent || el.getAttribute('placeholder') || el.tagName).trim().slice(0, 60);
+  const hits = (r, k) => r.left < k.x + k.width - 0.5 && r.right > k.x + 0.5 && r.top < k.y + k.height - 0.5 && r.bottom > k.y + 0.5;
+  const onScreenY = (r) => r.bottom > 0 && r.top < H;
+  const boxes = [];
+  const CONTROLS = '[role=button], [role=link], button, textarea, input, a[href]';
+
+  // What's actually painted: the box cut down by every ancestor that clips (an ellipsized line, a pane).
+  const visible = (el, r) => {
+    let { left, top, right, bottom } = r;
+    for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+        const c = a.getBoundingClientRect();
+        if (cs.overflowX !== 'visible') [left, right] = [Math.max(left, c.left), Math.min(right, c.right)];
+        if (cs.overflowY !== 'visible') [top, bottom] = [Math.max(top, c.top), Math.min(bottom, c.bottom)];
+      }
+    }
+    return right - left > 0.5 && bottom - top > 0.5 ? { left, top, right, bottom } : null;
+  };
+  const shown = (el) => {
+    for (let a = el; a; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (cs.visibility === 'hidden' || cs.opacity === '0' || cs.display === 'none') return false;
+    }
+    return true;
+  };
+
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!n.textContent.trim() || !shown(n.parentElement) || n.parentElement.closest('noscript')) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    for (const raw of range.getClientRects()) {
+      const r = visible(n.parentElement, raw);
+      if (r) boxes.push({ kind: 'text', what: n.textContent.trim().slice(0, 60), r, raw });
+    }
+  }
+  for (const el of document.querySelectorAll(CONTROLS)) {
+    const r = shown(el) && visible(el, el.getBoundingClientRect());
+    if (r) boxes.push({ kind: 'control', what: label(el), r });
+  }
+
+  for (const b of boxes) {
+    const { r } = b;
+    if (!onScreenY(r)) continue;
+    if (r.left < insets.left - 0.5 || r.right > W - insets.right + 0.5) {
+      problems.push(
+        `${b.kind} "${b.what}" spans x ${r.left.toFixed(1)}–${r.right.toFixed(1)}, outside the safe area (${insets.left}–${W - insets.right})`,
+      );
+      continue;
+    }
+    for (const k of keepOut)
+      if (hits(r, k))
+        problems.push(
+          `${b.kind} "${b.what}" is on the ${k.name} (x ${r.left.toFixed(1)}–${r.right.toFixed(1)}, y ${r.top.toFixed(1)}–${r.bottom.toFixed(1)})`,
+        );
+  }
+  // Controls that must stay reachable: fully on screen, above the home indicator, below the top inset.
+  for (const sel of fixed) {
+    const el = [...document.querySelectorAll(CONTROLS)].find((e) => shown(e) && label(e).includes(sel));
+    if (!el) {
+      problems.push(`missing control "${sel}"`);
+      continue;
+    }
+    const r = el.getBoundingClientRect();
+    if (r.top < insets.top - 0.5 || r.bottom > H - insets.bottom + 0.5) {
+      problems.push(
+        `control "${sel}" at y ${r.top.toFixed(1)}–${r.bottom.toFixed(1)} is outside the safe area (${insets.top}–${H - insets.bottom})`,
+      );
+    }
+  }
+  // Text that must be fully in view when the screen opens (the newest chat message).
+  for (const want of seen) {
+    const box = boxes.find((b) => b.kind === 'text' && b.what.includes(want));
+    const cut = box && (box.r.top > box.raw.top + 0.5 || box.r.bottom < box.raw.bottom - 0.5);
+    if (!box || cut || box.raw.bottom > H - insets.bottom) problems.push(`"${want}" isn't fully in view when the screen opens`);
+  }
+  return [...new Set(problems)];
+}
+
+const FIXED = { chat: ['Message assistant', 'Send'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'] };
+const SEEN = { chat: ['Any time.'] };
+
+function serve(dir) {
+  const types = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.ttf': 'font/ttf',
+    '.css': 'text/css',
+  };
+  const server = createServer((req, res) => {
+    const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    let file = join(dir, path);
+    if (!file.startsWith(dir) || !existsSync(file) || path.endsWith('/')) file = join(dir, 'index.html'); // SPA fallback
+    res.writeHead(200, { 'Content-Type': types[extname(file)] ?? 'application/octet-stream' });
+    res.end(readFileSync(file));
+  });
+  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
+}
+
+function chromiumPath() {
+  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+  for (const p of ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']) if (existsSync(p)) return p;
+  return undefined; // playwright-core's own download (npx playwright-core install chromium)
+}
+
+async function main() {
+  if (!args.includes('--no-build')) {
+    execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', 'dist-web'], { cwd: ROOT, stdio: 'inherit' });
+  }
+  mkdirSync(OUT, { recursive: true });
+  const server = await serve(DIST);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ executablePath: chromiumPath() });
+  const report = [];
+  let failed = 0;
+
+  for (const [posture, shape] of Object.entries(POSTURES)) {
+    if (only && posture !== only) continue;
+    for (const screen of SCREENS) {
+      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2 });
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.addInitScript(
+        ({ insets, store }) => {
+          globalThis.__DORK_TEST_INSETS__ = insets;
+          for (const [k, v] of Object.entries(store)) localStorage.setItem(`dorkbot.${k}`, v);
+        },
+        { insets: shape.insets, store: seedFor(screen) },
+      );
+      await page.route(`${HERMES}/**`, fakeHermes);
+      await page.route(`${ADMIN}/**`, fakeHermes);
+      const path = screen.path(posture);
+      let problems;
+      try {
+        await page.goto(base + path);
+        await page.getByText(screen.waitFor, { exact: false }).first().waitFor({ timeout: 15_000 });
+        await page.waitForTimeout(400); // let the list scroll to the end and statuses settle
+        problems = await page.evaluate(audit, {
+          insets: shape.insets,
+          keepOut: shape.keepOut,
+          fixed: FIXED[screen.name] ?? [],
+          seen: SEEN[screen.name] ?? [],
+        });
+      } catch (e) {
+        problems = [`didn't render: ${e.message.split('\n')[0]}`];
+      }
+      problems.push(...errors.map((m) => `page error: ${m}`));
+      const shot = join(OUT, `${posture}--${screen.name}.png`);
+      await page.screenshot({ path: shot });
+      report.push({ posture, screen: screen.name, path, problems, screenshot: shot });
+      failed += problems.length ? 1 : 0;
+      console.log(`${problems.length ? 'FAIL' : 'ok  '} ${posture.padEnd(20)} ${screen.name}`);
+      for (const p of problems) console.log(`       - ${p}`);
+      await context.close();
+    }
+  }
+  await browser.close();
+  server.close();
+  writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+  console.log(`\n${report.length - failed}/${report.length} screens clean. Screenshots: ${OUT}`);
+  process.exit(failed ? 1 : 0);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

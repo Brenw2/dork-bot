@@ -1,6 +1,7 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from 'expo/fetch';
 import { loadManager } from '@/components/manager';
 import { getConnection, listBots, removeBot, type SavedBot } from '@/lib/bots';
@@ -13,6 +14,7 @@ type Status = 'checking' | 'ok' | string;
 export function BotList({ onSelect, selected }: { onSelect: (bot: string) => void; selected?: string | null }) {
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, Status>>({});
+  const { bottom } = useSafeAreaInsets();
 
   const load = useCallback(() => {
     let live = true;
@@ -96,6 +98,9 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
               style={({ pressed }) => [styles.row, item.bot === selected && styles.rowSelected, pressed && { opacity: 0.6 }]}
               onPress={() => onSelect(item.bot)}
               onLongPress={() => showActions(item.bot)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.bot}, ${s === 'ok' ? 'connected' : s === 'checking' || !s ? 'checking' : s}`}
+              accessibilityHint="Opens the chat. Long-press for more."
             >
               <View style={[styles.avatar, { backgroundColor: botColor(item.bot) }]}>
                 <Text style={styles.avatarText}>{item.bot[0]?.toUpperCase()}</Text>
@@ -112,7 +117,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
         }}
       />
       <Link href="/new" asChild>
-        <Pressable style={styles.add}>
+        <Pressable style={StyleSheet.flatten([styles.add, { marginBottom: Math.max(bottom, 16) }])} accessibilityRole="button">
           <Text style={styles.addText}>New bot</Text>
         </Pressable>
       </Link>
@@ -144,6 +149,6 @@ const styles = StyleSheet.create({
   name: { color: colors.text, fontSize: 17, fontWeight: '600' },
   sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  add: { margin: 16, marginBottom: 34, padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
+  add: { margin: 16, padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
   addText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

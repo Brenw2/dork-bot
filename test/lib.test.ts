@@ -147,3 +147,35 @@ describe('HermesClient', () => {
     ]);
   });
 });
+
+describe('tool activity rows', () => {
+  const msg = (id: string, role: 'user' | 'assistant' | 'tool', content = '', toolName?: string) => ({ id, role, content, toolName });
+
+  it('collapses a run of tool calls into one row', async () => {
+    const { chatRows } = await import('@/lib/chatState');
+    const rows = chatRows({
+      messages: [msg('1', 'user', 'hi'), msg('2', 'tool', '', 'terminal'), msg('3', 'tool', '', 'skill_view'), msg('4', 'tool', '', 'terminal'), msg('5', 'assistant', 'done'), msg('6', 'tool', '', 'web_search')],
+      pending: null,
+    });
+    expect(rows.map((r) => r.kind)).toEqual(['message', 'activity', 'message', 'activity']);
+    expect(rows[1].kind === 'activity' && rows[1].tools.map((t) => t.name)).toEqual(['terminal', 'skill_view', 'terminal']);
+  });
+
+  it('shows the latest step while the bot works, a summary after', async () => {
+    const { activityLine, chatRows } = await import('@/lib/chatState');
+    const tools = [
+      { name: 'skill_view', preview: null, status: 'done' as const },
+      { name: 'terminal', preview: 'ls', status: 'done' as const },
+      { name: 'terminal', preview: 'cat x', status: 'running' as const },
+    ];
+    const rows = chatRows({ messages: [], pending: { text: '', tools, thinking: true } });
+    expect(rows.map((r) => r.kind)).toEqual(['activity', 'pending']);
+    expect(rows[0].kind === 'activity' && rows[0].live).toBe(true);
+    expect(activityLine(tools, true)).toBe('… terminal · 3 steps');
+    expect(activityLine(tools, false)).toBe('✓ skill_view, terminal · 3 steps');
+    expect(activityLine([...tools, { name: 'read_file', preview: null, status: 'failed' }, { name: 'x', preview: null, status: 'done' }], false)).toBe(
+      '✕ skill_view, terminal +2 · 5 steps · 1 failed',
+    );
+    expect(activityLine([tools[0]], false)).toBe('✓ skill_view');
+  });
+});
