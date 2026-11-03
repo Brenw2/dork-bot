@@ -42,6 +42,7 @@ A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like pe
 4. **Routines.** Each bot has a list of scheduled tasks (`/api/jobs`) that you can add, pause or delete. Results land in that bot's chat.
 5. **Group chat.** Make a room with 2–6 bots. @-mentions direct a message, and with no mention every bot decides for itself. Each reply shows which bot said it.
 6. **All on Dork.** No cloud model calls. Every bot profile is pinned to the Ollama endpoint.
+7. **Connectors.** Each bot has its own connectors (remote MCP servers: Notion, Linear, Strava…), from Hermes's catalog or a custom URL. Signing in happens in an in-app browser that closes itself once approved, with no copy-pasting. Done when a bot uses a connector added from the phone. The gateway loads it within about a minute, with no restart (docs/HERMES.md, Connectors).
 
 ## Out of scope for milestone 1
 

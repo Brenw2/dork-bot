@@ -78,7 +78,8 @@ export class HermesManager {
     }
   }
 
-  private async api(path: string, method = 'GET', body?: unknown): Promise<FetchResponse> {
+  /** An authenticated call to `hermes serve` (also used by lib/connectors.ts). */
+  async api(path: string, method = 'GET', body?: unknown): Promise<FetchResponse> {
     const send = async () =>
       this.raw(path, {
         method,
@@ -234,7 +235,7 @@ interface RawProfile {
   is_default?: boolean;
 }
 
-async function fail(res: FetchResponse, what: string): Promise<HermesError> {
+export async function fail(res: FetchResponse, what: string): Promise<HermesError> {
   const text = await safeText(res);
   let detail = text;
   try {

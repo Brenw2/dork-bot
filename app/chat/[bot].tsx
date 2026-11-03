@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { BotSprite } from '@/components/BotSprite';
-import { ChatView } from '@/components/ChatView';
+import { ChatView, ConnectorsButton } from '@/components/ChatView';
 import { colors } from '@/lib/theme';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH, foldNavFor } from '@/lib/layoutClass';
@@ -32,6 +32,7 @@ export default function ChatScreen() {
               </Text>
             </View>
           ),
+          headerRight: () => <ConnectorsButton bot={bot} />,
         }}
       />
       <ChatView bot={bot} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />

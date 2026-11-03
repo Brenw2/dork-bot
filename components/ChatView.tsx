@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from 'expo/fetch';
 import { BotSprite } from '@/components/BotSprite';
 import { activity } from '@/lib/activity';
+import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
 import { activityLine, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
@@ -72,7 +74,16 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     const abort = new AbortController();
     abortRef.current = abort;
     try {
-      await client.chat(sessionId, text, (event) => dispatch({ type: 'event', event }), abort.signal);
+      await client.chat(
+        sessionId,
+        text,
+        (event) => {
+          if (event.type === 'tool' && event.phase === 'started') connectorNotes.toolUsed(bot, event.name);
+          dispatch({ type: 'event', event });
+        },
+        abort.signal,
+        { instructions: connectorNotes.instructions(bot) },
+      );
       dispatch({ type: 'ended' });
     } catch (e) {
       if (!abort.signal.aborted) dispatch({ type: 'failed', message: (e as Error).message });
@@ -89,6 +100,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = !!draft.trim() && !!client;
   const { color } = useBotLook(bot);
+  const warming = useConnectorWarmup(bot);
 
   return (
     <KeyboardAvoidingView
@@ -100,6 +112,8 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
         <View style={styles.paneHeader}>
           <BotSprite bot={bot} size={30} />
           <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
+          <View style={{ flex: 1 }} />
+          <ConnectorsButton bot={bot} />
         </View>
       ) : null}
       <FlatList
@@ -121,6 +135,11 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
         renderItem={({ item }) => <Row row={item} bot={bot} thinking={`${bot} is thinking… ${elapsed}s`} />}
       />
       {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
+      {warming.length ? (
+        <Text style={[styles.warming, column]} accessibilityLiveRegion="polite">
+          {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
+        </Text>
+      ) : null}
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }, column]}>
         <TextInput
           style={styles.input}
@@ -155,6 +174,34 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
         )}
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+/** Connectors the gateway may still be loading for this bot, re-rendered each second until done. */
+function useConnectorWarmup(bot: string) {
+  const [, tick] = useState(0);
+  const warming = connectorNotes.warming(bot);
+  useEffect(() => connectorNotes.subscribe(() => tick((n) => n + 1)), []);
+  const active = warming.length > 0;
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  return warming;
+}
+
+/** Opens the bot's connectors (Notion, Linear, ...). In the chat header and the open-Duo pane header. */
+export function ConnectorsButton({ bot }: { bot: string }) {
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/connectors/[bot]', params: { bot } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${bot}'s connectors`}
+      hitSlop={8}
+    >
+      <Text style={styles.headerButton}>Connectors</Text>
+    </Pressable>
   );
 }
 
@@ -221,6 +268,7 @@ function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  headerButton: { color: colors.accent, fontSize: 16 },
   paneHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -257,6 +305,7 @@ const styles = StyleSheet.create({
   step: { color: colors.dim, fontSize: 12, paddingLeft: 8 },
   preview: { fontFamily: mono, paddingLeft: 20 },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingBottom: 6 },
+  warming: { color: colors.dim, fontSize: 13, paddingHorizontal: 16, paddingBottom: 6 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

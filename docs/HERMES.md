@@ -37,6 +37,26 @@ scripts/pair-hermes.sh         # QR code that signs the app in
 
 - With this service running, `hermes dashboard` on the same machine may refuse to start (one backend per host). Stop it with `scripts/setup-bot-manager.sh off`.
 
+## Connectors (MCP servers per bot)
+
+The Connectors screen (long-press a bot, or Connectors in the chat header) uses the same `hermes serve` MCP API as the Hermes dashboard. Everything takes `?profile=<bot>`, so each bot has its own connectors and sign-ins. A cloned bot starts with the template's connectors (`assistant` has `trello`).
+
+| What | Call |
+|---|---|
+| Bot's connectors | `GET /api/mcp/servers` → `{servers: [{name, url, auth, enabled, source}]}` |
+| Catalog | `GET /api/mcp/catalog` → `{entries: [{name, description, transport, auth_type, url, required_env, needs_install}]}` (65 entries on 0.22.5; the app hides local builds and localhost URLs) |
+| Add from catalog | `POST /api/mcp/catalog/install` `{name, env, enable: true, profile}` |
+| Add custom URL | `POST /api/mcp/servers` `{name, url, auth: "oauth", profile}` (409 if it exists) |
+| Check / list tools | `POST /api/mcp/servers/<name>/test` → `{ok, tools, error}` (an OAuth server with no token is `ok: false`) |
+| Sign in | `POST /api/mcp/servers/<name>/auth` → `{flow_id, status, authorization_url}`; poll `GET /api/mcp/oauth/flows/<id>` until `approved`; cancel with `DELETE` |
+| Remove | `DELETE /api/mcp/servers/<name>` |
+
+- The OAuth callback is `HERMES_DASHBOARD_PUBLIC_URL` + `/api/mcp/oauth/callback/<name>`, so `https://b-lab.tail7e27a7.ts.net:8443/...`. The phone's browser reaches it over Tailscale, and the callback path skips the login gate. Verified: the sign-in page Hermes hands out carries that `redirect_uri`.
+- **No restart needed.** The gateway loads a connector added to a running bot on its next housekeeping tick (every 60 s). A bot created moments before can take up to two ticks, because the first tick after a bot appears is skipped. Measured 2026-11-03 on 0.22.5: deepwiki registered 15 s and 65 s after it was added, and the bot then called it from its existing chat and from a new one.
+- The bot logs this in its **own** log folder, not the main one: `~/.hermes/profiles/<bot>/logs/agent.log` has `MCP servers reconciled with config (<bot>): ... added=['deepwiki']`. `~/.hermes/logs/gateway.log` only shows `Re-scanned profile ...`, which is why an earlier look concluded the gateway never loaded it.
+- **The catch is the model, not Hermes.** If the bot is asked before the connector is loaded, it says "I don't have a deepwiki tool", and on later turns it goes along with that reply and never searches for the tool, even though the tool is now there (seen live: two more misses over 6 minutes). The app handles it in `lib/connectorNotes.ts`: for 2 minutes after a connect, the chat shows "<connector> still connecting to <bot>", and until the bot has used the connector (or 30 minutes pass), each turn carries a one-turn system note (`system_message` on `/api/sessions/<id>/chat/stream`, not saved in the history) that names the new connector and its `mcp__<name>__*` tools.
+- `DORK_LIVE=1 npx vitest run test/live-connectors.test.ts` checks the whole thing with a throwaway bot, worst case first: it asks before the connector has loaded, then once after the warm-up, and expects a real `mcp__deepwiki__*` tool call on that ask.
+
 ## Adding a bot by hand
 
 ```bash
