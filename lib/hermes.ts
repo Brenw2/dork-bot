@@ -123,12 +123,21 @@ export class HermesClient {
     return toChatMessages(body.data ?? []);
   }
 
-  /** Sends a message and calls onEvent for each streamed event until the run ends. */
-  async chat(id: string, message: string, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+  /**
+   * Sends one message and streams the reply. `instructions` is a system note for this turn only
+   * (Hermes's ephemeral `system_message`): it isn't saved in the chat's history.
+   */
+  async chat(
+    id: string,
+    message: string,
+    onEvent: (e: ChatEvent) => void,
+    signal?: AbortSignal,
+    opts: { instructions?: string } = {},
+  ): Promise<void> {
     const res = await this.request(`/api/sessions/${encodeURIComponent(id)}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(opts.instructions ? { message, system_message: opts.instructions } : { message }),
       signal,
     });
     if (!res.ok || !res.body) {

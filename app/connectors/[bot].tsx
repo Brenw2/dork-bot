@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Column, useColumnStyle } from '@/components/Column';
 import { loadManager } from '@/components/manager';
+import { connectorNotes } from '@/lib/connectorNotes';
 import { Connectors, type CatalogEntry, type Connector, type SignInBrowser } from '@/lib/connectors';
 import { colors, mono } from '@/lib/theme';
 
@@ -85,7 +86,8 @@ export default function ConnectorsScreen() {
     setBusy({ name, status: 'Starting…' });
     try {
       const tools = await work((status) => setBusy({ name, status }));
-      setNotice({ ok: true, text: `${name} is connected (${tools} tools). If ${bot} says it doesn't have it yet, Hermes needs a restart.` });
+      connectorNotes.added(bot, name);
+      setNotice({ ok: true, text: `${name} is connected (${tools} tools). ${bot} can use it in about a minute.` });
       setSetupFor(null);
       setValues({});
       await refresh(api);
@@ -123,6 +125,7 @@ export default function ConnectorsScreen() {
         onPress: () =>
           api
             .remove(c.name)
+            .then(() => connectorNotes.removed(bot, c.name))
             .then(() => refresh(api))
             .catch((e: Error) => setNotice({ ok: false, text: e.message })),
       },

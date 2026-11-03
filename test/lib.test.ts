@@ -132,6 +132,23 @@ describe('HermesClient', () => {
     expect(f.calls[0].url).toBe('https://h.ts.net/p/assistant/api/sessions/dork-bot-assistant/chat/stream');
   });
 
+  it('sends a one-turn system note only when there is one', async () => {
+    const bodies: unknown[] = [];
+    const fetch: FetchLike = async (_url, init) => {
+      bodies.push(JSON.parse(init?.body ?? '{}'));
+      return new Response(fixture, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    };
+    const client = new HermesClient(conn, fetch);
+    await client.chat('dork-bot-assistant', 'hi', () => {});
+    await client.chat('dork-bot-assistant', 'hi', () => {}, undefined, { instructions: undefined });
+    await client.chat('dork-bot-assistant', 'hi', () => {}, undefined, { instructions: 'You have deepwiki now.' });
+    expect(bodies).toEqual([
+      { message: 'hi' },
+      { message: 'hi' },
+      { message: 'hi', system_message: 'You have deepwiki now.' },
+    ]);
+  });
+
   it('turns history into chat rows and drops empty/meta rows', () => {
     const rows = toChatMessages([
       { id: 1, role: 'user', content: 'hi' },

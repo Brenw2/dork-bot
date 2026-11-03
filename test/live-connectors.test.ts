@@ -2,7 +2,8 @@
 // Skipped unless DORK_LIVE=1. Needs scripts/setup-bot-manager.sh to have run.
 //   DORK_LIVE=1 npx vitest run test/live-connectors.test.ts
 // It creates a throwaway bot, adds a no-sign-in connector (deepwiki), checks its tools,
-// checks the bot can use it in chat with no gateway restart, starts (and cancels) a real
+// checks the bot uses it in chat with no gateway restart (after first being asked before it
+// was connected, so its history says it doesn't have it), starts (and cancels) a real
 // OAuth sign-in to see the page and callback the phone would get, then deletes the bot.
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -10,6 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { chatReducer, initialChat } from '@/lib/chatState';
+import { ConnectorNotes, WARMUP_MS } from '@/lib/connectorNotes';
 import { Connectors, type SignInBrowser } from '@/lib/connectors';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';
@@ -51,33 +53,49 @@ describe.skipIf(!live)(`live: connectors on ${adminUrl}`, () => {
       expect(deepwiki, 'deepwiki in the catalog').toBeDefined();
       expect(catalog.every((e) => !e.needsInstall)).toBe(true);
 
+      // The worst case for the bot: it was asked before the connector existed and said it doesn't
+      // have it. On later turns the model goes along with that reply (seen live), so the app adds a
+      // one-turn note (lib/connectorNotes.ts) until the bot has used the connector.
+      const notes = new ConnectorNotes();
+      const client = new HermesClient(conn, f);
+      const sessionId = `dork-bot-${name}`;
+      await client.ensureSession(sessionId, name);
+      const t0 = Date.now();
+      const ask = async (label: string) => {
+        const q = 'Use your deepwiki tool to tell me, in one sentence, what the GitHub repo facebook/react is.';
+        let state = chatReducer(initialChat, { type: 'send', text: q });
+        await client.chat(
+          sessionId,
+          q,
+          (event) => {
+            if (event.type === 'tool' && event.phase === 'started') notes.toolUsed(name, event.name);
+            state = chatReducer(state, { type: 'event', event });
+          },
+          undefined,
+          { instructions: notes.instructions(name) },
+        );
+        // Only a real tool call counts (MCP tools are named mcp__deepwiki__<tool>), not a mention in the reply.
+        const used = state.messages.filter((msg) => msg.role === 'tool').map((msg) => msg.toolName ?? '').find((t) => t.includes('deepwiki'));
+        console.log(`${label} at ${Math.round((Date.now() - t0) / 1000)}s: tool=${used ?? 'none'} reply=${JSON.stringify(state.messages.at(-1)?.content?.slice(0, 160))}`);
+        return used;
+      };
+      expect(await ask('before connecting'), 'no deepwiki before it is connected').toBeUndefined();
+
       // No-sign-in connector: add + probe, no browser.
       const noBrowser: SignInBrowser = { open: async () => expect.fail('no browser for deepwiki'), close: () => {} };
       const tools = await c.connect({ entry: deepwiki! }, noBrowser);
+      notes.added(name, 'deepwiki');
+      const addedAt = Date.now();
       console.log(`deepwiki tools: ${tools.map((t) => t.name).join(', ')}`);
       expect(tools.length).toBeGreaterThan(0);
       expect((await c.list()).map((s) => s.name)).toContain('deepwiki');
       // Scoped to this bot only.
       expect((await new Connectors(m, 'assistant').list()).map((s) => s.name)).not.toContain('deepwiki');
 
-      // The gateway picks it up on its reconcile tick (no restart). Ask until a deepwiki tool runs.
-      const client = new HermesClient(conn, f);
-      const sessionId = `dork-bot-${name}`;
-      await client.ensureSession(sessionId, name);
-      const t0 = Date.now();
-      let used: string | undefined;
-      for (let attempt = 0; attempt < 4 && !used; attempt++) {
-        if (attempt) await new Promise((r) => setTimeout(r, 30_000));
-        const q = 'Use your deepwiki tool to tell me, in one sentence, what the GitHub repo facebook/react is.';
-        let state = chatReducer(initialChat, { type: 'send', text: q });
-        await client.chat(sessionId, q, (event) => {
-          state = chatReducer(state, { type: 'event', event });
-        });
-        // Only a real tool call counts (MCP tools are named mcp__deepwiki__<tool>), not a mention in the reply.
-        used = state.messages.filter((msg) => msg.role === 'tool').map((msg) => msg.toolName ?? '').find((t) => t.includes('deepwiki'));
-        console.log(`attempt ${attempt + 1} at ${Math.round((Date.now() - t0) / 1000)}s: tool=${used ?? 'none'} reply=${JSON.stringify(state.messages.at(-1)?.content?.slice(0, 160))}`);
-      }
-      expect(used, 'the bot called a deepwiki tool').toBeDefined();
+      // No restart: the gateway loads it on its next tick (WARMUP_MS at most). Ask once after that.
+      await new Promise((r) => setTimeout(r, Math.max(0, addedAt + WARMUP_MS - Date.now())));
+      expect(await ask('after the warm-up'), 'the bot called a deepwiki tool on the first ask after the warm-up').toBeDefined();
+      expect(notes.instructions(name), 'the note stops once the bot has used the connector').toBeUndefined();
 
       // OAuth: a real sign-in page whose callback goes to Hermes over Tailscale, then cancel.
       const oauthEntry = catalog.find((e) => e.auth === 'oauth' && e.needs.length === 0);
