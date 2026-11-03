@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from 'expo/fetch';
 import { BotSprite } from '@/components/BotSprite';
@@ -100,6 +101,8 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
         <View style={styles.paneHeader}>
           <BotSprite bot={bot} size={30} />
           <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
+          <View style={{ flex: 1 }} />
+          <ConnectorsButton bot={bot} />
         </View>
       ) : null}
       <FlatList
@@ -155,6 +158,20 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
         )}
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+/** Opens the bot's connectors (Notion, Linear, ...). In the chat header and the open-Duo pane header. */
+export function ConnectorsButton({ bot }: { bot: string }) {
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/connectors/[bot]', params: { bot } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${bot}'s connectors`}
+      hitSlop={8}
+    >
+      <Text style={styles.headerButton}>Connectors</Text>
+    </Pressable>
   );
 }
 
@@ -221,6 +238,7 @@ function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  headerButton: { color: colors.accent, fontSize: 16 },
   paneHeader: {
     flexDirection: 'row',
     alignItems: 'center',

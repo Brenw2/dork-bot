@@ -37,6 +37,24 @@ scripts/pair-hermes.sh         # QR code that signs the app in
 
 - With this service running, `hermes dashboard` on the same machine may refuse to start (one backend per host). Stop it with `scripts/setup-bot-manager.sh off`.
 
+## Connectors (MCP servers per bot)
+
+The Connectors screen (long-press a bot, or Connectors in the chat header) uses the same `hermes serve` MCP API as the Hermes dashboard. Everything takes `?profile=<bot>`, so each bot has its own connectors and sign-ins. A cloned bot starts with the template's connectors (`assistant` has `trello`).
+
+| What | Call |
+|---|---|
+| Bot's connectors | `GET /api/mcp/servers` → `{servers: [{name, url, auth, enabled, source}]}` |
+| Catalog | `GET /api/mcp/catalog` → `{entries: [{name, description, transport, auth_type, url, required_env, needs_install}]}` (65 entries on 0.22.5; the app hides local builds and localhost URLs) |
+| Add from catalog | `POST /api/mcp/catalog/install` `{name, env, enable: true, profile}` |
+| Add custom URL | `POST /api/mcp/servers` `{name, url, auth: "oauth", profile}` (409 if it exists) |
+| Check / list tools | `POST /api/mcp/servers/<name>/test` → `{ok, tools, error}` (an OAuth server with no token is `ok: false`) |
+| Sign in | `POST /api/mcp/servers/<name>/auth` → `{flow_id, status, authorization_url}`; poll `GET /api/mcp/oauth/flows/<id>` until `approved`; cancel with `DELETE` |
+| Remove | `DELETE /api/mcp/servers/<name>` |
+
+- The OAuth callback is `HERMES_DASHBOARD_PUBLIC_URL` + `/api/mcp/oauth/callback/<name>`, so `https://b-lab.tail7e27a7.ts.net:8443/...`. The phone's browser reaches it over Tailscale, and the callback path skips the login gate. Verified: the sign-in page Hermes hands out carries that `redirect_uri`.
+- **Known problem (0.22.5):** for a bot created after the gateway started, the gateway never loaded a connector added to it. Over 6 minutes the bot's own `tool_search` found no deepwiki tool, and the logs show no reconcile. Sending `/reload-mcp` through the API server just goes to the model. Untested: whether a gateway restart fixes it, and whether bots that existed at gateway start get connectors without one.
+- `DORK_LIVE=1 npx vitest run test/live-connectors.test.ts` checks the whole thing with a throwaway bot (and fails on the problem above).
+
 ## Adding a bot by hand
 
 ```bash

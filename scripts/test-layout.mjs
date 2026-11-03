@@ -90,6 +90,23 @@ const PROFILES = [
   },
 ];
 
+const SERVERS = [
+  { name: 'trello', transport: 'http', url: 'https://mcp.trello.com/v1', auth: 'oauth', enabled: true, source: 'config' },
+  { name: 'linear', transport: 'http', url: 'https://mcp.linear.app/mcp', auth: 'oauth', enabled: true, source: 'config' },
+];
+// A slice of the real catalog from b-lab (GET /api/mcp/catalog).
+const CATALOG = [
+  ['airtable', 'Bases, tables, and records from your Airtable workspace.', 'oauth'],
+  ['asana', 'Tasks, projects, and portfolios in Asana.', 'oauth', ['ASANA_CLIENT_ID', 'ASANA_CLIENT_SECRET']],
+  ['deepwiki', 'Ask questions about any public GitHub repository, with a really long description that has to wrap or be cut off.', 'none'],
+  ['linear', 'Issues and projects in Linear.', 'oauth'],
+  ['notion', 'Pages and databases in your Notion workspace.', 'oauth'],
+  ['strava', 'Your activities, routes and segments on Strava.', 'oauth'],
+].map(([name, description, auth_type, env = []]) => ({
+  name, description, transport: 'http', auth_type, url: `https://mcp.${name}.com/mcp`, needs_install: false, installed: false,
+  required_env: env.map((n) => ({ name: n, prompt: n, required: true })),
+}));
+
 function seedFor(screen) {
   const store = {};
   if (screen.bots !== false) {
@@ -108,6 +125,8 @@ const SCREENS = [
   { name: 'new-unpaired', path: () => '/new', waitFor: 'Connect to Hermes first' },
   { name: 'new', paired: true, path: () => '/new', waitFor: 'Already on Hermes' },
   { name: 'add', path: () => '/add', waitFor: 'Hermes address' },
+  { name: 'connectors', paired: true, path: () => '/connectors/assistant', waitFor: 'Needs you to sign in' },
+  { name: 'connectors-unpaired', path: () => '/connectors/assistant', waitFor: 'Connect to Hermes first' },
 ];
 
 async function fakeHermes(route) {
@@ -125,6 +144,11 @@ async function fakeHermes(route) {
   if (p === '/auth/native/refresh')
     return json(200, { access_token: 'a'.repeat(40), refresh_token: 'r'.repeat(40), expires_at: Date.now() / 1000 + 3600 });
   if (p === '/api/profiles') return json(200, { profiles: PROFILES });
+  if (p === '/api/mcp/servers') return json(200, { servers: SERVERS });
+  if (p === '/api/mcp/catalog') return json(200, { entries: CATALOG });
+  const test = p.match(/^\/api\/mcp\/servers\/([^/]+)\/test$/)?.[1];
+  if (test === 'trello') return json(200, { ok: true, tools: Array.from({ length: 14 }, (_, i) => ({ name: `t${i}`, description: '' })) });
+  if (test) return json(200, { ok: false, error: 'OAuth authentication required — no token found.', tools: [] });
   return json(404, { error: `no fake for ${req.method()} ${p}` });
 }
 
@@ -214,7 +238,7 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'] };
+const FIXED = { chat: ['Message assistant', 'Send'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'] };
 const SEEN = { chat: ['Any time.'] };
 
 function serve(dir) {

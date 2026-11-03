@@ -39,6 +39,7 @@ function Screens(): ReactNode {
       <Stack.Screen name="chat/[bot]" options={{ title: '' }} />
       <Stack.Screen name="look/[bot]" options={{ title: "Look", presentation: "modal" }} />
       <Stack.Screen name="gallery" options={{ title: 'Gallery' }} />
+      <Stack.Screen name="connectors/[bot]" options={{ title: 'Connectors', presentation: 'modal' }} />
     </Stack>
   );
 }

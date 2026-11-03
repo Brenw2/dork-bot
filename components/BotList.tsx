@@ -75,6 +75,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
   const showActions = (bot: string) =>
     Alert.alert(bot, undefined, [
       { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
+      { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
       { text: 'Remove from app', onPress: () => removeFromApp(bot) },
       ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),
       { text: 'Cancel', style: 'cancel' },

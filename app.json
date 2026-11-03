@@ -26,7 +26,8 @@
         {
           "initialOrientation": "PORTRAIT_UP"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
