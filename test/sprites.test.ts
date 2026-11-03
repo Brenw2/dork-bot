@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ActivityStore, DONE_MS } from '@/lib/activity';
-import { CANVAS, CHARACTER_IDS, CHARACTERS, MOODS, characterFor, framePaths, frameSpec, moodFromChat, renderFrame, shift } from '@/lib/sprites';
+import { BOT_COLORS, CANVAS, CHARACTER_IDS, MOODS, characterFor, framePaths, frameSpec, lookName, looksOf, moodFromChat, renderFrame, shift } from '@/lib/sprites';
 
 describe('sprites', () => {
-  it('every character is a 16x16 grid with its face inside', () => {
-    for (const id of CHARACTER_IDS) {
-      const c = CHARACTERS[id];
+  it('every look of every character is a 16x16 grid with its face inside', () => {
+    for (const id of CHARACTER_IDS)
+      for (const c of looksOf(id)) {
       expect(c.rows, id).toHaveLength(16);
       for (const r of c.rows) expect(r, id).toHaveLength(16);
       for (const [x, y] of c.eyes) {
@@ -17,14 +17,30 @@ describe('sprites', () => {
         const [x, y] = c.mouth;
         for (let dx = 0; dx < 4; dx++) expect('BC', `${id} mouth`).toContain(c.rows[y][x + dx]);
       }
+      }
+  });
+
+  it('robot comes in square, round and tall; looks have distinct names and art', () => {
+    expect(looksOf('robot').map((_, v) => lookName('robot', v))).toEqual(['Square', 'Round', 'Tall']);
+    for (const id of CHARACTER_IDS) {
+      const looks = looksOf(id);
+      expect(looks.length, id).toBeGreaterThanOrEqual(2);
+      expect(new Set(looks.map((_, v) => lookName(id, v))).size).toBe(looks.length);
+      expect(new Set(looks.map((l) => l.rows.join(''))).size).toBe(looks.length);
     }
+    // An unknown look falls back to the first one instead of crashing.
+    expect(renderFrame('cat', '#8B7CF6', frameSpec('idle', 1), 99).size).toBeGreaterThan(0);
+  });
+
+  it('draws in any palette color', () => {
+    for (const c of BOT_COLORS) expect(renderFrame('robot', c, frameSpec('idle', 1), 1).has(c)).toBe(true);
   });
 
   it('renders every mood of every character within the canvas, for a whole loop', () => {
     for (const id of CHARACTER_IDS)
       for (const m of MOODS)
         for (let t = 0; t < 24; t++) {
-          const frame = renderFrame(id, '#8B7CF6', frameSpec(m, t, 3));
+          const frame = renderFrame(id, '#8B7CF6', frameSpec(m, t, 3), t % looksOf(id).length);
           const px = [...frame.values()].flat();
           expect(px.length, `${id} ${m}`).toBeGreaterThan(60);
           for (const [x, y] of px) expect(x >= 0 && y >= 0 && x < CANVAS && y < CANVAS).toBe(true);

@@ -1,25 +1,24 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CharacterPicker } from '@/components/CharacterPicker';
-import { useColumnStyle } from '@/components/Column';
 import { Sprite } from '@/components/BotSprite';
-import { useBotCharacter } from '@/components/useBotCharacter';
-import { setCharacter } from '@/lib/bots';
-import { MOODS, type CharacterId } from '@/lib/sprites';
-import { botColor, colors } from '@/lib/theme';
+import { useColumnStyle } from '@/components/Column';
+import { LookPicker } from '@/components/LookPicker';
+import { useBotLook } from '@/components/useBotLook';
+import { setLook } from '@/lib/bots';
+import { MOODS, type Look } from '@/lib/sprites';
+import { colors } from '@/lib/theme';
 
-// Change a bot's pixel character (long-press a bot → Change character…).
-export default function ChangeCharacter() {
+// Change a bot's look (long-press a bot → Change look…): color, character, and its style.
+export default function ChangeLook() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
-  const current = useBotCharacter(bot);
-  const [picked, setPicked] = useState<CharacterId>(current);
+  const current = useBotLook(bot);
+  const [picked, setPicked] = useState<Look>(current);
   const column = useColumnStyle();
-  const color = botColor(bot);
   useEffect(() => setPicked(current), [current]);
 
   const save = async () => {
-    await setCharacter(bot, picked);
+    await setLook(bot, picked);
     router.back();
   };
 
@@ -28,10 +27,10 @@ export default function ChangeCharacter() {
       <Stack.Screen options={{ title: bot }} />
       <View style={styles.preview}>
         {MOODS.filter((m) => m !== 'sleeping').map((m) => (
-          <Sprite key={m} character={picked} color={color} mood={m} size={40} seed={m.length} />
+          <Sprite key={m} character={picked.character} variant={picked.variant} color={picked.color} mood={m} size={40} seed={m.length} />
         ))}
       </View>
-      <CharacterPicker value={picked} onChange={setPicked} color={color} />
+      <LookPicker value={picked} onChange={setPicked} />
       <Pressable style={styles.button} onPress={save} accessibilityRole="button">
         <Text style={styles.buttonText}>Save</Text>
       </Pressable>

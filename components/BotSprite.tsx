@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { useBotCharacter } from '@/components/useBotCharacter';
+import { useBotLook } from '@/components/useBotLook';
 import { useBotMood } from '@/components/useBotMood';
 import { CANVAS, FRAME_MS, framePaths, frameSpec, renderFrame, type CharacterId, type Mood } from '@/lib/sprites';
-import { botColor } from '@/lib/theme';
 
 /**
  * A pixel character, animated for its mood at a retro frame rate (FRAME_MS per frame).
@@ -12,12 +11,14 @@ import { botColor } from '@/lib/theme';
  */
 export function Sprite({
   character,
+  variant = 0,
   color,
   mood = 'idle',
   size = 42,
   seed = 0,
 }: {
   character: CharacterId;
+  variant?: number;
   color: string;
   mood?: Mood;
   size?: number;
@@ -33,8 +34,8 @@ export function Sprite({
   }, [still]);
 
   const paths = useMemo(
-    () => framePaths(renderFrame(character, color, frameSpec(mood, still ? 1 : t, seed))),
-    [character, color, mood, t, seed, still],
+    () => framePaths(renderFrame(character, color, frameSpec(mood, still ? 1 : t, seed), variant)),
+    [character, variant, color, mood, t, seed, still],
   );
 
   return (
@@ -50,10 +51,10 @@ export function Sprite({
 
 /** A saved bot's character in its color, showing what the bot is doing right now. */
 export function BotSprite({ bot, size = 42, mood }: { bot: string; size?: number; mood?: Mood }) {
-  const character = useBotCharacter(bot);
+  const look = useBotLook(bot);
   const live = useBotMood(bot);
   const seed = useMemo(() => [...bot].reduce((a, c) => a + c.charCodeAt(0), 0) % 11, [bot]);
-  return <Sprite character={character} color={botColor(bot)} mood={mood ?? live} size={size} seed={seed} />;
+  return <Sprite character={look.character} variant={look.variant} color={look.color} mood={mood ?? live} size={size} seed={seed} />;
 }
 
 function useReduceMotion(): boolean {

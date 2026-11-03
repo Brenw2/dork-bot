@@ -1,22 +1,25 @@
 import { Link, router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { CharacterPicker } from '@/components/CharacterPicker';
+import { Sprite } from '@/components/BotSprite';
+import { LookPicker } from '@/components/LookPicker';
+import { defaultLook } from '@/components/useBotLook';
 import { Column, useColumnStyle } from '@/components/Column';
 import { loadManager, randomKey } from '@/components/manager';
 import { listBots, saveBot } from '@/lib/bots';
 import type { HermesManager, Profile } from '@/lib/manager';
-import { characterFor, type CharacterId } from '@/lib/sprites';
-import { botColor, colors, mono } from '@/lib/theme';
+import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
+import { colors, mono } from '@/lib/theme';
 
 // Create a bot (a new Hermes profile on Dork), or connect one that's already on Hermes.
 export default function NewBot() {
   const [manager, setManager] = useState<HermesManager | null | undefined>(undefined);
   const [name, setName] = useState('');
   const [job, setJob] = useState('');
-  // Follows the name (a default character per name) until he picks one himself.
-  const [picked, setPicked] = useState<CharacterId | null>(null);
-  const character = picked ?? characterFor(name || 'new');
+  // Follows the name (a default look per name) until he picks one himself.
+  const [picked, setPicked] = useState<Look | null>(null);
+  const look = picked ?? defaultLook(name || 'new');
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [others, setOthers] = useState<Profile[]>([]);
@@ -61,7 +64,7 @@ export default function NewBot() {
     setBusy('Creating the bot on Hermes…');
     try {
       const conn = await manager.createBot({ name, job }, randomKey);
-      await saveBot(conn, character);
+      await saveBot(conn, look);
       router.dismissTo({ pathname: '/', params: { bot: conn.bot } });
     } catch (e) {
       setError((e as Error).message);
@@ -96,8 +99,21 @@ export default function NewBot() {
         style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
       />
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Character</Text>
-        <CharacterPicker value={character} onChange={setPicked} color={botColor(name || 'new')} />
+        <Text style={styles.label}>Look</Text>
+        <Pressable
+          style={styles.row}
+          onPress={() => setPicking(!picking)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: picking }}
+          accessibilityLabel={`Look: ${CHARACTERS[look.character].name}, ${lookName(look.character, look.variant)}. Change`}
+        >
+          <Sprite character={look.character} variant={look.variant} color={look.color} mood="idle" size={40} />
+          <Text style={[styles.name, { flex: 1 }]}>
+            {CHARACTERS[look.character].name} · {lookName(look.character, look.variant)}
+          </Text>
+          <Text style={styles.addText}>{picking ? 'Done' : 'Change'}</Text>
+        </Pressable>
+        {picking ? <LookPicker value={look} onChange={setPicked} /> : null}
       </View>
       <Text style={styles.hint}>
         It runs on Dork, with the same tools as {'"'}assistant{'"'} but its own memory and chat.

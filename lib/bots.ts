@@ -3,14 +3,14 @@
 import * as SecureStore from './secureStore';
 import type { BotConnection } from './hermes';
 import type { ManagerAuth } from './manager';
-import type { CharacterId } from './sprites';
+import type { Look } from './sprites';
 
 export interface SavedBot {
   bot: string;
   url: string;
   addedAt: number;
-  /** Picked pixel character; unset means the default from the name (characterFor). */
-  character?: CharacterId;
+  /** Picked character, look and color; unset means the defaults from the name. */
+  look?: Look;
 }
 
 // Screens showing a bot's character re-read the list when it changes.
@@ -40,19 +40,19 @@ export async function getConnection(bot: string): Promise<BotConnection | null> 
   return saved && key ? { url: saved.url, bot, key } : null;
 }
 
-export async function saveBot(conn: BotConnection, character?: CharacterId): Promise<void> {
+export async function saveBot(conn: BotConnection, look?: Look): Promise<void> {
   await SecureStore.setItemAsync(keyName(conn.bot), conn.key);
   const all = await listBots();
   const old = all.find((b) => b.bot === conn.bot);
   const bots = all.filter((b) => b.bot !== conn.bot);
-  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), character: character ?? old?.character });
+  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look });
   bots.sort((a, b) => a.bot.localeCompare(b.bot));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
 }
 
-export async function setCharacter(bot: string, character: CharacterId): Promise<void> {
-  const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, character } : b));
+export async function setLook(bot: string, look: Look): Promise<void> {
+  const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, look } : b));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
 }

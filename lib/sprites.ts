@@ -209,6 +209,265 @@ export const CHARACTERS: Record<CharacterId, Character> = {
   },
 };
 
+// More looks per character (the base one in CHARACTERS is look 0). Each is drawn in the bot's own color.
+// 'S' is a stripe: the body color, darker.
+const EXTRA_LOOKS: Record<CharacterId, Character[]> = {
+  robot: [
+    {
+      name: 'Round',
+      rows: [
+        '.......AA.......',
+        '.......GG.......',
+        '.....KKKKKK.....',
+        '...KKBBBBBBKK...',
+        '..KBBBBBBBBBBK..',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        'KKBBBBBBBBBBBBKK',
+        'KGBBBBBBBBBBBBGK',
+        'KKBBBBBBBBBBBBKK',
+        '.KBBBBBBBBBBBBK.',
+        '..KBBBBBBBBBBK..',
+        '...KKBBBBBBKK...',
+        '.....KKKKKK.....',
+        '.....KGGGGK.....',
+        '....KKKKKKKK....',
+      ],
+      eyes: [[4, 6], [9, 6]],
+      mouth: [6, 10],
+    },
+    {
+      name: 'Tall',
+      rows: [
+        '...A........A...',
+        '...G........G...',
+        '..KKKKKKKKKKKK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KBBBBBBBBBBK..',
+        '..KKKKKKKKKKKK..',
+        '....KGGGGGGK....',
+        '...KBBBBBBBBK...',
+        '...KKKKKKKKKK...',
+      ],
+      eyes: [[4, 5], [9, 5]],
+      mouth: [6, 9],
+    },
+  ],
+  cat: [
+    {
+      name: 'Tabby',
+      rows: [
+        '................',
+        '.KK..........KK.',
+        '.KBK........KBK.',
+        '.KBPK......KPBK.',
+        '.KBBBKKKKKKBBBK.',
+        'KBBBBBSBBSBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KSBBBBBBBBBBBBSK',
+        'KPBBBBBBBBBBBBPK',
+        'KSBBBBBBBBBBBBSK',
+        '.KBBBBBBBBBBBBK.',
+        '..KKBBBBBBBBKK..',
+        '...KBBKKKKBBK...',
+        '...KKK....KKK...',
+        '................',
+      ],
+      eyes: [[3, 6], [10, 6]],
+      mouth: [6, 9],
+    },
+  ],
+  ghost: [
+    {
+      name: 'Pointy',
+      rows: [
+        '.......KK.......',
+        '......KBBK......',
+        '.....KBBBBK.....',
+        '....KBBBBBBK....',
+        '...KBBBBBBBBK...',
+        '..KBBBBBBBBBBK..',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBKBBBBBBKBBK.',
+        '.KBK.KBBBBK.KBK.',
+        '..K...KKKK...K..',
+      ],
+      eyes: [[4, 7], [9, 7]],
+      mouth: [6, 10],
+    },
+  ],
+  frog: [
+    {
+      name: 'Prince',
+      rows: [
+        '.....A.AA.A.....',
+        '..KKKAAAAAAKKK..',
+        '.KBBBKAAAAKBBBK.',
+        'KBBBBBK..KBBBBBK',
+        'KBBBBBKKKKBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        '.KBBBBBBBBBBBBK.',
+        '..KKBBBBBBBBKK..',
+        '.KBBKKKKKKKKBBK.',
+        '.KKK........KKK.',
+        '................',
+        '................',
+      ],
+      eyes: [[2, 3], [11, 3]],
+      mouth: [6, 7],
+    },
+  ],
+  slime: [
+    {
+      name: 'Sprout',
+      rows: [
+        '........VV......',
+        '.......VV.......',
+        '.......K........',
+        '......KKKK......',
+        '....KKBBBBKK....',
+        '...KBBBBBBBBK...',
+        '..KBBBBBBBBBBK..',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        '.KBBBBBBBBBBBBK.',
+        '..KKKKKKKKKKKK..',
+        '................',
+      ],
+      eyes: [[4, 8], [9, 8]],
+      mouth: [6, 11],
+    },
+  ],
+  owl: [
+    {
+      name: 'Round',
+      rows: [
+        '................',
+        '................',
+        '....KKKKKKKK....',
+        '..KKBBBBBBBBKK..',
+        '..KBBBBBBBBBBK..',
+        '.KBWWWWBBWWWWBK.',
+        '.KWWWWWBBWWWWWK.',
+        '.KBWWWWBBWWWWBK.',
+        '.KBBBBBAABBBBBK.',
+        '.KBBBBBAABBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBCBCBBCBCBBK.',
+        '..KBBBBBBBBBBK..',
+        '...KKKKKKKKKK...',
+        '....AAA..AAA....',
+        '................',
+      ],
+      eyes: [[3, 5], [10, 5]],
+      mouth: null,
+    },
+  ],
+  alien: [
+    {
+      name: 'Cyclops',
+      rows: [
+        '.......AA.......',
+        '.......GG.......',
+        '....KKKKKKKK....',
+        '..KKBBBBBBBBKK..',
+        '.KBBBBBBBBBBBBK.',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        'KBBBBBBBBBBBBBBK',
+        '.KBBBBBBBBBBBBK.',
+        '..KBBBBBBBBBBK..',
+        '...KBBBBBBBBK...',
+        '....KBBBBBBK....',
+        '.....KKKKKK.....',
+        '......KBBK......',
+        '.....KBBBBK.....',
+        '.....KKKKKK.....',
+      ],
+      eyes: [[6, 6]],
+      mouth: [6, 9],
+    },
+  ],
+  bear: [
+    {
+      name: 'Bunny',
+      rows: [
+        '...KK......KK...',
+        '..KBPK....KPBK..',
+        '..KBPK....KPBK..',
+        '..KBPK....KPBK..',
+        '..KBBKKKKKKBBK..',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KBBBBBBBBBBBBK.',
+        '.KPBBBBBBBBBBPK.',
+        '.KBBBBCCCCBBBBK.',
+        '..KBBBBBBBBBBK..',
+        '...KKKKKKKKKK...',
+        '....KBBKKBBK....',
+        '....KKK..KKK....',
+        '................',
+      ],
+      eyes: [[3, 6], [10, 6]],
+      mouth: [6, 9],
+    },
+  ],
+};
+
+/** Every look of a character, the base one first. */
+export function looksOf(id: CharacterId): Character[] {
+  return [CHARACTERS[id], ...EXTRA_LOOKS[id]];
+}
+
+/** A look's own name ("Round"); the base look is named after the character's first look label. */
+export function lookName(id: CharacterId, variant: number): string {
+  if (variant === 0) return BASE_LOOK_NAMES[id];
+  return looksOf(id)[variant]?.name ?? BASE_LOOK_NAMES[id];
+}
+const BASE_LOOK_NAMES: Record<CharacterId, string> = {
+  robot: 'Square',
+  cat: 'Classic',
+  ghost: 'Classic',
+  frog: 'Classic',
+  slime: 'Classic',
+  owl: 'Tufted',
+  alien: 'Classic',
+  bear: 'Bear',
+};
+
+/** What a bot looks like: which character, which look of it, and its color. */
+export interface Look {
+  character: CharacterId;
+  variant: number;
+  color: string;
+}
+
+/** Retro palette for bot colors (light enough for the dark outline to read). */
+export const BOT_COLORS = ['#8B7CF6', '#F25F5C', '#F2A65A', '#FFD447', '#C8D35A', '#4CC38A', '#3FC1C9', '#5AB0F2', '#F06A9A', '#B98B6E', '#D9DCE3'];
+
 export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
 export const MOODS: Mood[] = ['idle', 'thinking', 'working', 'talking', 'done', 'error', 'sleeping'];
 
@@ -245,6 +504,7 @@ const FIXED: Record<string, string> = {
   G: '#8A8FA3',
   C: '#FFF1D6',
   R: '#FF5A5A',
+  V: '#5BD16A',
   Z: '#B9C2FF',
 };
 
@@ -298,9 +558,9 @@ export function frameSpec(mood: Mood, t: number, seed = 0): FrameSpec {
   }
 }
 
-/** Builds the pixels for one frame of a character in a body color. */
-export function renderFrame(id: CharacterId, color: string, spec: FrameSpec): Frame {
-  const ch = CHARACTERS[id];
+/** Builds the pixels for one frame of a character (in one of its looks) in a body color. */
+export function renderFrame(id: CharacterId, color: string, spec: FrameSpec, variant = 0): Frame {
+  const ch = looksOf(id)[variant] ?? CHARACTERS[id];
   const grid = ch.rows.map((r) => r.split(''));
   const stamp = (mask: readonly string[], x0: number, y0: number) =>
     mask.forEach((row, dy) =>
@@ -324,7 +584,7 @@ export function renderFrame(id: CharacterId, color: string, spec: FrameSpec): Fr
   for (const [ex, ey] of ch.eyes) stamp(EYES[spec.eyes], ex + spec.eyeShift, ey);
   if (ch.mouth) stamp(MOUTHS[spec.mouth], ch.mouth[0], ch.mouth[1]);
 
-  const colors: Record<string, string> = { ...FIXED, B: color, L: shift(color, 0.28), D: shift(color, -0.25) };
+  const colors: Record<string, string> = { ...FIXED, B: color, L: shift(color, 0.28), D: shift(color, -0.25), S: shift(color, -0.4) };
   const frame: Frame = new Map();
   const put = (c: string, x: number, y: number) => {
     if (x < 0 || y < 0 || x >= CANVAS || y >= CANVAS) return;

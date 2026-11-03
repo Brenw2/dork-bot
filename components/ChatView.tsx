@@ -9,7 +9,8 @@ import { getConnection } from '@/lib/bots';
 import { activityLine, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { moodFromChat } from '@/lib/sprites';
-import { botColor, colors, mono } from '@/lib/theme';
+import { useBotLook } from '@/components/useBotLook';
+import { colors, mono } from '@/lib/theme';
 
 /** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
 export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWidth?: number; inPane?: boolean }) {
@@ -87,6 +88,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
   const rows = useMemo(() => chatRows(state).reverse(), [state]);
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = !!draft.trim() && !!client;
+  const { color } = useBotLook(bot);
 
   return (
     <KeyboardAvoidingView
@@ -97,7 +99,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
       {inPane ? (
         <View style={styles.paneHeader}>
           <BotSprite bot={bot} size={30} />
-          <Text style={[styles.paneTitle, { color: botColor(bot) }]}>{bot}</Text>
+          <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
         </View>
       ) : null}
       <FlatList
@@ -176,9 +178,10 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
 
 function Bubble({ role, text, bot }: { role: ChatMessage['role']; text: string; bot: string }) {
   const mine = role === 'user';
+  const { color } = useBotLook(bot);
   return (
     <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-      {!mine ? <Text style={[styles.who, { color: botColor(bot) }]}>{bot}</Text> : null}
+      {!mine ? <Text style={[styles.who, { color }]}>{bot}</Text> : null}
       <Text style={styles.text} selectable>
         {text}
       </Text>
