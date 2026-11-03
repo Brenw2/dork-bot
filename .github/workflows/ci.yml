@@ -14,3 +14,20 @@ jobs:
       - run: npm test
       # Proves the app compiles into an iOS JS bundle (no Mac needed).
       - run: npm run bundle:ios
+
+  # Every screen rendered at the iPhone / iPhone Duo window sizes and safe areas (closed, open portrait,
+  # open landscape): fails on text or controls under the status rail, on the fold, or under the home indicator.
+  layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run test:layout
+      - if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: layout-screenshots
+          path: artifacts/layout/

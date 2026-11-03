@@ -1,30 +1,21 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from 'expo/fetch';
 import { getConnection } from '@/lib/bots';
-import { chatReducer, initialChat, type ToolCall } from '@/lib/chatState';
+import { activityLine, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { botColor, colors, mono } from '@/lib/theme';
 
 /** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
 export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWidth?: number; inPane?: boolean }) {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
   const [elapsed, setElapsed] = useState(0);
-  const listRef = useRef<FlatList<ChatMessage>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const sessionId = chatSessionId(bot);
 
@@ -82,15 +73,16 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     if (client && state.runId) client.stop(state.runId).catch(() => undefined);
   };
 
-  const rows: ChatMessage[] = state.pending
-    ? [...state.messages, { id: 'pending', role: 'assistant', content: state.pending.text }]
-    : state.messages;
+  // Inverted list: newest at the bottom, and the chat opens there however long the history is.
+  const rows = useMemo(() => chatRows(state).reverse(), [state]);
+  const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
+  const canSend = !!draft.trim() && !!client;
 
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top + 44}
+      keyboardVerticalOffset={headerHeight}
     >
       {inPane ? (
         <View style={styles.paneHeader}>
@@ -98,58 +90,70 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
         </View>
       ) : null}
       <FlatList
-        ref={listRef}
+        inverted
         data={rows}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={[styles.list, maxWidth ? { maxWidth, width: '100%', alignSelf: 'center' } : null]}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        keyExtractor={(r) => r.id}
+        style={styles.list}
+        contentContainerStyle={[styles.listBody, column]}
+        keyboardDismissMode="interactive"
         ListEmptyComponent={
-          client ? <Text style={styles.hint}>Say something to {bot}.</Text> : state.error ? undefined : <ActivityIndicator style={{ marginTop: 40 }} />
+          <View style={styles.flip}>
+            {client ? (
+              <Text style={styles.hint}>Say something to {bot}.</Text>
+            ) : state.error ? null : (
+              <ActivityIndicator style={{ marginTop: 40 }} />
+            )}
+          </View>
         }
-        renderItem={({ item }) =>
-          item.id === 'pending' && state.pending ? (
-            <View style={{ gap: 6 }}>
-              {state.pending.tools.map((t, i) => (
-                <ToolRow key={i} tool={t} />
-              ))}
-              {state.pending.text ? (
-                <Bubble role="assistant" text={state.pending.text} bot={bot} />
-              ) : (
-                <Text style={styles.hint}>
-                  {bot} is thinking… {elapsed}s
-                </Text>
-              )}
-            </View>
-          ) : item.role === 'tool' ? (
-            <ToolRow tool={{ name: item.toolName ?? 'tool', preview: item.content || null, status: 'done' }} />
-          ) : (
-            <Bubble role={item.role} text={item.content} bot={bot} />
-          )
-        }
+        renderItem={({ item }) => <Row row={item} bot={bot} thinking={`${bot} is thinking… ${elapsed}s`} />}
       />
       {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
-      <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }, maxWidth ? { maxWidth, width: '100%', alignSelf: 'center' } : null]}>
+      <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }, column]}>
         <TextInput
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
           placeholder={`Message ${bot}`}
           placeholderTextColor={colors.dim}
+          accessibilityLabel={`Message ${bot}`}
           multiline
           editable={!!client}
         />
         {running ? (
-          <Pressable style={[styles.send, { backgroundColor: colors.bad }]} onPress={stop} disabled={!state.runId}>
+          <Pressable
+            style={[styles.send, { backgroundColor: colors.bad }]}
+            onPress={stop}
+            disabled={!state.runId}
+            accessibilityRole="button"
+            accessibilityLabel="Stop"
+          >
             <Text style={styles.sendText}>Stop</Text>
           </Pressable>
         ) : (
-          <Pressable style={[styles.send, (!draft.trim() || !client) && { opacity: 0.4 }]} onPress={send}>
+          <Pressable
+            style={[styles.send, !canSend && { opacity: 0.4 }]}
+            onPress={send}
+            accessibilityRole="button"
+            accessibilityLabel="Send"
+            accessibilityState={{ disabled: !canSend }}
+          >
             <Text style={styles.sendText}>Send</Text>
           </Pressable>
         )}
       </View>
     </KeyboardAvoidingView>
   );
+}
+
+function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
+  switch (row.kind) {
+    case 'message':
+      return <Bubble role={row.message.role} text={row.message.content} bot={bot} />;
+    case 'activity':
+      return <Activity tools={row.tools} live={row.live} />;
+    case 'pending':
+      return row.text ? <Bubble role="assistant" text={row.text} bot={bot} /> : <Text style={styles.hint}>{thinking}</Text>;
+  }
 }
 
 function Bubble({ role, text, bot }: { role: ChatMessage['role']; text: string; bot: string }) {
@@ -164,17 +168,33 @@ function Bubble({ role, text, bot }: { role: ChatMessage['role']; text: string; 
   );
 }
 
-// Tool calls show inline and collapsed: tap to see what it ran.
-function ToolRow({ tool }: { tool: ToolCall }) {
+// A run of tool calls is one line that updates in place ("… terminal · 3 steps"). Tap it for the steps,
+// tap a step for what it ran.
+function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
   const [open, setOpen] = useState(false);
-  const icon = tool.status === 'running' ? '…' : tool.status === 'failed' ? '✕' : '✓';
+  const [openStep, setOpenStep] = useState<number | null>(null);
   return (
-    <Pressable onPress={() => setOpen(!open)} style={styles.tool}>
-      <Text style={styles.toolText}>
-        {icon} {tool.name}
-      </Text>
-      {open && tool.preview ? <Text style={[styles.toolText, { fontFamily: mono }]}>{tool.preview}</Text> : null}
-    </Pressable>
+    <View style={styles.activity}>
+      <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={6}>
+        <Text style={styles.toolText} numberOfLines={1}>
+          {activityLine(tools, live)} {open ? '▾' : '▸'}
+        </Text>
+      </Pressable>
+      {open
+        ? tools.map((t, i) => (
+            <Pressable key={i} onPress={() => setOpenStep(openStep === i ? null : i)} disabled={!t.preview} accessibilityRole="button">
+              <Text style={styles.step} numberOfLines={1}>
+                {t.status === 'running' ? '…' : t.status === 'failed' ? '✕' : '✓'} {t.name}
+              </Text>
+              {openStep === i && t.preview ? (
+                <Text style={[styles.step, styles.preview]} numberOfLines={12}>
+                  {t.preview}
+                </Text>
+              ) : null}
+            </Pressable>
+          ))
+        : null}
+    </View>
   );
 }
 
@@ -182,15 +202,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   paneHeader: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   paneTitle: { fontSize: 17, fontWeight: '600' },
-  list: { padding: 14, gap: 10 },
+  list: { flex: 1 },
+  listBody: { flexGrow: 1, padding: 14, gap: 10 },
+  // An inverted list draws its empty state upside down unless it's flipped back.
+  flip: { flex: 1, transform: [{ scaleY: -1 }], justifyContent: 'flex-end' },
   hint: { color: colors.dim, fontSize: 14, textAlign: 'center', marginTop: 8 },
   bubble: { maxWidth: '86%', padding: 12, borderRadius: 16 },
   mine: { alignSelf: 'flex-end', backgroundColor: colors.user },
   theirs: { alignSelf: 'flex-start', backgroundColor: colors.card },
   who: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
   text: { color: colors.text, fontSize: 16, lineHeight: 22 },
-  tool: {
+  activity: {
     alignSelf: 'flex-start',
+    maxWidth: '86%',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 10,
@@ -199,6 +223,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   toolText: { color: colors.dim, fontSize: 13 },
+  step: { color: colors.dim, fontSize: 12, paddingLeft: 8 },
+  preview: { fontFamily: mono, paddingLeft: 20 },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingBottom: 6 },
   composer: {
     flexDirection: 'row',

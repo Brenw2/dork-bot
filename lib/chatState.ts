@@ -92,3 +92,46 @@ function findLastIndex<T>(arr: T[], pred: (t: T) => boolean): number {
   for (let i = arr.length - 1; i >= 0; i--) if (pred(arr[i])) return i;
   return -1;
 }
+
+// What the chat list shows. Runs of tool calls (terminal, skills, searches...) collapse into one
+// "activity" row that updates in place instead of stacking a row per call down the screen.
+export type ChatRow =
+  | { kind: 'message'; id: string; message: ChatMessage }
+  | { kind: 'activity'; id: string; tools: ToolCall[]; live: boolean }
+  | { kind: 'pending'; id: 'pending'; text: string };
+
+/** Rows oldest first. The in-flight reply ends with its live activity and its text (or thinking line). */
+export function chatRows(state: Pick<ChatState, 'messages' | 'pending'>): ChatRow[] {
+  const rows: ChatRow[] = [];
+  let run: ToolCall[] | null = null;
+  for (const m of state.messages) {
+    if (m.role === 'tool') {
+      if (!run) {
+        run = [];
+        rows.push({ kind: 'activity', id: `tools-${m.id}`, tools: run, live: false });
+      }
+      run.push({ name: m.toolName ?? 'tool', preview: m.content || null, status: 'done' });
+      continue;
+    }
+    run = null;
+    rows.push({ kind: 'message', id: m.id, message: m });
+  }
+  const p = state.pending;
+  if (p) {
+    if (p.tools.length) rows.push({ kind: 'activity', id: 'pending-tools', tools: p.tools, live: !p.text });
+    rows.push({ kind: 'pending', id: 'pending', text: p.text });
+  }
+  return rows;
+}
+
+/** One line for a run of tool calls: the latest one while it works, a count when it's done. */
+export function activityLine(tools: ToolCall[], live: boolean): string {
+  const last = tools[tools.length - 1];
+  if (!last) return '';
+  const failed = tools.filter((t) => t.status === 'failed').length;
+  const steps = tools.length === 1 ? '' : ` · ${tools.length} steps`;
+  if (live) return `${last.status === 'running' ? '…' : last.status === 'failed' ? '✕' : '✓'} ${last.name}${steps}`;
+  const names = [...new Set(tools.map((t) => t.name))];
+  const shown = names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
+  return `${failed ? '✕' : '✓'} ${shown}${steps}${failed ? ` · ${failed} failed` : ''}`;
+}

@@ -77,7 +77,9 @@ export class HermesClient {
   private async request(path: string, init: Parameters<FetchLike>[1] = {}): Promise<FetchResponse> {
     let res: FetchResponse;
     try {
-      res = await this.fetchImpl(`${botBase(this.conn)}${path}`, {
+      // Called unbound: the browser's fetch throws "Illegal invocation" when called as a method.
+      const fetchImpl = this.fetchImpl;
+      res = await fetchImpl(`${botBase(this.conn)}${path}`, {
         ...init,
         headers: this.headers(init.headers),
       });

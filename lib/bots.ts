@@ -1,6 +1,6 @@
 // Saved bots. The list (names, addresses) and each bot's key are kept in the
 // iOS Keychain through expo-secure-store; keys never leave the device.
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secureStore';
 import type { BotConnection } from './hermes';
 import type { ManagerAuth } from './manager';
 

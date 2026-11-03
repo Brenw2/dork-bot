@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotList } from '@/components/BotList';
 import { ChatView } from '@/components/ChatView';
 import { useLayoutClass } from '@/components/useLayoutClass';
@@ -11,6 +12,8 @@ import { colors } from '@/lib/theme';
 // Open Duo in landscape: bot list left of the fold, gutter on the fold, chat on the right.
 export default function Home() {
   const cls = useLayoutClass();
+  // Content starts after the left inset (the rail, when it's on the left), but the fold is fixed in the window.
+  const { left } = useSafeAreaInsets();
   const params = useLocalSearchParams<{ bot?: string }>();
   const [selected, setSelected] = useState<string | null>(params.bot ?? null);
   const prevCls = useRef(cls);
@@ -32,7 +35,7 @@ export default function Home() {
 
   return (
     <View style={styles.row}>
-      <View style={{ width: FOLD.listSize }}>
+      <View style={{ width: FOLD.listSize - left }}>
         <BotList onSelect={setSelected} selected={selected} />
       </View>
       {/* Nothing is drawn on the fold. */}
