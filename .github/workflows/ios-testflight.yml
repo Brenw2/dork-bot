@@ -93,7 +93,9 @@ jobs:
               '.submit.production.ios += {ascApiKeyPath: $p, ascApiKeyId: $k, ascApiKeyIssuerId: $i}' \
               eas.json > "$RUNNER_TEMP/eas.json" && cp "$RUNNER_TEMP/eas.json" eas.json
           fi
-          npx --yes eas-cli@${EAS_CLI_VERSION} submit -p ios --profile production --path build.ipa --non-interactive
+          # --no-wait: Apple's processing takes ~30 min and the wait once failed on a DNS blip after the
+          # upload had already gone through. Check the submission on expo.dev (or the EAS GraphQL API).
+          npx --yes eas-cli@${EAS_CLI_VERSION} submit -p ios --profile production --path build.ipa --non-interactive --no-wait
 
       - name: Remove ASC key
         if: always()
