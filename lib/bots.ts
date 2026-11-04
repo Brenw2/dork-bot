@@ -3,6 +3,7 @@
 import * as SecureStore from './secureStore';
 import type { BotConnection } from './hermes';
 import type { ManagerAuth } from './manager';
+import type { ModelChoice } from './models';
 import type { Look } from './sprites';
 
 export interface SavedBot {
@@ -11,6 +12,8 @@ export interface SavedBot {
   addedAt: number;
   /** Picked character, look and color; unset means the defaults from the name. */
   look?: Look;
+  /** The model this phone last switched the bot's chat to (Hermes only reports the model name, not the provider). */
+  model?: ModelChoice;
 }
 
 // Screens showing a bot's character re-read the list when it changes.
@@ -45,8 +48,14 @@ export async function saveBot(conn: BotConnection, look?: Look): Promise<void> {
   const all = await listBots();
   const old = all.find((b) => b.bot === conn.bot);
   const bots = all.filter((b) => b.bot !== conn.bot);
-  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look });
+  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look, model: old?.model });
   bots.sort((a, b) => a.bot.localeCompare(b.bot));
+  await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
+  changed();
+}
+
+export async function setModelChoice(bot: string, model: ModelChoice): Promise<void> {
+  const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, model } : b));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
 }

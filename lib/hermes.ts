@@ -1,6 +1,7 @@
 // Client for one bot (= one Hermes profile) on the Hermes API server.
 // Plain TypeScript with an injectable fetch, so it runs in the app (expo/fetch,
 // which can stream) and in Node tests and scripts (global fetch).
+import { parseModelOptions, type ModelCatalog, type ModelChoice } from './models';
 import { SseParser } from './sse';
 
 export interface BotConnection {
@@ -154,6 +155,35 @@ export class HermesClient {
         if (mapped) onEvent(mapped);
       }
     }
+  }
+
+  /** Every model this bot can use (Hermes's own model picker list). Can take a few seconds. */
+  async modelOptions(): Promise<ModelCatalog> {
+    const res = await this.request('/api/model/options?include_unconfigured=false');
+    if (!res.ok) throw new HermesError(`Couldn't list models: HTTP ${res.status} ${await safeText(res)}`, res.status);
+    return parseModelOptions(await res.json());
+  }
+
+  /** The model name the chat is on (Hermes doesn't say which provider). Null for a chat that doesn't exist yet. */
+  async sessionModel(id: string): Promise<string | null> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new HermesError(`Couldn't read the chat: HTTP ${res.status}`, res.status);
+    const body = (await res.json()) as { session?: { model?: unknown } };
+    return typeof body.session?.model === 'string' && body.session.model ? body.session.model : null;
+  }
+
+  /**
+   * Locks the chat to a model; the next message uses it. Pass the lock's provider id
+   * (models.lockProvider), and normally use models.switchModel, which sets the bot first.
+   */
+  async setModel(id: string, choice: ModelChoice): Promise<void> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}/model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: choice.model, provider: choice.provider }),
+    });
+    if (!res.ok) throw new HermesError(`Couldn't switch to ${choice.model}: HTTP ${res.status} ${await safeText(res)}`, res.status);
   }
 
   async stop(runId: string): Promise<void> {

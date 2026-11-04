@@ -73,9 +73,23 @@ scripts/pair-bot.sh <bot>        # gives it a key if it has none, checks it, sho
 | Send + stream a reply | `POST /p/<bot>/api/sessions/<id>/chat/stream` `{message}` → SSE |
 | History | `GET /p/<bot>/api/sessions/<id>/messages` → `{data: [{role, content, tool_name, …}]}` |
 | Stop a run | `POST /p/<bot>/v1/runs/<run_id>/stop` |
+| Model list | `GET /p/<bot>/api/model/options?include_unconfigured=false` → `{model, provider, providers: [{slug, name, is_current, models, unavailable_models}]}` (a few seconds; Hermes's own picker list) |
+| Chat's model | `GET /p/<bot>/api/sessions/<id>` → `session.model` (name only, no provider) |
+| Switch the chat's model | `POST /p/<bot>/api/sessions/<id>/model` `{model, provider}` → `hermes.session.model_lock`; sticks for that chat, next message uses it |
 | Routines | `GET/POST /p/<bot>/api/jobs` |
 
 SSE events: `run.started` (`run_id`), `message.started`, `assistant.delta` (`delta`), `tool.started` / `tool.completed` / `tool.failed` (`tool_name`, `preview`), `tool.progress`, `assistant.completed` (`content`), `run.completed` / `run.cancelled` / `run.failed`, `error`, `done`. A real capture is in `test/fixtures/chat-stream-tool.sse`. `runtime` comes back with empty provider/model for the Ollama provider, so check `curl -s localhost:11434/api/ps` to see what served a reply.
+
+## Models
+
+A chat keeps the model it started on. If the bot's own setting changes later (e.g. chief was asked to "switch to Opus" and edited its config to Anthropic), the old chat keeps sending its old model name to the new provider, and every message fails ("Anthropic didn't answer after 3 attempts", really `404 model: gemma4:31b`; 2026-11-03, reproduced on a throwaway bot). So the app switches models in two steps (`switchModel` in lib/models.ts):
+
+1. the bot's setting through hermes serve: `POST /api/model/set {scope: "main", provider, model, profile: <bot>}` (same as the dashboard's picker; the gateway uses it from the next turn, no restart);
+2. then the open chat: `POST /p/<bot>/api/sessions/<id>/model {model, provider}`.
+
+Lock a hand-added provider as plain `custom`, not `custom:dork`: Hermes checks the lock against the provider the turn ran on, which is reported as `custom`, and throws a good reply away as "confirmed model lock runtime mismatch". `custom` means the endpoint in the bot's own settings, which is why step 1 comes first. Without the Hermes sign-in, the app only does step 2, and can't move a non-Dork bot to Dork.
+
+The model line at the top of every chat opens the picker. A chat whose model doesn't match the bot's provider shows in red. Providers come from Hermes (signed-in ones only; `-acp` duplicates hidden), the bot's own first, then Dork. A brand-new bot can see a shorter list for its first minute while Hermes fills its model cache, and deleting a bot while that runs can leave `profiles/<bot>/provider_models_cache.json.lock` behind.
 
 ## Tests against the real thing
 
@@ -83,4 +97,5 @@ SSE events: `run.started` (`run_id`), `message.started`, `assistant.delta` (`del
 DORK_LIVE=1 npm test                                                   # local, http://127.0.0.1:8642
 DORK_LIVE=1 DORK_HERMES_URL=https://b-lab.tail7e27a7.ts.net npm test   # through Tailscale, like the phone
 node scripts/smoke-chat.mjs [bot] ["message"]                          # one streamed chat, prints timings
+DORK_LIVE=1 npx vitest run test/live-models.test.ts --silent=false     # switch models mid-chat (one Haiku call)
 ```
