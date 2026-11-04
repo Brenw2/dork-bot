@@ -3,7 +3,7 @@ import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { BotSprite } from '@/components/BotSprite';
 import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
@@ -17,6 +17,8 @@ import { liveRuns, liveRunsReady } from '@/components/liveRuns';
 import { elapsedLabel } from '@/lib/liveRuns';
 import { providerName } from '@/lib/models';
 import { button, colors, mono } from '@/lib/theme';
+
+const WEB = Platform.OS === 'web';
 
 /** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
 export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWidth?: number; inPane?: boolean }) {
@@ -156,6 +158,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     const text = draft.trim();
     if (!text || !client || (running && !remote)) return;
     setDraft('');
+    pinned.current = true;
     startedAt.current = Date.now();
     dispatch({ type: 'send', text });
     const abort = new AbortController();
@@ -199,8 +202,23 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     if (client && state.runId) client.stop(state.runId).catch(() => undefined);
   };
 
-  // Inverted list: newest at the bottom, and the chat opens there however long the history is.
-  const rows = useMemo(() => chatRows(state).reverse(), [state]);
+  // Phone: an inverted list (newest at the bottom, opens there however long the history is).
+  // Web (the desktop app): react-native-web scrolls an inverted list in script, so the wheel jumps,
+  // trackpad momentum is lost and the scrollbar runs backwards. There it's a normal list, pinned
+  // to the bottom while you're at the bottom (new messages, the streaming reply).
+  const rows = useMemo(() => (WEB ? chatRows(state) : chatRows(state).reverse()), [state]);
+  const listRef = useRef<FlatList<ChatRow>>(null);
+  const pinned = useRef(true);
+  const onScroll = (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    pinned.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 80;
+  };
+  // scrollToEnd does nothing here until the list has measured itself, so scroll to the height we're given.
+  const contentHeight = useRef(0);
+  const followBottom = (h = contentHeight.current) => {
+    contentHeight.current = h;
+    if (pinned.current) listRef.current?.scrollToOffset({ offset: h, animated: false });
+  };
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = !!draft.trim() && !!client;
   const { color } = useBotLook(bot);
@@ -222,14 +240,27 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
       ) : null}
       <ModelBar bot={bot} style={column} />
       <FlatList
-        inverted
+        ref={listRef}
+        inverted={!WEB}
+        {...(WEB
+          ? {
+              onScroll,
+              scrollEventThrottle: 50,
+              onContentSizeChange: (_w: number, h: number) => followBottom(h),
+              onLayout: () => followBottom(),
+              // Chats are short enough to draw whole; virtualizing from the top made the list jump
+              // while it filled in on the way to the bottom.
+              initialNumToRender: 10_000,
+              windowSize: 10_000,
+            }
+          : null)}
         data={rows}
         keyExtractor={(r) => r.id}
         style={styles.list}
         contentContainerStyle={[styles.listBody, column]}
         keyboardDismissMode="interactive"
         ListEmptyComponent={
-          <View style={styles.flip}>
+          <View style={WEB ? styles.emptyWeb : styles.flip}>
             {client ? (
               <Text style={styles.hint}>Say something to {bot}.</Text>
             ) : state.error ? null : (
@@ -260,6 +291,17 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           placeholderTextColor={colors.dim}
           accessibilityLabel={`Message ${bot}`}
           multiline
+          // Desktop: Enter sends, Shift+Enter is a new line.
+          {...(Platform.OS === 'web'
+            ? {
+                onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault: () => void }) => {
+                  if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                },
+              }
+            : null)}
           // The web build (layout tests, previews) draws a multiline box two rows tall; iOS starts at one.
           {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
           editable={!!client}
@@ -433,6 +475,7 @@ const styles = StyleSheet.create({
   listBody: { flexGrow: 1, padding: 14, gap: 10 },
   // An inverted list draws its empty state upside down unless it's flipped back.
   flip: { flex: 1, transform: [{ scaleY: -1 }], justifyContent: 'flex-end' },
+  emptyWeb: { flex: 1, justifyContent: 'flex-end' },
   hint: { color: colors.dim, fontSize: 14, textAlign: 'center', marginTop: 8 },
   bubble: { maxWidth: '86%', padding: 12, borderRadius: 16 },
   mine: { alignSelf: 'flex-end', backgroundColor: colors.user },

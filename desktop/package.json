@@ -1,0 +1,43 @@
+{
+  "name": "dork-bot-desktop",
+  "productName": "Dork Bot",
+  "version": "0.4.0",
+  "description": "Dork Bot for the Linux desktop (the app's web build in Electron).",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "author": "Brennan <Brenw2@users.noreply.github.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --linux dir"
+  },
+  "devDependencies": {
+    "electron": "45.2.2",
+    "electron-builder": "26.18.1"
+  },
+  "build": {
+    "appId": "com.brenw2.dorkbot",
+    "productName": "Dork Bot",
+    "executableName": "dork-bot",
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "icon.png",
+      "web/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "category": "Network",
+      "icon": "icon.png"
+    }
+  },
+  "allowScripts": {
+    "electron@45.2.2": true
+  }
+}

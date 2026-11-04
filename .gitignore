@@ -15,3 +15,5 @@ coverage/
 expo-env.d.ts
 dist-web/
 artifacts/
+desktop/web/
+desktop/icon.png

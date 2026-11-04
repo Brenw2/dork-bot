@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { Column } from '@/components/Column';
+import { syncNow } from '@/components/sync';
 import { saveManagerAuth } from '@/lib/bots';
 import type { FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';
@@ -24,6 +25,8 @@ export default function Connect() {
     manager
       .listProfiles()
       .then(() => saveManagerAuth(auth))
+      // Bring in the bots already on Hermes (the ones on the phone, if this is the desktop).
+      .then(() => syncNow(true))
       .then(() => setState('ok'))
       .catch((e: Error) => setState(e.message));
     // Only on first open: the link doesn't change.
@@ -40,9 +43,9 @@ export default function Connect() {
         ) : state === 'ok' ? (
           <>
             <Text style={styles.title}>Connected to Hermes</Text>
-            <Text style={styles.text}>You can create bots from the app now.</Text>
-            <Pressable style={styles.button} onPress={() => router.replace('/new')} accessibilityRole="button">
-              <Text style={styles.buttonText}>Create a bot</Text>
+            <Text style={styles.text}>Your bots on Hermes are in the list, with the same chats on every device. You can create bots from here too.</Text>
+            <Pressable style={styles.button} onPress={() => router.dismissTo('/')} accessibilityRole="button">
+              <Text style={styles.buttonText}>See your bots</Text>
             </Pressable>
           </>
         ) : (

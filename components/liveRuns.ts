@@ -1,7 +1,7 @@
 // The app's one LiveRuns (lib/liveRuns.ts): saved in the Keychain so a reply that was still running
 // when the app closed is picked up again, checked every few seconds and whenever the app comes back.
 import { AppState } from 'react-native';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { activity } from '@/lib/activity';
 import { getConnection } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
