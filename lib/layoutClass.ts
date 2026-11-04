@@ -15,6 +15,12 @@ export const COMPACT_MAX_SHORT_SIDE = 600;
 export const WIDE_MIN_USABLE_WIDTH = 840;
 /** Open Duo, landscape: the list pane ends at the fold, then a 40 pt gutter (Sports Week's design default). */
 export const FOLD = { listSize: 455.5, gutterSize: 40 } as const;
+/**
+ * Two panes (open Duo in landscape, wide desktop window): the bot list is a sidebar this wide,
+ * and the chat gets the rest of the window. Hiding the list gives the chat the whole width.
+ * On the Duo the chat crosses the fold, the same way every screen does in open portrait.
+ */
+export const SIDEBAR_WIDTH = 300;
 /** Chat column cap on expanded-narrow, so lines stay readable on the 669 pt wide inner screen. */
 export const CHAT_MAX_WIDTH = 640;
 

@@ -25,8 +25,19 @@ import { button, colors, mix, mono, onColor } from '@/lib/theme';
 
 const WEB = Platform.OS === 'web';
 
-/** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
-export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWidth?: number; inPane?: boolean }) {
+/** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the chat pane next to the bot list. */
+export function ChatView({
+  bot,
+  maxWidth,
+  inPane = false,
+  list,
+}: {
+  bot: string;
+  maxWidth?: number;
+  inPane?: boolean;
+  /** In a pane next to the bot list: the button that hides or shows that list. */
+  list?: { hidden: boolean; toggle: () => void };
+}) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const [client, setClient] = useState<HermesClient | null>(null);
@@ -260,6 +271,17 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     >
       {inPane ? (
         <View style={styles.paneHeader}>
+          {list ? (
+            <Pressable
+              onPress={list.toggle}
+              accessibilityRole="button"
+              accessibilityLabel={list.hidden ? 'Show the bot list' : 'Hide the bot list'}
+              hitSlop={8}
+              style={({ pressed }) => [styles.listToggle, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={[styles.headerButton, { color }]}>{list.hidden ? '› Bots' : '‹ Hide'}</Text>
+            </Pressable>
+          ) : null}
           <BotSprite bot={bot} size={30} />
           <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
           <View style={{ flex: 1 }} />
@@ -578,6 +600,7 @@ function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   headerButton: { color: colors.accent, fontSize: 16 },
+  listToggle: { marginRight: 4 },
   paneHeader: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { BotSprite } from '@/components/BotSprite';
 import { ChatView, ConnectorsButton } from '@/components/ChatView';
 import { colors } from '@/lib/theme';
@@ -32,7 +32,16 @@ export default function ChatScreen() {
               </Text>
             </View>
           ),
-          headerRight: () => <ConnectorsButton bot={bot} />,
+          // iOS 26+ wraps a plain header button in a grey liquid-glass capsule. Hand the button over
+          // as a custom item with that background turned off, so it looks like the in-pane one
+          // (the bot's color, no capsule). Other platforms keep the plain headerRight.
+          ...(Platform.OS === 'ios'
+            ? {
+                unstable_headerRightItems: () => [
+                  { type: 'custom' as const, element: <ConnectorsButton bot={bot} />, hidesSharedBackground: true },
+                ],
+              }
+            : { headerRight: () => <ConnectorsButton bot={bot} /> }),
         }}
       />
       <ChatView bot={bot} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />
