@@ -15,8 +15,11 @@ import { botColor, button, colors } from '@/lib/theme';
 
 type Status = 'checking' | 'ok' | string;
 
-/** The saved bots. onSelect opens a chat (pushes a screen on phones, fills the right pane on an open Duo). */
-export function BotList({ onSelect, selected }: { onSelect: (bot: string) => void; selected?: string | null }) {
+/**
+ * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
+ * compact: the slim sidebar next to a chat, with smaller rows.
+ */
+export function BotList({ onSelect, selected, compact = false }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean }) {
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, Status>>({});
   const { bottom } = useSafeAreaInsets();
@@ -97,7 +100,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
       <FlatList
         data={bots}
         keyExtractor={(b) => b.bot}
-        contentContainerStyle={bots.length ? styles.list : styles.empty}
+        contentContainerStyle={bots.length ? (compact ? styles.listCompact : styles.list) : styles.empty}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyTitle}>No bots yet</Text>
@@ -108,16 +111,16 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
           const s = status[item.bot];
           return (
             <Pressable
-              style={({ pressed }) => [styles.row, item.bot === selected && [styles.rowSelected, { borderColor: (item.look?.color ?? botColor(item.bot)) }], pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.row, compact && styles.rowCompact, item.bot === selected && [styles.rowSelected, { borderColor: (item.look?.color ?? botColor(item.bot)) }], pressed && { opacity: 0.6 }]}
               onPress={() => onSelect(item.bot)}
               onLongPress={() => showActions(item.bot)}
               accessibilityRole="button"
               accessibilityLabel={`${item.bot}, ${s === 'ok' ? 'connected' : s === 'checking' || !s ? 'checking' : s}`}
               accessibilityHint="Opens the chat. Long-press for more."
             >
-              <BotSprite bot={item.bot} size={48} mood={s && s !== 'ok' && s !== 'checking' ? 'sleeping' : undefined} />
+              <BotSprite bot={item.bot} size={compact ? 34 : 48} mood={s && s !== 'ok' && s !== 'checking' ? 'sleeping' : undefined} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.bot}</Text>
+                <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={1}>{item.bot}</Text>
                 <StatusLine bot={item.bot} status={s} />
               </View>
               <View style={[styles.dot, { backgroundColor: s === 'ok' ? colors.ok : s === 'checking' ? colors.dim : colors.bad }]} />
@@ -132,7 +135,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
         }}
       />
       <Link href="/new" asChild>
-        <Pressable style={StyleSheet.flatten([styles.add, { marginBottom: Math.max(bottom, 16) }])} accessibilityRole="button" accessibilityLabel="New bot">
+        <Pressable style={StyleSheet.flatten([styles.add, compact && styles.addCompact, { marginBottom: Math.max(bottom, compact ? 12 : 16) }])} accessibilityRole="button" accessibilityLabel="New bot">
           <Text style={styles.addText}>+ New bot</Text>
         </Pressable>
       </Link>
@@ -171,11 +174,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
+  listCompact: { padding: 10, gap: 6 },
+  rowCompact: { gap: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   rowSelected: { borderColor: colors.accent, borderWidth: 1.5 },
   name: { color: colors.text, fontSize: 17, fontWeight: '600' },
+  nameCompact: { fontSize: 15 },
   sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   more: { color: colors.dim, fontSize: 20, paddingHorizontal: 4 },
   add: { ...button.primary, alignSelf: 'center', minWidth: 180, margin: 16 },
+  addCompact: { height: 40, minWidth: 0, alignSelf: 'stretch', marginHorizontal: 10, marginTop: 8 },
   addText: button.text,
 });

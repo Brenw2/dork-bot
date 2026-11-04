@@ -41,10 +41,9 @@ export const POSTURES = {
     width: 951,
     height: 669,
     insets: { top: 0, right: 84, bottom: 34, left: 0 },
-    keepOut: [
-      { name: 'status rail', x: 867, y: 0, width: 84, height: 669 },
-      { name: 'fold', x: 455.5, y: 0, width: 40, height: 669 },
-    ],
+    // The fold isn't a keep-out: the two-pane view is a slim bot list plus a wide chat that
+    // crosses the fold, the same way every screen crosses it in open portrait.
+    keepOut: [{ name: 'status rail', x: 867, y: 0, width: 84, height: 669 }],
   },
 };
 
@@ -188,6 +187,8 @@ const SCREENS = [
   { name: 'chat-model-problem', extraBots: ['chief'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=chief' : '/chat/chief'), waitFor: 'which doesn' },
   { name: 'model', path: () => '/model/assistant', waitFor: 'claude-opus-5-5' },
   { name: 'connectors-unpaired', path: () => '/connectors/assistant', waitFor: 'Connect to Hermes first' },
+  // Two panes with the bot list hidden: the chat takes the whole width.
+  { name: 'chat-list-hidden', postures: ['duo-open-landscape'], click: 'Hide the bot list', path: () => '/?bot=assistant', waitFor: 'Any time.' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
 ];
 
@@ -305,8 +306,8 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
-const SEEN = { chat: ['Any time.'], 'chat-rich': ['Ping me if'] };
+const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
+const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'] };
 
 function serve(dir) {
   const types = {
@@ -347,6 +348,7 @@ async function main() {
   for (const [posture, shape] of Object.entries(POSTURES)) {
     if (only && posture !== only) continue;
     for (const screen of SCREENS) {
+      if (screen.postures && !screen.postures.includes(posture)) continue;
       const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2 });
       const page = await context.newPage();
       const errors = [];
@@ -365,6 +367,7 @@ async function main() {
       try {
         await page.goto(base + path);
         await page.getByText(screen.waitFor, { exact: false }).first().waitFor({ timeout: 15_000 });
+        if (screen.click) await page.getByLabel(screen.click).first().click();
         await page.waitForTimeout(400); // let the list scroll to the end and statuses settle
         problems = await page.evaluate(audit, {
           insets: shape.insets,

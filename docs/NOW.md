@@ -15,6 +15,10 @@ Last updated: 2026-11-04 (midday)
 - Hermes chat accepts images inline (`message: [{type: text}, {type: image_url, image_url: {url: data:…}}]`, 10 MB request limit; probe: chief read "BLUE 42" from a PNG in 2 s). History keeps them as `[Image attached at: <profile>/cache/documents/native-inputs/…]`. gemma4:31b reports vision.
 - Ollama's model runner crashed once on 2026-11-04 11:23 (a desktop test turn hung until stopped). Watch for it.
 
+## In review (app/pane-layout)
+
+Chat header button no longer drawn as a grey liquid-glass capsule on iOS 26+ (closed and open-portrait Duo). Open Duo in landscape: 300 pt bot list (smaller rows) + chat, with a Hide / Bots button in the chat header; the chat now crosses the fold (layout test's fold keep-out removed for landscape). Same sidebar and Hide on the wide desktop window. Needs a Duo check: the header button look, and whether text across the fold reads OK.
+
 ## Done 2026-11-04 (#19, in 0.6.0)
 
 Custom ⋯ menu and dialogs on desktop; chat buttons in the bot's color; formatted replies with highlighted code and Copy; photos and screenshots (camera/library on the phone, pick/paste/drop on desktop), shown on both devices.
