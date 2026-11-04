@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dork Bot",
     "slug": "dork-bot",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "scheme": "dorkbot",
@@ -11,7 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.brenw2.dorkbot",
       "appleTeamId": "C7Z2H37BVG",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
