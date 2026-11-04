@@ -4,7 +4,7 @@
 
 A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like people: each has a job, its own memory and routines, and they can work together in a group chat. The brains run at home:
 
-- **Brain:** Dork, the local model in Ollama on b-lab (now `gemma4:31b` on the Radeon 7900).
+- **Brain:** any model Hermes can reach, picked per bot: Dork, the local model in Ollama on b-lab (now `gemma4:31b` on the Radeon 7900), or a frontier model (Anthropic, OpenAI, …).
 - **Engine:** Hermes on b-lab. It handles tool use, memory, skills, scheduling and approvals.
 - **App:** Dork Bot, this repo. A React Native (Expo) iPhone app, shipped through TestFlight, built for one user (Brennan).
 
@@ -28,7 +28,7 @@ A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like pe
   - `https://b-lab.tail7e27a7.ts.net` → the gateway's API server (8642): chat, history, routines. Each bot's own key. (`scripts/expose-hermes.sh`)
   - `https://b-lab.tail7e27a7.ts.net:8443` → `hermes serve` (9119), the backend the Hermes desktop app uses: create, list and delete profiles, set their keys. Behind Hermes's login gate (username/password provider); the app holds a refresh token and uses short-lived bearer tokens. (`scripts/setup-bot-manager.sh`, a user service)
 - **A bot is a Hermes profile.** Each profile has its own `API_SERVER_KEY` and accepts only that key at `/p/<bot>/`. The app keeps each key in the iOS Keychain (expo-secure-store).
-- **Making a bot in the app:** sign the app in to Hermes once (`scripts/pair-hermes.sh` → `dorkbot://connect?admin=…&chat=…&rt=…`). Then New bot (name + job) clones the Dork-pinned `assistant` profile (model, tools, skills and API keys; not its memory), writes SOUL.md from the job, generates the bot's own `API_SERVER_KEY` on the phone and sets it through Hermes, and waits until the gateway accepts it (a few seconds; no restart). New bot also lists profiles already on Hermes and adds them with their existing key. Long-press → Delete bot deletes the profile (typed confirm). `scripts/pair-bot.sh <bot>` still adds a single bot by QR code.
+- **Making a bot in the app:** sign the app in to Hermes once (`scripts/pair-hermes.sh` → `dorkbot://connect?admin=…&chat=…&rt=…`). Then New bot (name + job) clones the `assistant` profile (model, tools, skills and API keys; not its memory), writes SOUL.md from the job, generates the bot's own `API_SERVER_KEY` on the phone and sets it through Hermes, and waits until the gateway accepts it (a few seconds; no restart). New bot also lists profiles already on Hermes and adds them with their existing key. Long-press → Delete bot deletes the profile (typed confirm). `scripts/pair-bot.sh <bot>` still adds a single bot by QR code.
 - **Chat:** one ongoing Hermes session per bot, id `dork-bot-<bot>`. Replies stream over SSE (`expo/fetch`), tool calls show inline and collapsed, and Stop calls `/v1/runs/<id>/stop`.
 - **Group chat** is orchestrated in the app: it works out who's addressed (@-mentions, or everyone) and runs each bot's turn in order through that bot's own session. Each bot sees the room transcript and can reply or stay silent (`[SILENT]`).
 - **Storage:** Hermes keeps the bot chats, and each bot's look, model pick and Hide flag (a `dork_bot:` block in its profile config), so the phone and the desktop app show the same bots and chats (docs/HERMES.md → Same bots and chats on every device). Each device keeps only the bot keys and its own sign-in.
@@ -41,7 +41,7 @@ A personal Grok Bot, as an iPhone app. You message AI teammates ("bots") like pe
 3. **One chat per bot.** Each bot has one ongoing conversation. Replies stream in, and tool calls show inline (collapsed). The chat survives app restarts. There's a Stop button.
 4. **Routines.** Each bot has a list of scheduled tasks (`/api/jobs`) that you can add, pause or delete. Results land in that bot's chat.
 5. **Group chat.** Make a room with 2–6 bots. @-mentions direct a message, and with no mention every bot decides for itself. Each reply shows which bot said it.
-6. **All on Dork.** No cloud model calls. Every bot profile is pinned to the Ollama endpoint.
+6. **Any model.** Each bot runs on the model Brennan picks for it: Dork (local Ollama) or a frontier model. (Was "all on Dork"; dropped 2026-11-04 at Brennan's call.)
 7. **Connectors.** Each bot has its own connectors (remote MCP servers: Notion, Linear, Strava…), from Hermes's catalog or a custom URL. Signing in happens in an in-app browser that closes itself once approved, with no copy-pasting. Done when a bot uses a connector added from the phone. The gateway loads it within about a minute, with no restart (docs/HERMES.md, Connectors).
 
 ## Out of scope for milestone 1

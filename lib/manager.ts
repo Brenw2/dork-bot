@@ -31,7 +31,7 @@ export interface NewBot {
   job: string;
 }
 
-/** The profile new bots are cloned from. It must be pinned to Dork (local Ollama). */
+/** The profile new bots are cloned from (model, tools, skills). Any model: Dork or a frontier one. */
 export const TEMPLATE_PROFILE = 'assistant';
 const KEY_VAR = 'API_SERVER_KEY';
 
@@ -114,9 +114,10 @@ export class HermesManager {
   }
 
   /**
-   * Makes a bot: clones the Dork-pinned template profile (model, tools, skills;
-   * not its memory), writes SOUL.md from the job, gives it its own API server
-   * key, and waits until the gateway accepts that key.
+   * Makes a bot: clones the template profile (model, tools, skills; not its
+   * memory), writes SOUL.md from the job, gives it its own API server key, and
+   * waits until the gateway accepts that key. The bot starts on the template's
+   * model, whichever it is; switch it from the chat's model line.
    */
   async createBot(bot: NewBot, randomKey: () => string, opts: WaitOptions = {}): Promise<BotConnection> {
     const name = bot.name.trim().toLowerCase();
@@ -126,9 +127,6 @@ export class HermesManager {
 
     const template = (await this.listProfiles()).find((p) => p.name === TEMPLATE_PROFILE);
     if (!template) throw new HermesError(`The template profile "${TEMPLATE_PROFILE}" isn't on Hermes.`);
-    if (!isLocalModel(template)) {
-      throw new HermesError(`"${TEMPLATE_PROFILE}" isn't pinned to Dork (it uses ${template.provider}/${template.model}), so new bots would too.`);
-    }
 
     const res = await this.api('/api/profiles', 'POST', {
       name,
@@ -275,10 +273,6 @@ export async function waitForBot(conn: BotConnection, fetchImpl: FetchLike, opts
     }
     await sleep(intervalMs);
   }
-}
-
-export function isLocalModel(p: Pick<Profile, 'provider' | 'model'>): boolean {
-  return p.provider === 'custom' || p.provider === 'ollama';
 }
 
 export function soulFor(name: string, job: string): string {

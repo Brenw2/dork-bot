@@ -11,7 +11,7 @@ Last updated: 2026-11-04 (evening)
 - iPhone Duo: native (iOS 27.1 SDK), portrait-locked when folded, two panes when open in landscape. Not yet tried on a real Duo; the fold frame is Sports Week's design default (455.5 / 40). Layout tests for every posture in CI.
 - TestFlight: 0.1.0 (1) to 0.4.0 (4) shipped. **0.5.0 (5)**: sync + the desktop fixes, built 2026-11-04, but its EAS submission ended CANCELED (0.6.0 includes all of it). **0.6.0 (6)**: formatted replies, code blocks, photos/screenshots, bot-colored buttons (#19), submission FINISHED. **0.7.0 (7)**: header button + hideable two-pane bot list (#21), released 2026-11-04 evening at Brennan's ask. Check a submission with the EAS GraphQL `submissions` query, not the run's color.
 - Bot manager: `hermes serve` as the user service `dork-bot-hermes-serve` at `:8443` behind Hermes's login.
-- Models: chief and assistant are both on Opus 5.5 (Anthropic). assistant is the template New bot clones, and New bot refuses a template that isn't on Dork, so **New bot is blocked until assistant is back on Dork** (Brennan's call).
+- Models: assistant on Dork (gemma4:31b), chief on Sonnet 5.5 (Anthropic), checked 2026-11-04 evening. Any model is fine now: New bot clones assistant whatever model it's on (the Dork-only rule is gone, Brennan's call).
 - Hermes chat accepts images inline (`message: [{type: text}, {type: image_url, image_url: {url: data:…}}]`, 10 MB request limit; probe: chief read "BLUE 42" from a PNG in 2 s). History keeps them as `[Image attached at: <profile>/cache/documents/native-inputs/…]`. gemma4:31b reports vision.
 - Ollama's model runner crashed once on 2026-11-04 11:23 (a desktop test turn hung until stopped). Watch for it.
 
@@ -33,4 +33,3 @@ Custom ⋯ menu and dialogs on desktop; chat buttons in the bot's color; formatt
 ## Blockers (Brennan)
 
 - The Duo checks above, and one real OAuth sign-in from the phone: hands on the phone.
-- assistant's model (Dork or Opus) decides whether New bot works.
