@@ -9,7 +9,7 @@ import { loadManager, randomKey } from '@/components/manager';
 import { listBots, saveBot } from '@/lib/bots';
 import type { HermesManager, Profile } from '@/lib/manager';
 import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
-import { colors, mono } from '@/lib/theme';
+import { button, colors, mono } from '@/lib/theme';
 
 // Create a bot (a new Hermes profile on Dork), or connect one that's already on Hermes.
 export default function NewBot() {
@@ -120,7 +120,7 @@ export default function NewBot() {
       </Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable
-        style={[styles.button, (!!busy || !name || !job.trim()) && { opacity: 0.5 }]}
+        style={[styles.button, (!!busy || !name || !job.trim()) && button.disabled]}
         onPress={create}
         disabled={!!busy || !name || !job.trim()}
         accessibilityRole="button"
@@ -132,7 +132,7 @@ export default function NewBot() {
             <Text style={styles.buttonText}>{busy}</Text>
           </View>
         ) : (
-          <Text style={styles.buttonText}>Create bot</Text>
+          <Text style={[styles.buttonText, (!name || !job.trim()) && button.disabledText]}>Create bot</Text>
         )}
       </Pressable>
 
@@ -198,9 +198,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   error: { color: colors.bad, fontSize: 14 },
-  button: { padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
+  button: { ...button.primary, height: 50, borderRadius: 25 },
   busyRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  buttonText: button.text,
   row: {
     flexDirection: 'row',
     alignItems: 'center',

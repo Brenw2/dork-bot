@@ -14,6 +14,14 @@ export const colors = {
 
 export const mono = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
+/** Dork Bot's one button shape: a pill. Disabled buttons go flat grey instead of see-through purple. */
+export const button = {
+  primary: { height: 48, borderRadius: 24, paddingHorizontal: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  disabled: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  text: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  disabledText: { color: colors.dim },
+} as const;
+
 /** Avatar color from the bot's name, so each bot keeps its own. */
 export function botColor(name: string): string {
   const palette = ['#8B7CF6', '#4CC38A', '#F2A65A', '#5AB0F2', '#F06A9A', '#C8D35A'];

@@ -10,8 +10,8 @@ export interface ToolCall {
 
 export interface ChatState {
   messages: ChatMessage[];
-  /** The reply being streamed right now, if any. */
-  pending: { text: string; tools: ToolCall[]; thinking: boolean } | null;
+  /** The reply being streamed right now, if any. `resumed`: picked up after the stream was lost. */
+  pending: { text: string; tools: ToolCall[]; thinking: boolean; resumed?: boolean } | null;
   runId: string | null;
   error: string | null;
 }
@@ -22,6 +22,9 @@ export type ChatAction =
   | { type: 'loaded'; messages: ChatMessage[] }
   | { type: 'send'; text: string }
   | { type: 'event'; event: ChatEvent }
+  | { type: 'resumed'; runId: string }
+  /** A resumed reply finished: the reloaded history already has it, so drop the partial copy. */
+  | { type: 'settled' }
   | { type: 'failed'; message: string }
   | { type: 'ended' };
 
@@ -42,6 +45,17 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       };
     case 'event':
       return applyEvent(state, action.event);
+    case 'resumed':
+      // The reply is still running on Hermes, but this screen isn't getting its stream (it was
+      // reopened, or the stream dropped). Keep any partial reply; the history fills in when it's done.
+      return {
+        ...state,
+        runId: action.runId,
+        pending: { ...(state.pending ?? { text: '', tools: [], thinking: true }), resumed: true },
+        error: null,
+      };
+    case 'settled':
+      return { ...state, pending: null, runId: null };
     case 'failed':
       return finish({ ...state, error: action.message });
     case 'ended':

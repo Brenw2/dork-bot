@@ -7,7 +7,7 @@ import { LookPicker } from '@/components/LookPicker';
 import { useBotLook } from '@/components/useBotLook';
 import { setLook } from '@/lib/bots';
 import { MOODS, type Look } from '@/lib/sprites';
-import { colors } from '@/lib/theme';
+import { button, colors } from '@/lib/theme';
 
 // Change a bot's look (long-press a bot → Change look…): color, character, and its style.
 export default function ChangeLook() {
@@ -42,6 +42,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 20, gap: 18 },
   preview: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  button: { padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  button: { ...button.primary, height: 50, borderRadius: 25 },
+  buttonText: button.text,
 });
