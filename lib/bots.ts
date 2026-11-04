@@ -1,5 +1,6 @@
-// Saved bots. The list (names, addresses) and each bot's key are kept in the
-// iOS Keychain through expo-secure-store; keys never leave the device.
+// Saved bots. The list (names, addresses) and each bot's key are kept on the device (the iOS
+// Keychain through expo-secure-store; the desktop app's encrypted store). The list itself, looks
+// and model picks follow Hermes on every device (lib/sync.ts).
 import * as SecureStore from './secureStore';
 import type { BotConnection } from './hermes';
 import type { ManagerAuth } from './manager';
@@ -43,12 +44,12 @@ export async function getConnection(bot: string): Promise<BotConnection | null> 
   return saved && key ? { url: saved.url, bot, key } : null;
 }
 
-export async function saveBot(conn: BotConnection, look?: Look): Promise<void> {
+export async function saveBot(conn: BotConnection, look?: Look, model?: ModelChoice): Promise<void> {
   await SecureStore.setItemAsync(keyName(conn.bot), conn.key);
   const all = await listBots();
   const old = all.find((b) => b.bot === conn.bot);
   const bots = all.filter((b) => b.bot !== conn.bot);
-  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look, model: old?.model });
+  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look, model: model ?? old?.model });
   bots.sort((a, b) => a.bot.localeCompare(b.bot));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
@@ -56,6 +57,13 @@ export async function saveBot(conn: BotConnection, look?: Look): Promise<void> {
 
 export async function setModelChoice(bot: string, model: ModelChoice): Promise<void> {
   const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, model } : b));
+  await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
+  changed();
+}
+
+/** Look and/or model picked on another device (lib/sync.ts). */
+export async function updateBot(bot: string, patch: { look?: Look; model?: ModelChoice }): Promise<void> {
+  const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, ...patch } : b));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
 }

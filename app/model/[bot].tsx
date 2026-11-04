@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput,
 import { loadManager } from '@/components/manager';
 import { useColumnStyle } from '@/components/Column';
 import { useChatModel } from '@/components/useChatModel';
+import { pushMeta } from '@/components/sync';
 import { setModelChoice } from '@/lib/bots';
 import { chatSessionId } from '@/lib/hermes';
 import { filterCatalog, switchModel, type ModelChoice } from '@/lib/models';
@@ -34,6 +35,7 @@ export default function PickModel() {
         setChatModel: (c) => client.setModel(chatSessionId(bot), c),
       });
       await setModelChoice(bot, next);
+      void pushMeta(bot, { model: next });
       router.back();
     } catch (e) {
       setFailed((e as Error).message);

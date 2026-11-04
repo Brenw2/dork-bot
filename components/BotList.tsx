@@ -5,8 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from 'expo/fetch';
 import { BotSprite } from '@/components/BotSprite';
 import { loadManager } from '@/components/manager';
+import { pushMeta, syncNow } from '@/components/sync';
 import { useBotMood } from '@/components/useBotMood';
-import { getConnection, listBots, removeBot, type SavedBot } from '@/lib/bots';
+import { getConnection, listBots, onBotsChanged, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { button, colors } from '@/lib/theme';
 
@@ -20,10 +21,10 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
 
   const load = useCallback(() => {
     let live = true;
-    listBots().then(async (list) => {
+    const show = () => listBots().then(async (list) => {
       if (!live) return;
       setBots(list);
-      setStatus(Object.fromEntries(list.map((b) => [b.bot, 'checking'])));
+      setStatus((s) => Object.fromEntries(list.map((b) => [b.bot, s[b.bot] ?? 'checking'])));
       for (const b of list) {
         const conn = await getConnection(b.bot);
         if (!conn) continue;
@@ -33,16 +34,22 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
           .catch((e: Error) => live && setStatus((s) => ({ ...s, [b.bot]: e.message })));
       }
     });
+    // Show what's on this device right away, then again if Hermes says the list changed
+    // (a bot made, deleted or hidden on another device).
+    // (a bot made, deleted or hidden on another device). Sync saves through lib/bots, which fires onBotsChanged.
+    const off = onBotsChanged(() => void show());
+    show().then(() => syncNow());
     return () => {
       live = false;
+      off();
     };
   }, []);
   useFocusEffect(load);
 
-  const removeFromApp = (bot: string) =>
-    Alert.alert(`Remove ${bot} from the app?`, 'The bot stays on Hermes. You can add it back from New bot.', [
+  const hide = (bot: string) =>
+    Alert.alert(`Hide ${bot}?`, 'It goes from Dork Bot on your phone and desktop, but stays on Hermes. Add it back from New bot.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeBot(bot).then(load) },
+      { text: 'Hide', style: 'destructive', onPress: () => removeBot(bot).then(() => pushMeta(bot, { hidden: true })).then(load) },
     ]);
 
   // Deleting a Hermes profile wipes its memory, chats and routines, so make him type the name.
@@ -76,7 +83,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
     Alert.alert(bot, undefined, [
       { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
       { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
-      { text: 'Remove from app', onPress: () => removeFromApp(bot) },
+      { text: 'Hide', onPress: () => hide(bot) },
       ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),
       { text: 'Cancel', style: 'cancel' },
     ]);

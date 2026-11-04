@@ -18,6 +18,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   toolName?: string;
+  /** When Hermes saved it (seconds since epoch). Unset for messages this device hasn't reloaded yet. */
+  at?: number;
 }
 
 export type ChatEvent =
@@ -174,6 +176,18 @@ export class HermesClient {
   }
 
   /**
+   * How many messages the chat has: a cheap way to see that another device (or a routine) added
+   * to it, without downloading the whole history. Null for a chat that doesn't exist yet.
+   */
+  async messageCount(id: string): Promise<number | null> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new HermesError(`Couldn't read the chat: HTTP ${res.status}`, res.status);
+    const body = (await res.json()) as { session?: { message_count?: unknown } };
+    return typeof body.session?.message_count === 'number' ? body.session.message_count : null;
+  }
+
+  /**
    * Locks the chat to a model; the next message uses it. Pass the lock's provider id
    * (models.lockProvider), and normally use models.switchModel, which sets the bot first.
    */
@@ -209,6 +223,7 @@ interface RawMessage {
   role?: string;
   content?: unknown;
   tool_name?: string | null;
+  timestamp?: number | null;
 }
 
 export function toChatMessages(raw: RawMessage[]): ChatMessage[] {
@@ -216,8 +231,9 @@ export function toChatMessages(raw: RawMessage[]): ChatMessage[] {
   raw.forEach((m, i) => {
     const content = typeof m.content === 'string' ? m.content : '';
     const id = String(m.id ?? i);
-    if (m.role === 'user' && content) out.push({ id, role: 'user', content });
-    else if (m.role === 'assistant' && content.trim()) out.push({ id, role: 'assistant', content: content.trim() });
+    const at = typeof m.timestamp === 'number' ? { at: m.timestamp } : {};
+    if (m.role === 'user' && content) out.push({ id, role: 'user', content, ...at });
+    else if (m.role === 'assistant' && content.trim()) out.push({ id, role: 'assistant', content: content.trim(), ...at });
     else if (m.role === 'tool' && m.tool_name) out.push({ id, role: 'tool', content: '', toolName: m.tool_name });
   });
   return out;

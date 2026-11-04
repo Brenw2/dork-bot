@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -8,7 +8,7 @@ import { BotSprite } from '@/components/BotSprite';
 import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
-import { activityLine, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
+import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
@@ -45,9 +45,13 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           setClient(c);
           dispatch({ type: 'loaded', messages });
           const run = liveRuns.get(bot);
+          const sentElsewhere = awaitingReply(messages, Date.now() / 1000);
           if (run && !liveRuns.isStreaming(bot)) {
             startedAt.current = run.startedAt;
             dispatch({ type: 'resumed', runId: run.runId });
+          } else if (sentElsewhere !== null && !liveRuns.isStreaming(bot)) {
+            startedAt.current = sentElsewhere * 1000;
+            dispatch({ type: 'remote' });
           }
         }
       } catch (e) {
@@ -84,6 +88,51 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     };
   }, [bot, client, sessionId, resumed]);
 
+  // The same chat is open on the other devices: pick up what they send (and their replies), and
+  // show the bot working on a message sent from elsewhere. A cheap count check every few seconds,
+  // the full history only when it changed.
+  const pendingRef = useRef(state.pending);
+  pendingRef.current = state.pending;
+  const msgCount = useRef<number | null>(null);
+  useEffect(() => {
+    if (!client) return;
+    let live = true;
+    let busy = false;
+    const check = async () => {
+      // This screen is streaming a reply itself; the history catches up when it's done.
+      if (busy || (pendingRef.current && !pendingRef.current.resumed)) return;
+      busy = true;
+      try {
+        const count = await client.messageCount(sessionId);
+        if (!live || count === msgCount.current) return;
+        const first = msgCount.current === null;
+        msgCount.current = count;
+        if (first) return; // the initial load already has this history
+        const messages = await client.messages(sessionId);
+        if (!live || (pendingRef.current && !pendingRef.current.resumed)) return;
+        dispatch({ type: 'loaded', messages });
+        const sentAt = awaitingReply(messages, Date.now() / 1000);
+        if (pendingRef.current?.remote && sentAt === null) dispatch({ type: 'settled' });
+        else if (!pendingRef.current && sentAt !== null) {
+          startedAt.current = sentAt * 1000;
+          dispatch({ type: 'remote' });
+        }
+      } catch {
+        // offline for a moment; try again on the next tick
+      } finally {
+        busy = false;
+      }
+    };
+    void check();
+    const id = setInterval(check, 4000);
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && void check());
+    return () => {
+      live = false;
+      clearInterval(id);
+      sub.remove();
+    };
+  }, [client, sessionId]);
+
   // Tell the rest of the app what this bot is doing, so its character animates everywhere.
   const mood = moodFromChat(state);
   useEffect(() => {
@@ -94,6 +143,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
 
   // Local models can take a while before the first word; show a timer.
   const running = state.pending !== null;
+  const remote = !!state.pending?.remote;
   useEffect(() => {
     if (!running) return;
     const t0 = startedAt.current || Date.now();
@@ -104,7 +154,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || !client || running) return;
+    if (!text || !client || (running && !remote)) return;
     setDraft('');
     startedAt.current = Date.now();
     dispatch({ type: 'send', text });
@@ -214,7 +264,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
           editable={!!client}
         />
-        {running ? (
+        {running && !remote ? (
           <Pressable
             style={[styles.send, { backgroundColor: colors.bad }]}
             onPress={stop}

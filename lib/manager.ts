@@ -7,6 +7,8 @@
 // short-lived bearer tokens at /auth/native/refresh and keeps the newest one.
 import { HermesClient, HermesError, normalizeUrl, type BotConnection, type FetchLike, type FetchResponse } from './hermes';
 import { isValidBotName } from './pairing';
+import type { ModelChoice } from './models';
+import { CHARACTER_IDS, type CharacterId, type Look } from './sprites';
 
 export interface ManagerAuth {
   /** `hermes serve` base URL, e.g. https://b-lab.tail7e27a7.ts.net:8443 */
@@ -170,6 +172,23 @@ export class HermesManager {
     if (!res.ok) throw await fail(res, `Couldn't set ${name} to ${choice.model}`);
   }
 
+  /**
+   * The app's own settings for a bot (look, model pick, hidden), kept on Hermes in the
+   * profile's config under `dork_bot`, so the phone and the desktop app share them.
+   */
+  async getMeta(name: string): Promise<BotMeta> {
+    const res = await this.api(`/api/config?profile=${encodeURIComponent(name)}&include_defaults=false`);
+    if (!res.ok) throw await fail(res, `Couldn't read ${name}'s settings`);
+    const body = (await res.json()) as { dork_bot?: unknown };
+    return cleanMeta(body.dork_bot);
+  }
+
+  /** Merges `patch` into the bot's `dork_bot` settings (Hermes deep-merges, other settings stay). */
+  async setMeta(name: string, patch: BotMeta): Promise<void> {
+    const res = await this.api(`/api/config?profile=${encodeURIComponent(name)}`, 'PUT', { config: { dork_bot: patch } });
+    if (!res.ok) throw await fail(res, `Couldn't save ${name}'s settings`);
+  }
+
   /** Permanently deletes the profile: its config, memory, chats and routines. */
   async deleteBot(name: string): Promise<void> {
     if (name === 'default') throw new HermesError("The default profile can't be deleted.");
@@ -190,6 +209,31 @@ export class HermesManager {
     const body = (await res.json()) as { value?: string };
     return body.value && body.value.length >= 16 ? body.value : null;
   }
+}
+
+/** What the app stores per bot on Hermes (profile config, `dork_bot:` block). */
+export interface BotMeta {
+  look?: Look;
+  model?: ModelChoice;
+  /** Hidden from the app on every device; the bot stays on Hermes. */
+  hidden?: boolean;
+}
+
+/** Keeps only well-formed fields: the block lives in a YAML file anyone can edit. */
+export function cleanMeta(raw: unknown): BotMeta {
+  if (!raw || typeof raw !== 'object') return {};
+  const r = raw as Record<string, unknown>;
+  const meta: BotMeta = {};
+  const look = r.look as Record<string, unknown> | undefined;
+  if (look && CHARACTER_IDS.includes(look.character as CharacterId) && typeof look.variant === 'number' && typeof look.color === 'string') {
+    meta.look = { character: look.character as CharacterId, variant: look.variant, color: look.color };
+  }
+  const model = r.model as Record<string, unknown> | undefined;
+  if (model && typeof model.provider === 'string' && typeof model.model === 'string') {
+    meta.model = { provider: model.provider, model: model.model };
+  }
+  if (typeof r.hidden === 'boolean') meta.hidden = r.hidden;
+  return meta;
 }
 
 export interface WaitOptions {
