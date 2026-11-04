@@ -8,7 +8,7 @@ import { loadManager } from '@/components/manager';
 import { useBotMood } from '@/components/useBotMood';
 import { getConnection, listBots, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
-import { colors } from '@/lib/theme';
+import { button, colors } from '@/lib/theme';
 
 type Status = 'checking' | 'ok' | string;
 
@@ -117,8 +117,8 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
         }}
       />
       <Link href="/new" asChild>
-        <Pressable style={StyleSheet.flatten([styles.add, { marginBottom: Math.max(bottom, 16) }])} accessibilityRole="button">
-          <Text style={styles.addText}>New bot</Text>
+        <Pressable style={StyleSheet.flatten([styles.add, { marginBottom: Math.max(bottom, 16) }])} accessibilityRole="button" accessibilityLabel="New bot">
+          <Text style={styles.addText}>+ New bot</Text>
         </Pressable>
       </Link>
     </View>
@@ -160,6 +160,6 @@ const styles = StyleSheet.create({
   name: { color: colors.text, fontSize: 17, fontWeight: '600' },
   sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  add: { margin: 16, padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
-  addText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  add: { ...button.primary, alignSelf: 'center', minWidth: 180, margin: 16 },
+  addText: button.text,
 });

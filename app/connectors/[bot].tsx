@@ -6,7 +6,7 @@ import { Column, useColumnStyle } from '@/components/Column';
 import { loadManager } from '@/components/manager';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { Connectors, type CatalogEntry, type Connector, type SignInBrowser } from '@/lib/connectors';
-import { colors, mono } from '@/lib/theme';
+import { button, colors, mono } from '@/lib/theme';
 
 // The sign-in page opens in an in-app browser (it shares Safari's logins, so it's often one tap).
 // The provider sends it back to Hermes on b-lab; Connectors.signIn sees the approval and closes it.
@@ -247,7 +247,7 @@ export default function ConnectorsScreen() {
         accessibilityLabel="Connector URL"
       />
       <Pressable
-        style={[styles.button, (!custom.name || !custom.url || !!busy) && { opacity: 0.5 }]}
+        style={[styles.button, (!custom.name || !custom.url || !!busy) && button.disabled]}
         disabled={!custom.name || !custom.url || !!busy}
         onPress={connectCustom}
         accessibilityRole="button"
@@ -312,6 +312,6 @@ const styles = StyleSheet.create({
   small: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.accent },
   smallQuiet: { backgroundColor: 'transparent', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   smallText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  button: { padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  button: { ...button.primary, height: 50, borderRadius: 25 },
+  buttonText: button.text,
 });

@@ -186,6 +186,19 @@ export class HermesClient {
     if (!res.ok) throw new HermesError(`Couldn't switch to ${choice.model}: HTTP ${res.status} ${await safeText(res)}`, res.status);
   }
 
+  /**
+   * Where a run is: running, completed, failed, cancelled, interrupted, or 'gone' when Hermes no
+   * longer knows it (restarted, or too old). The run keeps going on Hermes when the app hangs up,
+   * so a chat that was left or backgrounded mid-reply checks this until it's done.
+   */
+  async runStatus(runId: string): Promise<string> {
+    const res = await this.request(`/v1/runs/${encodeURIComponent(runId)}`);
+    if (res.status === 404) return 'gone';
+    if (!res.ok) throw new HermesError(`Couldn't check the reply: HTTP ${res.status}`, res.status);
+    const body = (await res.json()) as { status?: unknown };
+    return typeof body.status === 'string' ? body.status : 'running';
+  }
+
   async stop(runId: string): Promise<void> {
     await this.request(`/v1/runs/${encodeURIComponent(runId)}/stop`, { method: 'POST' });
   }

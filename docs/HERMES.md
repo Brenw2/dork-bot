@@ -73,6 +73,7 @@ scripts/pair-bot.sh <bot>        # gives it a key if it has none, checks it, sho
 | Send + stream a reply | `POST /p/<bot>/api/sessions/<id>/chat/stream` `{message}` → SSE |
 | History | `GET /p/<bot>/api/sessions/<id>/messages` → `{data: [{role, content, tool_name, …}]}` |
 | Stop a run | `POST /p/<bot>/v1/runs/<run_id>/stop` |
+| Is a reply still running? | `GET /p/<bot>/v1/runs/<run_id>` → `{status}`: `running`, then `completed` / `failed` / `cancelled` / `interrupted`; 404 once Hermes forgets it. The reply keeps going when the app hangs up. `/v1/runs/<id>/events` has no events for chat-started runs, so the app polls this (lib/liveRuns.ts) |
 | Model list | `GET /p/<bot>/api/model/options?include_unconfigured=false` → `{model, provider, providers: [{slug, name, is_current, models, unavailable_models}]}` (a few seconds; Hermes's own picker list) |
 | Chat's model | `GET /p/<bot>/api/sessions/<id>` → `session.model` (name only, no provider) |
 | Switch the chat's model | `POST /p/<bot>/api/sessions/<id>/model` `{model, provider}` → `hermes.session.model_lock`; sticks for that chat, next message uses it |

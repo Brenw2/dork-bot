@@ -13,8 +13,10 @@ import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
 import { useChatModel } from '@/components/useChatModel';
+import { liveRuns, liveRunsReady } from '@/components/liveRuns';
+import { elapsedLabel } from '@/lib/liveRuns';
 import { providerName } from '@/lib/models';
-import { colors, mono } from '@/lib/theme';
+import { button, colors, mono } from '@/lib/theme';
 
 /** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
 export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWidth?: number; inPane?: boolean }) {
@@ -25,9 +27,11 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
   const [draft, setDraft] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const startedAt = useRef(0);
   const sessionId = chatSessionId(bot);
 
-  // Connect, make sure the bot's one chat exists, and load its history.
+  // Connect, make sure the bot's one chat exists, and load its history. If a reply was still
+  // running when this chat was last open (or the app was closed), show that it's still working.
   useEffect(() => {
     let live = true;
     (async () => {
@@ -36,10 +40,15 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
       const c = new HermesClient(conn, fetch as unknown as FetchLike);
       try {
         await c.ensureSession(sessionId, `Dork Bot: ${bot}`);
-        const messages = await c.messages(sessionId);
+        const [messages] = await Promise.all([c.messages(sessionId), liveRunsReady]);
         if (live) {
           setClient(c);
           dispatch({ type: 'loaded', messages });
+          const run = liveRuns.get(bot);
+          if (run && !liveRuns.isStreaming(bot)) {
+            startedAt.current = run.startedAt;
+            dispatch({ type: 'resumed', runId: run.runId });
+          }
         }
       } catch (e) {
         if (live) dispatch({ type: 'failed', message: (e as Error).message });
@@ -47,23 +56,48 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     })();
     return () => {
       live = false;
+      // Hanging up doesn't stop the reply on Hermes: hand it to the background checks.
+      liveRuns.detach(bot);
       abortRef.current?.abort();
     };
   }, [bot, sessionId]);
+
+  // A reply this screen isn't streaming finished: load it from the history.
+  const resumed = !!state.pending?.resumed;
+  useEffect(() => {
+    if (!client) return;
+    const reload = () =>
+      client
+        .messages(sessionId)
+        .then((messages) => dispatch({ type: 'loaded', messages }))
+        .catch(() => undefined);
+    const off = liveRuns.subscribe((b) => {
+      if (b !== bot) return;
+      reload().then(() => dispatch({ type: 'settled' }));
+    });
+    // While waiting, refresh now and then so steps Hermes has saved show up.
+    const id = resumed ? setInterval(reload, 5000) : null;
+    if (resumed) void liveRuns.poll();
+    return () => {
+      off();
+      if (id) clearInterval(id);
+    };
+  }, [bot, client, sessionId, resumed]);
 
   // Tell the rest of the app what this bot is doing, so its character animates everywhere.
   const mood = moodFromChat(state);
   useEffect(() => {
     activity.set(bot, mood);
   }, [bot, mood]);
-  useEffect(() => () => activity.set(bot, 'idle'), [bot]);
+  // Leaving the chat: idle, unless the reply is still running (the background checks keep it "working").
+  useEffect(() => () => void (liveRuns.get(bot) ? activity.set(bot, 'working') : activity.set(bot, 'idle')), [bot]);
 
   // Local models can take a while before the first word; show a timer.
   const running = state.pending !== null;
   useEffect(() => {
     if (!running) return;
-    const t0 = Date.now();
-    setElapsed(0);
+    const t0 = startedAt.current || Date.now();
+    setElapsed(Math.round((Date.now() - t0) / 1000));
     const id = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
     return () => clearInterval(id);
   }, [running]);
@@ -72,24 +106,42 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     const text = draft.trim();
     if (!text || !client || running) return;
     setDraft('');
+    startedAt.current = Date.now();
     dispatch({ type: 'send', text });
     const abort = new AbortController();
     abortRef.current = abort;
+    let runId: string | null = null;
     try {
       await client.chat(
         sessionId,
         text,
         (event) => {
           if (event.type === 'tool' && event.phase === 'started') connectorNotes.toolUsed(bot, event.name);
+          if (event.type === 'started' && event.runId) {
+            runId = event.runId;
+            liveRuns.start(bot, runId);
+          }
+          if (event.type === 'finished') liveRuns.finish(bot);
           dispatch({ type: 'event', event });
         },
         abort.signal,
         { instructions: connectorNotes.instructions(bot) },
       );
-      dispatch({ type: 'ended' });
+      // The stream can end without run.completed (the phone dropped the connection): if Hermes
+      // still has the run, keep showing that the bot is working.
+      if (runId && liveRuns.get(bot)) {
+        liveRuns.detach(bot);
+        dispatch({ type: 'resumed', runId });
+      } else dispatch({ type: 'ended' });
     } catch (e) {
-      if (!abort.signal.aborted) dispatch({ type: 'failed', message: (e as Error).message });
-      else dispatch({ type: 'ended' });
+      if (abort.signal.aborted) dispatch({ type: 'ended' });
+      else if (runId && liveRuns.get(bot)) {
+        // Network dropped or the app was backgrounded mid-reply; the reply carries on on Hermes.
+        liveRuns.detach(bot);
+        dispatch({ type: 'resumed', runId });
+      } else dispatch({ type: 'failed', message: (e as Error).message });
+    } finally {
+      startedAt.current = liveRuns.get(bot)?.startedAt ?? 0;
     }
   };
 
@@ -135,7 +187,13 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
             )}
           </View>
         }
-        renderItem={({ item }) => <Row row={item} bot={bot} thinking={`${bot} is thinking… ${elapsed}s`} />}
+        renderItem={({ item }) => (
+          <Row
+            row={item}
+            bot={bot}
+            thinking={`${bot} ${resumed ? 'is still working' : 'is thinking'}… ${elapsedLabel(elapsed * 1000)}`}
+          />
+        )}
       />
       {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
       {warming.length ? (
@@ -152,6 +210,8 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           placeholderTextColor={colors.dim}
           accessibilityLabel={`Message ${bot}`}
           multiline
+          // The web build (layout tests, previews) draws a multiline box two rows tall; iOS starts at one.
+          {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
           editable={!!client}
         />
         {running ? (
@@ -166,13 +226,13 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           </Pressable>
         ) : (
           <Pressable
-            style={[styles.send, !canSend && { opacity: 0.4 }]}
+            style={[styles.send, !canSend && button.disabled]}
             onPress={send}
             accessibilityRole="button"
             accessibilityLabel="Send"
             accessibilityState={{ disabled: !canSend }}
           >
-            <Text style={styles.sendText}>Send</Text>
+            <Text style={[styles.sendText, !canSend && button.disabledText]}>Send</Text>
           </Pressable>
         )}
       </View>
@@ -346,7 +406,7 @@ const styles = StyleSheet.create({
   warming: { color: colors.dim, fontSize: 13, paddingHorizontal: 16, paddingBottom: 6 },
   composer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-end', // Send stays level with the bottom line as the message box grows
     gap: 8,
     paddingHorizontal: 12,
     paddingTop: 8,
@@ -355,15 +415,17 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minHeight: 44,
     maxHeight: 140,
     color: colors.text,
     fontSize: 16,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderRadius: 20,
+    lineHeight: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderRadius: 22,
     backgroundColor: colors.card,
   },
-  send: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 20, backgroundColor: colors.accent },
-  sendText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  send: { ...button.primary, height: 44, borderRadius: 22, paddingHorizontal: 18 },
+  sendText: { ...button.text, fontSize: 15 },
 });

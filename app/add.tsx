@@ -6,7 +6,7 @@ import { useColumnStyle } from '@/components/Column';
 import { saveBot } from '@/lib/bots';
 import { HermesClient, normalizeUrl, type FetchLike } from '@/lib/hermes';
 import { connectionFromParams, validateConnection } from '@/lib/pairing';
-import { colors } from '@/lib/theme';
+import { button, colors } from '@/lib/theme';
 
 // Opened by hand, or by a dorkbot://add?url=…&bot=…&key=… pairing link.
 export default function AddBot() {
@@ -81,6 +81,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   error: { color: colors.bad, fontSize: 14 },
-  button: { padding: 15, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  button: { ...button.primary, height: 50, borderRadius: 25 },
+  buttonText: button.text,
 });

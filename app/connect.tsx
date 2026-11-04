@@ -7,7 +7,7 @@ import { saveManagerAuth } from '@/lib/bots';
 import type { FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';
 import { managerFromParams } from '@/lib/pairing';
-import { colors } from '@/lib/theme';
+import { button, colors } from '@/lib/theme';
 
 // Opened by a dorkbot://connect?admin=…&chat=…&rt=… code from scripts/pair-hermes.sh.
 export default function Connect() {
@@ -65,6 +65,6 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 20, fontWeight: '600' },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center' },
   error: { color: colors.bad, fontSize: 15, textAlign: 'center' },
-  button: { marginTop: 10, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 14, backgroundColor: colors.accent },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  button: { ...button.primary, marginTop: 10, paddingHorizontal: 28 },
+  buttonText: button.text,
 });
