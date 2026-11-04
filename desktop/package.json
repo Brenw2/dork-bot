@@ -1,7 +1,7 @@
 {
   "name": "dork-bot-desktop",
   "productName": "Dork Bot",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Dork Bot for the Linux desktop (the app's web build in Electron).",
   "private": true,
   "type": "module",
