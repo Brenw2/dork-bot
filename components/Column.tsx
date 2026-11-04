@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isDesktop } from '@/components/desktop';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH, FOLD } from '@/lib/layoutClass';
 
@@ -13,6 +14,8 @@ import { CHAT_MAX_WIDTH, FOLD } from '@/lib/layoutClass';
 export function useColumnStyle(): ViewStyle {
   const cls = useLayoutClass();
   const { left } = useSafeAreaInsets();
+  // Desktop: no fold to avoid; pop-ups are panels that already set the width.
+  if (isDesktop) return { width: '100%' };
   if (cls === 'expanded-wide') return { width: FOLD.listSize - left, alignSelf: 'flex-start' };
   if (cls === 'expanded-narrow') return { width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' };
   return { width: '100%' };

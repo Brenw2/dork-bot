@@ -4,7 +4,7 @@
 // shouldn't sit in browser storage. So this main process does the app's network calls itself
 // (net.fetch, streamed back over IPC), keeps keys in an encrypted file (safeStorage, the system
 // keyring), opens connector sign-ins in a pop-up window, and handles dorkbot:// links.
-import { app, BrowserWindow, dialog, ipcMain, net, protocol, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, safeStorage, shell } from 'electron';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -15,6 +15,10 @@ const WEB = join(HERE, 'web');
 const ORIGIN = 'app://dorkbot';
 
 app.setName('Dork Bot');
+// The app is dark only: dark scrollbars, form controls and dialogs instead of the bright defaults.
+nativeTheme.themeSource = 'dark';
+// A second, separate copy for testing (own sign-in and window): DORK_DESKTOP_PROFILE=test.
+if (process.env.DORK_DESKTOP_PROFILE) app.setPath('userData', join(app.getPath('appData'), `Dork Bot (${process.env.DORK_DESKTOP_PROFILE})`));
 // Keeps the window grouped under the .desktop entry (StartupWMClass) on Wayland/X11.
 app.commandLine.appendSwitch('class', 'dork-bot');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -68,6 +72,8 @@ function createWindow(start) {
     webPreferences: { preload: join(HERE, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   win.removeMenu();
+  // Dark scrollbars and form controls (nativeTheme alone doesn't reach the page on Linux).
+  win.webContents.on('dom-ready', () => void win?.webContents.insertCSS(':root { color-scheme: dark; }'));
   // Links in replies open in the normal browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) void shell.openExternal(url);
