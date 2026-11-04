@@ -11,7 +11,7 @@ export interface ToolCall {
 export interface ChatState {
   messages: ChatMessage[];
   /** The reply being streamed right now, if any. `resumed`: picked up after the stream was lost. */
-  pending: { text: string; tools: ToolCall[]; thinking: boolean; resumed?: boolean } | null;
+  pending: { text: string; tools: ToolCall[]; thinking: boolean; resumed?: boolean; remote?: boolean } | null;
   runId: string | null;
   error: string | null;
 }
@@ -23,6 +23,8 @@ export type ChatAction =
   | { type: 'send'; text: string }
   | { type: 'event'; event: ChatEvent }
   | { type: 'resumed'; runId: string }
+  /** The last message was sent from another device and its reply isn't in yet. */
+  | { type: 'remote' }
   /** A resumed reply finished: the reloaded history already has it, so drop the partial copy. */
   | { type: 'settled' }
   | { type: 'failed'; message: string }
@@ -54,6 +56,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         pending: { ...(state.pending ?? { text: '', tools: [], thinking: true }), resumed: true },
         error: null,
       };
+    case 'remote':
+      if (state.pending && !state.pending.remote) return state;
+      return { ...state, runId: null, pending: { text: '', tools: [], thinking: true, resumed: true, remote: true }, error: null };
     case 'settled':
       return { ...state, pending: null, runId: null };
     case 'failed':
@@ -148,4 +153,22 @@ export function activityLine(tools: ToolCall[], live: boolean): string {
   const names = [...new Set(tools.map((t) => t.name))];
   const shown = names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
   return `${failed ? '✕' : '✓'} ${shown}${steps}${failed ? ` · ${failed} failed` : ''}`;
+}
+
+/** How long a message from another device with no reply yet counts as "the bot is still on it". */
+export const REMOTE_REPLY_WINDOW_S = 15 * 60;
+
+/**
+ * When the chat's last message is the user's and has no reply yet (sent from another device, the
+ * reply still running there), the time it was sent, in seconds. Null when nothing is waiting.
+ * Tool steps saved while the reply runs don't count as a reply.
+ */
+export function awaitingReply(messages: ChatMessage[], nowS: number, windowS = REMOTE_REPLY_WINDOW_S): number | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === 'tool') continue;
+    if (m.role !== 'user' || m.at === undefined) return null;
+    return nowS - m.at <= windowS ? m.at : null;
+  }
+  return null;
 }

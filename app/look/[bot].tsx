@@ -5,6 +5,7 @@ import { Sprite } from '@/components/BotSprite';
 import { useColumnStyle } from '@/components/Column';
 import { LookPicker } from '@/components/LookPicker';
 import { useBotLook } from '@/components/useBotLook';
+import { pushMeta } from '@/components/sync';
 import { setLook } from '@/lib/bots';
 import { MOODS, type Look } from '@/lib/sprites';
 import { button, colors } from '@/lib/theme';
@@ -19,6 +20,7 @@ export default function ChangeLook() {
 
   const save = async () => {
     await setLook(bot, picked);
+    void pushMeta(bot, { look: picked });
     router.back();
   };
 

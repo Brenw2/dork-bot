@@ -81,6 +81,17 @@ scripts/pair-bot.sh <bot>        # gives it a key if it has none, checks it, sho
 
 SSE events: `run.started` (`run_id`), `message.started`, `assistant.delta` (`delta`), `tool.started` / `tool.completed` / `tool.failed` (`tool_name`, `preview`), `tool.progress`, `assistant.completed` (`content`), `run.completed` / `run.cancelled` / `run.failed`, `error`, `done`. A real capture is in `test/fixtures/chat-stream-tool.sse`. `runtime` comes back with empty provider/model for the Ollama provider, so check `curl -s localhost:11434/api/ps` to see what served a reply.
 
+## Same bots and chats on every device
+
+The phone and the desktop app show the same bots and the same chats. Nothing extra runs for it:
+
+- **Chats** were already shared: each bot has one Hermes session (`dork-bot-<bot>`), whichever device sends. An open chat checks `GET /p/<bot>/api/sessions/<id>` every 4 s (and when the app comes back) and reloads the history only when `message_count` changed. Hermes saves the user's message as soon as a turn starts (seen on b-lab: count 0 → 1 within 3 s, the reply 49 s later), so a message sent on the other device with no reply yet shows as "<bot> is still working" here, with no Stop (only the sending device has the run id) and with Send still on. That lasts until the reply lands, or 15 minutes.
+- **The bot list** follows Hermes (`lib/sync.ts`, run when the list shows and when the app comes back): every profile is a bot, except `default` unless it was added by hand. A bot deleted anywhere goes away everywhere. A new device fetches each bot's existing key (`/api/env/reveal`, 5 reads per 30 s, so a big first sync can take two passes); keys are never replaced, so other devices keep working. Bots added by hand from another Hermes address are left alone.
+- **Looks, model picks and Hide** are stored on Hermes in each profile's config, in a `dork_bot:` block, through hermes serve: `GET /api/config?profile=<bot>&include_defaults=false` → `dork_bot`, `PUT /api/config?profile=<bot>` `{config: {dork_bot: {look, model, hidden}}}` (Hermes deep-merges, so the rest of the config stays). Checked live: the block survives a model change (`/api/model/set` writes the same file). Hermes's copy wins; the first sync after updating pushes the phone's existing looks up. "Hide" (was "Remove from app") sets `hidden: true`, so the bot goes from every device and stays on Hermes; adding it back from New bot clears it.
+- Without the Hermes sign-in (`scripts/pair-hermes.sh`), a device keeps its own bot list, as before.
+
+`DORK_LIVE=1 npx vitest run test/live-sync.test.ts --silent=false` runs it end to end with two simulated devices and a throwaway bot.
+
 ## Models
 
 A chat keeps the model it started on. If the bot's own setting changes later (e.g. chief was asked to "switch to Opus" and edited its config to Anthropic), the old chat keeps sending its old model name to the new provider, and every message fails ("Anthropic didn't answer after 3 attempts", really `404 model: gemma4:31b`; 2026-11-03, reproduced on a throwaway bot). So the app switches models in two steps (`switchModel` in lib/models.ts):

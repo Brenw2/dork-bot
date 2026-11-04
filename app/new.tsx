@@ -6,6 +6,7 @@ import { LookPicker } from '@/components/LookPicker';
 import { defaultLook } from '@/components/useBotLook';
 import { Column, useColumnStyle } from '@/components/Column';
 import { loadManager, randomKey } from '@/components/manager';
+import { pushMeta } from '@/components/sync';
 import { listBots, saveBot } from '@/lib/bots';
 import type { HermesManager, Profile } from '@/lib/manager';
 import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
@@ -65,6 +66,7 @@ export default function NewBot() {
     try {
       const conn = await manager.createBot({ name, job }, randomKey);
       await saveBot(conn, look);
+      void pushMeta(conn.bot, { look, hidden: false });
       router.dismissTo({ pathname: '/', params: { bot: conn.bot } });
     } catch (e) {
       setError((e as Error).message);
@@ -79,6 +81,8 @@ export default function NewBot() {
     try {
       const conn = await manager.connectExisting(profile, randomKey);
       await saveBot(conn);
+      // Hidden on another device (or never added): it shows on every device again.
+      void pushMeta(conn.bot, { hidden: false });
       router.dismissTo({ pathname: '/', params: { bot: conn.bot } });
     } catch (e) {
       setError((e as Error).message);
