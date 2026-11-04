@@ -27,7 +27,15 @@
           "initialOrientation": "PORTRAIT_UP"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Dork Bot sends the pictures you pick to your bots.",
+          "cameraPermission": "Dork Bot sends the photos you take to your bots.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

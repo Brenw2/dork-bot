@@ -74,6 +74,54 @@ const MESSAGES = [
   { id: 6, role: 'assistant', content: 'Any time.' },
 ];
 
+// A reply with everything a bot writes: headings, lists, a table, inline code and long code lines
+// that must scroll sideways instead of running off screen. Plus a sent picture (a file on Hermes).
+const RICH_REPLY = [
+  '## Fix for the flaky test',
+  '',
+  'The race is in `waitForBot`: it polls **before** the key is set. Two changes:',
+  '',
+  '1. Set the key first, then poll.',
+  '2. Give up after `30_000` ms with a *clear* error.',
+  '',
+  '```typescript',
+  'export async function waitForBot(conn: BotConnection, fetchImpl: FetchLike, opts: WaitOptions = {}): Promise<void> {',
+  '  const { timeoutMs = 30_000, intervalMs = 2_000 } = opts; // a deliberately long line to force sideways scrolling in the block',
+  '  for (;;) {',
+  '    try {',
+  "      await new HermesClient(conn, fetchImpl).check();",
+  '      return;',
+  '    } catch (err) {',
+  '      if (Date.now() >= deadline) throw err;',
+  '    }',
+  '  }',
+  '}',
+  '```',
+  '',
+  'Run it:',
+  '',
+  '```bash',
+  'DORK_LIVE=1 npx vitest run test/live-manager.test.ts --silent=false',
+  '```',
+  '',
+  '| Step | Before | After |',
+  '| --- | ---: | ---: |',
+  '| Create bot | 1.2 s | 1.1 s |',
+  '| First chat | flaky | 8.0 s |',
+  '',
+  '> Tip: keep the template bot on Dork.',
+  '',
+  '- [x] key set before polling',
+  '- [ ] add a live test for the timeout',
+].join('\n');
+const PICTURE = `data:image/png;base64,${readFileSync(join(ROOT, 'assets', 'icon.png')).toString('base64')}`;
+const RICH_MESSAGES = [
+  { id: 1, role: 'user', content: 'why does this test fail?\n\n[Image attached at: /home/b/.hermes/profiles/coder/cache/documents/native-inputs/aa/api_aa.png]\n[screenshot]' },
+  { id: 2, role: 'assistant', content: RICH_REPLY },
+  { id: 3, role: 'user', content: 'perfect, thanks' },
+  { id: 4, role: 'assistant', content: 'Any time. Ping me if `npm test` goes red again.' },
+];
+
 const PROFILES = [
   { name: 'default', is_default: true, model: 'claude', provider: 'anthropic', description: '' },
   {
@@ -88,6 +136,7 @@ const PROFILES = [
     provider: 'custom',
     description: 'Chief of staff: manages all of the products and the other agents assigned to them.',
   },
+  { name: 'coder', model: 'gemma4:31b', provider: 'custom', description: 'Writes and fixes code.' },
 ];
 
 // The real model list from b-lab (test/fixtures/model-options.json), as a Dork-pinned bot sees it.
@@ -139,6 +188,7 @@ const SCREENS = [
   { name: 'chat-model-problem', extraBots: ['chief'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=chief' : '/chat/chief'), waitFor: 'which doesn' },
   { name: 'model', path: () => '/model/assistant', waitFor: 'claude-opus-5-5' },
   { name: 'connectors-unpaired', path: () => '/connectors/assistant', waitFor: 'Connect to Hermes first' },
+  { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
 ];
 
 async function fakeHermes(route) {
@@ -151,7 +201,7 @@ async function fakeHermes(route) {
   if (bot === 'scout' && p.endsWith('/api/sessions')) return json(401, { error: 'unauthorized' }); // shows a red status
   if (/\/api\/sessions$/.test(p) && req.method() === 'GET') return json(200, { data: [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
-  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: MESSAGES });
+  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: bot === 'coder' ? RICH_MESSAGES : MESSAGES });
   if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
   // chief: moved to Anthropic while its chat still says gemma4:31b (what broke it on 2026-11-03).
   if (p.endsWith('/api/model/options')) return json(200, bot === 'chief' ? RAW_MODELS : MODEL_OPTIONS);
@@ -159,6 +209,8 @@ async function fakeHermes(route) {
   if (p === '/auth/native/refresh')
     return json(200, { access_token: 'a'.repeat(40), refresh_token: 'r'.repeat(40), expires_at: Date.now() / 1000 + 3600 });
   if (p === '/api/profiles') return json(200, { profiles: PROFILES });
+  if (p === '/api/files/read') return json(200, { name: 'api_aa.png', mime_type: 'image/png', data_url: PICTURE });
+  if (p === '/api/config') return json(200, {});
   if (p === '/api/mcp/servers') return json(200, { servers: SERVERS });
   if (p === '/api/mcp/catalog') return json(200, { entries: CATALOG });
   const test = p.match(/^\/api\/mcp\/servers\/([^/]+)\/test$/)?.[1];
@@ -253,8 +305,8 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send', 'Change model'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
-const SEEN = { chat: ['Any time.'] };
+const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
+const SEEN = { chat: ['Any time.'], 'chat-rich': ['Ping me if'] };
 
 function serve(dir) {
   const types = {

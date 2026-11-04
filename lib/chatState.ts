@@ -20,7 +20,7 @@ export const initialChat: ChatState = { messages: [], pending: null, runId: null
 
 export type ChatAction =
   | { type: 'loaded'; messages: ChatMessage[] }
-  | { type: 'send'; text: string }
+  | { type: 'send'; text: string; images?: string[] }
   | { type: 'event'; event: ChatEvent }
   | { type: 'resumed'; runId: string }
   /** The last message was sent from another device and its reply isn't in yet. */
@@ -40,7 +40,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'send':
       return {
         ...state,
-        messages: [...state.messages, { id: nextId(), role: 'user', content: action.text }],
+        messages: [
+          ...state.messages,
+          { id: nextId(), role: 'user', content: action.text, ...(action.images?.length ? { localImages: action.images } : {}) },
+        ],
         pending: { text: '', tools: [], thinking: true },
         runId: null,
         error: null,

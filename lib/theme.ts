@@ -29,3 +29,6 @@ export function botColor(name: string): string {
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return palette[h % palette.length];
 }
+
+// Readable text on a bot color, and dark tints of it (lib/color.ts, plain TypeScript for tests).
+export { mix, onColor } from './color';

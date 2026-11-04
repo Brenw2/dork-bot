@@ -92,6 +92,13 @@ The phone and the desktop app show the same bots and the same chats. Nothing ext
 
 `DORK_LIVE=1 npx vitest run test/live-sync.test.ts --silent=false` runs it end to end with two simulated devices and a throwaway bot.
 
+## Pictures in chats
+
+- **Sending.** Session chat takes OpenAI-style parts: `message: [{type: "text", text}, {type: "image_url", image_url: {url: "data:image/jpeg;base64,…"}}]`. The request limit is 10 MB (`MAX_REQUEST_BYTES`), so the app shrinks pictures to 2000 px on the long side (JPEG 0.82–0.85; small PNG screenshots stay PNG) and caps a message at 6 pictures / ~7 MB (`lib/attachments.ts`). Hermes requires some text, so a picture sent alone carries "Here's a picture." (hidden again in the chat).
+- **History.** Hermes doesn't keep the picture in the message. It saves a file under the bot's profile and stores the text as `…\n\n[Image attached at: ~/.hermes/profiles/<bot>/cache/documents/native-inputs/<hash>/api_<hash>.png]\n[screenshot]`. The app strips those lines and loads the file back through hermes serve: `GET /api/files/read?path=<path>&profile=<bot>` → `{data_url}`. `GET /api/media?path=` refuses profile folders (403 "Path outside media roots"; its roots are only `~/.hermes/{images,screenshots,cache}`). Deleting a session deletes its picture files.
+- Verified 2026-11-04: chief (Opus) read "BLUE 42" from a PNG in 2 s; the desktop app sent a picture through the + button, the reply read it, and after a reload the picture came back from Hermes. gemma4:31b (Dork) reports `vision` in `ollama show`, not yet tried through Hermes.
+- Phone: camera and library through expo-image-picker (`NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription` in Info.plist). Desktop: + opens a file picker; paste a screenshot (Ctrl+V) or drop pictures onto the chat.
+
 ## Models
 
 A chat keeps the model it started on. If the bot's own setting changes later (e.g. chief was asked to "switch to Opus" and edited its config to Anthropic), the old chat keeps sending its old model name to the new provider, and every message fails ("Anthropic didn't answer after 3 attempts", really `404 model: gemma4:31b`; 2026-11-03, reproduced on a throwaway bot). So the app switches models in two steps (`switchModel` in lib/models.ts):

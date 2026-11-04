@@ -1,6 +1,7 @@
 // Client for one bot (= one Hermes profile) on the Hermes API server.
 // Plain TypeScript with an injectable fetch, so it runs in the app (expo/fetch,
 // which can stream) and in Node tests and scripts (global fetch).
+import { splitStoredImages, type ContentPart } from './attachments';
 import { parseModelOptions, type ModelCatalog, type ModelChoice } from './models';
 import { SseParser } from './sse';
 
@@ -20,6 +21,10 @@ export interface ChatMessage {
   toolName?: string;
   /** When Hermes saved it (seconds since epoch). Unset for messages this device hasn't reloaded yet. */
   at?: number;
+  /** Pictures sent with it, as files on Hermes (load with HermesManager.image). */
+  images?: string[];
+  /** Pictures this device just sent, as data URLs, until the history reloads. */
+  localImages?: string[];
 }
 
 export type ChatEvent =
@@ -132,7 +137,7 @@ export class HermesClient {
    */
   async chat(
     id: string,
-    message: string,
+    message: string | ContentPart[],
     onEvent: (e: ChatEvent) => void,
     signal?: AbortSignal,
     opts: { instructions?: string } = {},
@@ -232,7 +237,10 @@ export function toChatMessages(raw: RawMessage[]): ChatMessage[] {
     const content = typeof m.content === 'string' ? m.content : '';
     const id = String(m.id ?? i);
     const at = typeof m.timestamp === 'number' ? { at: m.timestamp } : {};
-    if (m.role === 'user' && content) out.push({ id, role: 'user', content, ...at });
+    if (m.role === 'user' && content) {
+      const { text, images } = splitStoredImages(content);
+      out.push({ id, role: 'user', content: text, ...at, ...(images.length ? { images } : {}) });
+    }
     else if (m.role === 'assistant' && content.trim()) out.push({ id, role: 'assistant', content: content.trim(), ...at });
     else if (m.role === 'tool' && m.tool_name) out.push({ id, role: 'tool', content: '', toolName: m.tool_name });
   });

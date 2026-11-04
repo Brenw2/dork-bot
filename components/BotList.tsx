@@ -1,7 +1,7 @@
 import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Alert } from '@/components/alert';
+import { Alert, Menu } from '@/components/alert';
 import { isDesktop } from '@/components/desktop';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from '@/components/net';
@@ -11,7 +11,7 @@ import { pushMeta, syncNow } from '@/components/sync';
 import { useBotMood } from '@/components/useBotMood';
 import { getConnection, listBots, onBotsChanged, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
-import { button, colors } from '@/lib/theme';
+import { botColor, button, colors } from '@/lib/theme';
 
 type Status = 'checking' | 'ok' | string;
 
@@ -81,14 +81,14 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
       'plain-text',
     );
 
-  const showActions = (bot: string) =>
-    Alert.alert(bot, undefined, [
+  const showActions = (bot: string, anchor?: { x: number; y: number }) =>
+    Menu.show(bot, [
       { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
       { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
       { text: 'Hide', onPress: () => hide(bot) },
       ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ], anchor);
 
   if (bots === null) return <View style={styles.screen} />;
 
@@ -108,7 +108,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
           const s = status[item.bot];
           return (
             <Pressable
-              style={({ pressed }) => [styles.row, item.bot === selected && styles.rowSelected, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.row, item.bot === selected && [styles.rowSelected, { borderColor: (item.look?.color ?? botColor(item.bot)) }], pressed && { opacity: 0.6 }]}
               onPress={() => onSelect(item.bot)}
               onLongPress={() => showActions(item.bot)}
               accessibilityRole="button"
@@ -123,7 +123,7 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
               <View style={[styles.dot, { backgroundColor: s === 'ok' ? colors.ok : s === 'checking' ? colors.dim : colors.bad }]} />
               {/* No long-press with a mouse: the same menu behind a button. */}
               {isDesktop ? (
-                <Pressable onPress={() => showActions(item.bot)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${item.bot}`}>
+                <Pressable onPress={(e) => showActions(item.bot, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${item.bot}`}>
                   <Text style={styles.more}>⋯</Text>
                 </Pressable>
               ) : null}

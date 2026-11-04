@@ -17,13 +17,14 @@ It installs to `~/.local/share/dork-bot/` and adds `~/.local/share/applications/
 - **Network.** Hermes's API server refuses browser requests (its CORS preflight answers 403). The app's fetch (`components/net.web.ts`) goes over IPC to the main process, which makes the request with `net.fetch` and streams the body back, so replies still arrive word by word.
 - **Keys.** `lib/secureStore.web.ts` → the main process keeps each value encrypted with `safeStorage` (system keyring) in `~/.config/Dork Bot/store.json` (mode 600).
 - **Tailscale name.** On b-lab itself, `b-lab.<tailnet>.ts.net` doesn't resolve (MagicDNS is off on the host). `desktop/main.mjs` maps this machine's own Tailscale name to its Tailscale IP (`host-resolver-rules`), so the desktop app uses the same `https://…ts.net` addresses as the phone and the bots match.
-- **Sign-ins and dialogs.** Connector OAuth opens in a pop-up window that closes itself once Hermes reports the sign-in approved. Alerts use native dialogs (`components/alert.web.ts`).
+- **Sign-ins.** Connector OAuth opens in a pop-up window that closes itself once Hermes reports the sign-in approved.
 
 ## Desktop-only behavior
 
 - Bot list and chat side by side from 720 px wide. Pop-ups (Look, Model, Connectors, New bot) open as panels over the dimmed app (`components/Overlay.tsx`). Esc, ✕ or a click outside closes them.
 - The chat isn't an inverted list on web: react-native-web scrolls inverted lists in script (jumpy wheel, no momentum, backwards scrollbar). It's a normal list that stays pinned to the bottom while you're at the bottom.
-- Enter sends, Shift+Enter makes a new line. ⋯ on each bot opens the menu that long-press opens on the phone.
+- Enter sends, Shift+Enter makes a new line. ⋯ on each bot opens the bot menu as an in-app popover. Confirmations are in-app cards (`components/Dialogs.tsx`), and Delete has a real box to type the bot's name. The phone keeps the system's sheets (`components/alert.ts` vs `alert.web.ts`).
+- Pictures: + opens a file picker. You can also paste a screenshot (Ctrl+V) or drop pictures anywhere on the chat (`components/pickImages.web.ts`).
 
 ## Developing
 
