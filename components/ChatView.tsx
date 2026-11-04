@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from '@/components/net';
+import { Menu } from '@/components/alert';
 import { BotSprite } from '@/components/BotSprite';
+import { Markdown } from '@/components/Markdown';
+import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
+import { useHermesImage } from '@/components/useHermesImage';
+import { attachmentProblem, MAX_IMAGES, messageBody, type Attachment } from '@/lib/attachments';
 import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
@@ -16,7 +21,7 @@ import { useChatModel } from '@/components/useChatModel';
 import { liveRuns, liveRunsReady } from '@/components/liveRuns';
 import { elapsedLabel } from '@/lib/liveRuns';
 import { providerName } from '@/lib/models';
-import { button, colors, mono } from '@/lib/theme';
+import { button, colors, mix, mono, onColor } from '@/lib/theme';
 
 const WEB = Platform.OS === 'web';
 
@@ -27,6 +32,17 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [attached, setAttached] = useState<Attachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const addImages = useCallback((more: Attachment[]) => {
+    if (!more.length) return;
+    setAttached((cur) => {
+      const next = [...cur, ...more].slice(0, MAX_IMAGES);
+      setAttachError(attachmentProblem(next));
+      return next;
+    });
+  }, []);
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const startedAt = useRef(0);
@@ -156,18 +172,23 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || !client || (running && !remote)) return;
+    const images = attached;
+    if ((!text && !images.length) || !client || (running && !remote)) return;
+    const tooBig = attachmentProblem(images);
+    if (tooBig) return setAttachError(tooBig);
     setDraft('');
+    setAttached([]);
+    setAttachError(null);
     pinned.current = true;
     startedAt.current = Date.now();
-    dispatch({ type: 'send', text });
+    dispatch({ type: 'send', text, images: images.map((im) => im.dataUrl) });
     const abort = new AbortController();
     abortRef.current = abort;
     let runId: string | null = null;
     try {
       await client.chat(
         sessionId,
-        text,
+        messageBody(text, images),
         (event) => {
           if (event.type === 'tool' && event.phase === 'started') connectorNotes.toolUsed(bot, event.name);
           if (event.type === 'started' && event.runId) {
@@ -220,8 +241,15 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
     if (pinned.current) listRef.current?.scrollToOffset({ offset: h, animated: false });
   };
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
-  const canSend = !!draft.trim() && !!client;
+  const canSend = (!!draft.trim() || attached.length > 0) && !!client;
   const { color } = useBotLook(bot);
+  const onBot = onColor(color);
+  useImageDrop(addImages, !!client);
+  const attach = (source: PickSource) => void pickImages(source, attached.length).then(addImages).catch((e: Error) => setAttachError(e.message));
+  const openAttach = (anchor?: { x: number; y: number }) =>
+    PICK_SOURCES.length === 1
+      ? attach(PICK_SOURCES[0].source)
+      : Menu.show('Add a picture', [...PICK_SOURCES.map((p) => ({ text: p.label, onPress: () => attach(p.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
   const warming = useConnectorWarmup(bot);
 
   return (
@@ -238,7 +266,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           <ConnectorsButton bot={bot} />
         </View>
       ) : null}
-      <ModelBar bot={bot} style={column} />
+      <ModelBar bot={bot} style={column} color={color} />
       <FlatList
         ref={listRef}
         inverted={!WEB}
@@ -282,9 +310,45 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
         </Text>
       ) : null}
+      {attached.length ? (
+        <ScrollView horizontal style={[styles.attachRow, column]} contentContainerStyle={styles.attachRowBody} keyboardShouldPersistTaps="handled">
+          {attached.map((im, i) => (
+            <View key={i} style={styles.thumbWrap}>
+              <Image source={{ uri: im.dataUrl }} style={styles.thumb} accessibilityLabel={`Picture ${i + 1}`} />
+              <Pressable
+                style={styles.thumbRemove}
+                onPress={() =>
+                  setAttached((cur) => {
+                    const next = cur.filter((_, j) => j !== i);
+                    setAttachError(attachmentProblem(next));
+                    return next;
+                  })
+                }
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove picture ${i + 1}`}
+              >
+                <Text style={styles.thumbRemoveText}>✕</Text>
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
+      {attachError ? <Text style={[styles.error, column]}>{attachError}</Text> : null}
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }, column]}>
+        <Pressable
+          style={({ pressed }) => [styles.attach, { borderColor: mix(color, 0.55) }, pressed && { opacity: 0.6 }]}
+          onPress={(e) => openAttach({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+          disabled={!client || attached.length >= MAX_IMAGES}
+          accessibilityRole="button"
+          accessibilityLabel="Add a picture"
+        >
+          <Text style={[styles.attachText, { color }]}>+</Text>
+        </Pressable>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: focused ? mix(color, 0.7) : 'transparent' }, WEB && ({ outlineStyle: 'none' } as object)]}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           value={draft}
           onChangeText={setDraft}
           placeholder={`Message ${bot}`}
@@ -318,13 +382,13 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           </Pressable>
         ) : (
           <Pressable
-            style={[styles.send, !canSend && button.disabled]}
+            style={[styles.send, { backgroundColor: color }, !canSend && button.disabled]}
             onPress={send}
             accessibilityRole="button"
             accessibilityLabel="Send"
             accessibilityState={{ disabled: !canSend }}
           >
-            <Text style={[styles.sendText, !canSend && button.disabledText]}>Send</Text>
+            <Text style={[styles.sendText, { color: onBot }, !canSend && button.disabledText]}>Send</Text>
           </Pressable>
         )}
       </View>
@@ -348,6 +412,7 @@ function useConnectorWarmup(bot: string) {
 
 /** Opens the bot's connectors (Notion, Linear, ...). In the chat header and the open-Duo pane header. */
 export function ConnectorsButton({ bot }: { bot: string }) {
+  const { color } = useBotLook(bot);
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/connectors/[bot]', params: { bot } })}
@@ -355,13 +420,13 @@ export function ConnectorsButton({ bot }: { bot: string }) {
       accessibilityLabel={`${bot}'s connectors`}
       hitSlop={8}
     >
-      <Text style={styles.headerButton}>Connectors</Text>
+      <Text style={[styles.headerButton, { color }]}>Connectors</Text>
     </Pressable>
   );
 }
 
 /** The chat's model ("claude-opus-5-5 · Anthropic"); tap to switch. Turns red when the model can't work. */
-function ModelBar({ bot, style }: { bot: string; style: ViewStyle | null }) {
+function ModelBar({ bot, style, color }: { bot: string; style: ViewStyle | null; color: string }) {
   const { choice, problem, catalog, error } = useChatModel(bot);
   const label = choice
     ? `${choice.model}${choice.provider ? ` · ${providerName(catalog, choice.provider)}` : ''}`
@@ -379,7 +444,7 @@ function ModelBar({ bot, style }: { bot: string; style: ViewStyle | null }) {
       <Text style={[styles.modelText, problem ? { color: colors.bad } : null]} numberOfLines={problem ? 3 : 1}>
         {problem ?? label}
       </Text>
-      <Text style={styles.modelChange}>Change</Text>
+      <Text style={[styles.modelChange, { color }]}>Change</Text>
     </Pressable>
   );
 }
@@ -387,12 +452,12 @@ function ModelBar({ bot, style }: { bot: string; style: ViewStyle | null }) {
 function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
   switch (row.kind) {
     case 'message':
-      return <Bubble role={row.message.role} text={row.message.content} bot={bot} />;
+      return row.message.role === 'user' ? <Mine message={row.message} bot={bot} /> : <Reply text={row.message.content} bot={bot} />;
     case 'activity':
       return <Activity tools={row.tools} live={row.live} />;
     case 'pending':
       return row.text ? (
-        <Bubble role="assistant" text={row.text} bot={bot} />
+        <Reply text={row.text} bot={bot} />
       ) : (
         <View style={styles.thinkingRow}>
           <BotSprite bot={bot} size={28} />
@@ -402,16 +467,81 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
   }
 }
 
-function Bubble({ role, text, bot }: { role: ChatMessage['role']; text: string; bot: string }) {
-  const mine = role === 'user';
+/** A bot reply: formatted text across the chat's width, under the bot's name in its color. */
+function Reply({ text, bot }: { text: string; bot: string }) {
   const { color } = useBotLook(bot);
   return (
-    <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-      {!mine ? <Text style={[styles.who, { color }]}>{bot}</Text> : null}
-      <Text style={styles.text} selectable>
-        {text}
-      </Text>
+    <View style={styles.reply}>
+      <Text style={[styles.who, { color }]}>{bot}</Text>
+      <Markdown text={text} accent={color} />
     </View>
+  );
+}
+
+/** What you sent: a bubble tinted with the bot's color, with any pictures above the text. */
+function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
+  const { color } = useBotLook(bot);
+  const local = message.localImages ?? [];
+  const remote = local.length ? [] : (message.images ?? []);
+  return (
+    <View style={[styles.mine, { maxWidth: '86%' }]}>
+      {local.length || remote.length ? (
+        <View style={styles.pictures}>
+          {local.map((uri, i) => (
+            <Picture key={`l${i}`} uri={uri} count={local.length} />
+          ))}
+          {remote.map((path) => (
+            <HermesPicture key={path} bot={bot} path={path} count={remote.length} />
+          ))}
+        </View>
+      ) : null}
+      {message.content ? (
+        <View style={[styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
+          <Text style={styles.text} selectable>
+            {message.content}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function HermesPicture({ bot, path, count }: { bot: string; path: string; count: number }) {
+  const { uri, failed } = useHermesImage(bot, path);
+  if (uri) return <Picture uri={uri} count={count} />;
+  return (
+    <View style={[styles.picture, pictureSize(count), styles.picturePlaceholder]}>
+      {failed ? <Text style={styles.pictureNote}>Picture</Text> : <ActivityIndicator color={colors.dim} />}
+    </View>
+  );
+}
+
+/** Several pictures: square tiles. One: its own shape, within 300 × 300. */
+const pictureSize = (count: number, aspect?: number) => {
+  if (count > 1) return { width: 124, height: 124 };
+  if (!aspect) return { width: 260, height: 200 };
+  return aspect >= 1 ? { width: 300, height: Math.round(300 / aspect) } : { width: Math.round(300 * aspect), height: 300 };
+};
+
+/** A sent picture; tap for full size. */
+function Picture({ uri, count }: { uri: string; count: number }) {
+  const [open, setOpen] = useState(false);
+  const [aspect, setAspect] = useState<number | undefined>();
+  useEffect(() => {
+    if (count > 1) return;
+    Image.getSize(uri, (w, h) => h > 0 && setAspect(w / h), () => undefined);
+  }, [uri, count]);
+  return (
+    <>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="imagebutton" accessibilityLabel="Picture. Open full size">
+        <Image source={{ uri }} style={[styles.picture, pictureSize(count, aspect)]} resizeMode="cover" />
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.viewer} onPress={() => setOpen(false)} accessibilityLabel="Close picture">
+          <Image source={{ uri }} style={styles.viewerImage} resizeMode="contain" />
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -477,10 +607,36 @@ const styles = StyleSheet.create({
   flip: { flex: 1, transform: [{ scaleY: -1 }], justifyContent: 'flex-end' },
   emptyWeb: { flex: 1, justifyContent: 'flex-end' },
   hint: { color: colors.dim, fontSize: 14, textAlign: 'center', marginTop: 8 },
-  bubble: { maxWidth: '86%', padding: 12, borderRadius: 16 },
-  mine: { alignSelf: 'flex-end', backgroundColor: colors.user },
-  theirs: { alignSelf: 'flex-start', backgroundColor: colors.card },
-  who: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
+  bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, alignSelf: 'flex-end' },
+  mine: { alignSelf: 'flex-end', gap: 6, alignItems: 'flex-end' },
+  reply: { alignSelf: 'stretch', paddingVertical: 4, paddingRight: 4 },
+  who: { fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 0.3 },
+  pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
+  picture: { borderRadius: 14, backgroundColor: colors.card },
+  picturePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  pictureNote: { color: colors.dim, fontSize: 13 },
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  viewerImage: { width: '100%', height: '100%' },
+  attachRow: { flexGrow: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  attachRowBody: { gap: 8, paddingHorizontal: 12, paddingTop: 10 },
+  thumbWrap: { width: 64, height: 64 },
+  thumb: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.card },
+  thumbRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbRemoveText: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  attach: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  attachText: { fontSize: 24, lineHeight: 26, fontWeight: '400' },
   text: { color: colors.text, fontSize: 16, lineHeight: 22 },
   activity: {
     alignSelf: 'flex-start',
@@ -517,6 +673,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 12,
     borderRadius: 22,
+    borderWidth: 1.5,
     backgroundColor: colors.card,
   },
   send: { ...button.primary, height: 44, borderRadius: 22, paddingHorizontal: 18 },

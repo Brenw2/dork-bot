@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isDesktop } from '@/components/desktop';
+import { DialogHost } from '@/components/Dialogs';
 import { Overlay } from '@/components/Overlay';
 import { TestInsets } from '@/components/TestInsets';
 import { applyInitialOrientation, OrientationController } from '@/components/useLayoutClass';
@@ -25,6 +26,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <OrientationController />
       <Screens />
+      <DialogHost />
     </TestInsets>
   );
 }

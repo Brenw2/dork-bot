@@ -189,6 +189,19 @@ export class HermesManager {
     if (!res.ok) throw await fail(res, `Couldn't save ${name}'s settings`);
   }
 
+  /**
+   * A picture sent in a chat, as a data URL. Hermes keeps it as a file in the bot's profile
+   * (the path is in the message, see lib/attachments.ts); its media endpoint won't serve profile
+   * folders, but the file reader does.
+   */
+  async image(bot: string, path: string): Promise<string> {
+    const res = await this.api(`/api/files/read?path=${encodeURIComponent(path)}&profile=${encodeURIComponent(bot)}`);
+    if (!res.ok) throw await fail(res, "Couldn't load the picture");
+    const body = (await res.json()) as { data_url?: string };
+    if (!body.data_url?.startsWith('data:image/')) throw new HermesError("That file isn't a picture.");
+    return body.data_url;
+  }
+
   /** Permanently deletes the profile: its config, memory, chats and routines. */
   async deleteBot(name: string): Promise<void> {
     if (name === 'default') throw new HermesError("The default profile can't be deleted.");
