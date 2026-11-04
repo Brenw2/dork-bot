@@ -1,6 +1,6 @@
 # Dork Bot
 
-My own take on Grok Bot, as an iPhone app. AI teammates you message like people. Each bot has a job, its own memory and routines, and bots can work together in group chats. The brains run at home: **Hermes** on my computer, with **Dork**, my local model in Ollama. The phone reaches them over Tailscale.
+My own take on Grok Bot, as an iPhone app. AI teammates you message like people. Each bot has a job, its own memory and routines, and bots can work together in group chats. The brains run at home: **Hermes** on my computer, running my local model **Dork** in Ollama or a frontier model, per bot. The phone reaches them over Tailscale.
 
 This is a personal project, built for me. Feel free to fork it.
 
@@ -33,4 +33,4 @@ Releases go to TestFlight: see `docs/TESTFLIGHT.md`.
 - [x] Create and delete bots from the app
 - [ ] Routines (scheduled tasks per bot)
 - [ ] Group chat with @-mentions
-- [ ] All of it on Dork (Ollama, local)
+- [x] Any model per bot: Dork (Ollama, local) or a frontier model

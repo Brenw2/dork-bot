@@ -6,7 +6,7 @@ Read `docs/PLAN.md` (what we're building and why) and `docs/NOW.md` (current sta
 
 - A personal Grok Bot clone as an iPhone app (Expo SDK 58, React Native, expo-router). Owner and only user: Brennan (GitHub Brenw2). The repo is public, MIT-licensed, and forks are welcome, but don't add features for other users.
 - The app talks straight to Hermes on b-lab over Tailscale: the gateway's API server for chat (`:443` → 8642) and `hermes serve` for creating and deleting bots (`:8443` → 9119, behind Hermes's login gate). There is no Dork Bot server; don't add one.
-- The engine is Hermes and the model is Dork (local Ollama). Never add calls to cloud models.
+- The engine is Hermes. Bots can run on any model Hermes has: Dork (local Ollama) or a frontier model (Anthropic, OpenAI, …). Brennan picks per bot and per chat.
 - A bot = a Hermes profile. Don't invent a second bot store.
 
 ## Rules

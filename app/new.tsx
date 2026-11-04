@@ -9,11 +9,11 @@ import { isDesktop } from '@/components/desktop';
 import { loadManager, randomKey } from '@/components/manager';
 import { pushMeta } from '@/components/sync';
 import { listBots, saveBot } from '@/lib/bots';
-import type { HermesManager, Profile } from '@/lib/manager';
+import { TEMPLATE_PROFILE, type HermesManager, type Profile } from '@/lib/manager';
 import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
 import { button, colors, mono } from '@/lib/theme';
 
-// Create a bot (a new Hermes profile on Dork), or connect one that's already on Hermes.
+// Create a bot (a new Hermes profile, on any model), or connect one that's already on Hermes.
 export default function NewBot() {
   const [manager, setManager] = useState<HermesManager | null | undefined>(undefined);
   const [name, setName] = useState('');
@@ -25,6 +25,7 @@ export default function NewBot() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [others, setOthers] = useState<Profile[]>([]);
+  const [template, setTemplate] = useState<Profile | null>(null);
   const column = useColumnStyle();
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function NewBot() {
       const [profiles, saved] = await Promise.all([m.listProfiles(), listBots()]);
       const have = new Set(saved.map((b) => b.bot));
       setOthers(profiles.filter((p) => !p.isDefault && !have.has(p.name)));
+      setTemplate(profiles.find((p) => p.name === TEMPLATE_PROFILE) ?? null);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -122,7 +124,7 @@ export default function NewBot() {
         {picking ? <LookPicker value={look} onChange={setPicked} /> : null}
       </View>
       <Text style={styles.hint}>
-        It runs on Dork, with the same tools as {'"'}assistant{'"'} but its own memory and chat.
+        It starts on the same model and tools as {'"'}assistant{'"'}{template?.model ? ` (${template.model})` : ''}, with its own memory and chats. Switch it to any model, local or frontier, from the model line in its chat.
       </Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable

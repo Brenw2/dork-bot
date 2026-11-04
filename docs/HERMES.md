@@ -60,7 +60,7 @@ The Connectors screen (long-press a bot, or Connectors in the chat header) uses 
 ## Adding a bot by hand
 
 ```bash
-hermes profile create <bot>      # pin it to Dork like the assistant profile
+hermes profile create <bot>      # then pick its model (hermes -p <bot> model, or the app's model line)
 scripts/pair-bot.sh <bot>        # gives it a key if it has none, checks it, shows the QR code
 ```
 

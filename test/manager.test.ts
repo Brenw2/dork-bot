@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FetchLike, FetchResponse } from '@/lib/hermes';
-import { HermesManager, isLocalModel, soulFor, waitForBot } from '@/lib/manager';
+import { HermesManager, soulFor, waitForBot } from '@/lib/manager';
 import { managerFromParams, managerLink } from '@/lib/pairing';
 
 // A fake `hermes serve` + gateway, shaped like the real responses seen on b-lab.
@@ -111,7 +111,7 @@ describe('HermesManager', () => {
     await expect(m.listProfiles()).rejects.toThrow(/pair-hermes\.sh/);
   });
 
-  it('creates a bot cloned from the Dork template, with its own key, and waits for the gateway', async () => {
+  it('creates a bot cloned from the template, with its own key, and waits for the gateway', async () => {
     const h = fakeHermes({ keyLiveAfter: 2 });
     const m = new HermesManager(auth, h.fetch, () => {}, () => 1000);
     const conn = await m.createBot({ name: 'Scout', job: 'Finds Mets news' }, key, noWait);
@@ -124,11 +124,12 @@ describe('HermesManager', () => {
     expect(h.calls.filter((c) => c.url.includes('/p/scout/api/sessions'))).toHaveLength(3);
   });
 
-  it('refuses to create bots from a template that is not on Dork', async () => {
-    const h = fakeHermes({ templateProvider: 'anthropic' });
-    const m = new HermesManager(auth, h.fetch);
-    await expect(m.createBot({ name: 'scout', job: 'x' }, key, noWait)).rejects.toThrow(/isn't pinned to Dork/);
-    expect(h.calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/profiles'))).toBe(false);
+  it('creates bots from a template on a frontier model too', async () => {
+    const h = fakeHermes({ templateProvider: 'anthropic', keyLiveAfter: 0 });
+    const m = new HermesManager(auth, h.fetch, () => {}, () => 1000);
+    const conn = await m.createBot({ name: 'scout', job: 'x' }, key, noWait);
+    expect(conn.bot).toBe('scout');
+    expect(h.calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/profiles'))).toBe(true);
   });
 
   it('turns name problems into plain messages', async () => {
@@ -167,12 +168,6 @@ describe('HermesManager', () => {
 });
 
 describe('helpers', () => {
-  it('only treats local providers as Dork', () => {
-    expect(isLocalModel({ provider: 'custom', model: 'gemma4:31b' })).toBe(true);
-    expect(isLocalModel({ provider: 'anthropic', model: 'claude' })).toBe(false);
-    expect(isLocalModel({ provider: null, model: null })).toBe(false);
-  });
-
   it('writes a SOUL.md from the job', () => {
     expect(soulFor('scout', 'Finds Mets news')).toMatch(/^You are Scout, one of Brennan's AI teammates/);
   });
