@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { getConnection, listBots, onBotsChanged } from '@/lib/bots';
 import { chatSessionId, HermesClient, type FetchLike } from '@/lib/hermes';
 import { chatModel, type ChatModel, type ModelCatalog } from '@/lib/models';

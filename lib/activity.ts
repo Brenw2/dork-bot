@@ -13,8 +13,10 @@ export class ActivityStore {
   private listeners = new Set<Listener>();
 
   constructor(
-    private readonly schedule: (fn: () => void, ms: number) => ReturnType<typeof setTimeout> = setTimeout,
-    private readonly cancel: (t: ReturnType<typeof setTimeout>) => void = clearTimeout,
+    // Wrapped, not passed as is: called as this.cancel(...), a browser's own clearTimeout throws
+    // "Illegal invocation" (it must be called on window), which blanked the desktop app.
+    private readonly schedule: (fn: () => void, ms: number) => ReturnType<typeof setTimeout> = (fn, ms) => setTimeout(fn, ms),
+    private readonly cancel: (t: ReturnType<typeof setTimeout>) => void = (t) => clearTimeout(t),
   ) {}
 
   get(bot: string): Mood {

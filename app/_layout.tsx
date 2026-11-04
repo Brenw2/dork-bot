@@ -6,6 +6,10 @@ import { TestInsets } from '@/components/TestInsets';
 import { applyInitialOrientation, OrientationController } from '@/components/useLayoutClass';
 import { colors } from '@/lib/theme';
 
+// A screen that throws shows expo-router's error page with a Retry button, instead of blanking
+// the whole window (the desktop app went black on one bad render).
+export { ErrorBoundary } from 'expo-router';
+
 // Decide portrait lock from the first window size, before the first paint.
 applyInitialOrientation();
 

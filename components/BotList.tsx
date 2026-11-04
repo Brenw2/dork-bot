@@ -1,8 +1,10 @@
 import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert } from '@/components/alert';
+import { isDesktop } from '@/components/desktop';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { BotSprite } from '@/components/BotSprite';
 import { loadManager } from '@/components/manager';
 import { pushMeta, syncNow } from '@/components/sync';
@@ -119,6 +121,12 @@ export function BotList({ onSelect, selected }: { onSelect: (bot: string) => voi
                 <StatusLine bot={item.bot} status={s} />
               </View>
               <View style={[styles.dot, { backgroundColor: s === 'ok' ? colors.ok : s === 'checking' ? colors.dim : colors.bad }]} />
+              {/* No long-press with a mouse: the same menu behind a button. */}
+              {isDesktop ? (
+                <Pressable onPress={() => showActions(item.bot)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${item.bot}`}>
+                  <Text style={styles.more}>⋯</Text>
+                </Pressable>
+              ) : null}
             </Pressable>
           );
         }}
@@ -167,6 +175,7 @@ const styles = StyleSheet.create({
   name: { color: colors.text, fontSize: 17, fontWeight: '600' },
   sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
   dot: { width: 9, height: 9, borderRadius: 5 },
+  more: { color: colors.dim, fontSize: 20, paddingHorizontal: 4 },
   add: { ...button.primary, alignSelf: 'center', minWidth: 180, margin: 16 },
   addText: button.text,
 });

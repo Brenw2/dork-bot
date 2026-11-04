@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { useColumnStyle } from '@/components/Column';
 import { saveBot } from '@/lib/bots';
 import { HermesClient, normalizeUrl, type FetchLike } from '@/lib/hermes';

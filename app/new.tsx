@@ -5,6 +5,7 @@ import { Sprite } from '@/components/BotSprite';
 import { LookPicker } from '@/components/LookPicker';
 import { defaultLook } from '@/components/useBotLook';
 import { Column, useColumnStyle } from '@/components/Column';
+import { isDesktop } from '@/components/desktop';
 import { loadManager, randomKey } from '@/components/manager';
 import { pushMeta } from '@/components/sync';
 import { listBots, saveBot } from '@/lib/bots';
@@ -52,8 +53,9 @@ export default function NewBot() {
           <Text style={styles.title}>Connect to Hermes first</Text>
           <Text style={styles.text}>
             On b-lab run{'\n'}
-            <Text style={styles.code}>scripts/pair-hermes.sh</Text>
-            {'\n'}and scan the QR code with the iPhone camera. You only do this once.
+            <Text style={styles.code}>{isDesktop ? 'scripts/pair-hermes.sh --desktop' : 'scripts/pair-hermes.sh'}</Text>
+            {'\n'}
+            {isDesktop ? 'It signs this app in and brings in your bots.' : 'and scan the QR code with the iPhone camera.'} You only do this once.
           </Text>
         </Column>
       </View>

@@ -3,7 +3,7 @@ import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { BotSprite } from '@/components/BotSprite';
 import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
@@ -260,6 +260,17 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           placeholderTextColor={colors.dim}
           accessibilityLabel={`Message ${bot}`}
           multiline
+          // Desktop: Enter sends, Shift+Enter is a new line.
+          {...(Platform.OS === 'web'
+            ? {
+                onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault: () => void }) => {
+                  if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                },
+              }
+            : null)}
           // The web build (layout tests, previews) draws a multiline box two rows tall; iOS starts at one.
           {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
           editable={!!client}

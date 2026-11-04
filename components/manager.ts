@@ -1,7 +1,7 @@
 // Wires the HermesManager to the phone: expo/fetch, the Keychain-stored sign-in
 // (refresh tokens are saved as they rotate) and random bot keys from expo-crypto.
 import { getRandomBytes } from 'expo-crypto';
-import { fetch } from 'expo/fetch';
+import { fetch } from '@/components/net';
 import { getManagerAuth, saveManagerAuth } from '@/lib/bots';
 import type { FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';

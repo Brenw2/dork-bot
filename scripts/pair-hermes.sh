@@ -4,7 +4,9 @@
 # with the iPhone camera. It contains a sign-in token, so only show it on your
 # own screen.
 #   scripts/pair-hermes.sh
+#   scripts/pair-hermes.sh --desktop   # sign in the desktop app on this machine instead (no QR code)
 set -euo pipefail
+DESKTOP=0; [[ "${1:-}" == "--desktop" ]] && DESKTOP=1
 ENV_FILE="$HOME/.config/dork-bot/serve.env"
 [[ -f "$ENV_FILE" ]] || { echo "Run scripts/setup-bot-manager.sh first."; exit 1; }
 set -a; . "$ENV_FILE"; set +a
@@ -40,6 +42,14 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 30 --resolve "$HOST:$PORT:$IP" 
 [[ "$CODE" == 200 ]] || { echo "The refresh token didn't work (HTTP $CODE)."; exit 1; }
 
 LINK=$(node -e 'const [a,c,r]=process.argv.slice(1);console.log("dorkbot://connect?"+new URLSearchParams({admin:a,chat:c,rt:r}))' "$ADMIN" "$CHAT" "$RT")
+if (( DESKTOP )); then
+  # The desktop app (scripts/install-desktop.sh) handles dorkbot:// links: this opens it on the sign-in screen.
+  xdg-mime query default x-scheme-handler/dorkbot | grep -q dork-bot \
+    || { echo "The desktop app isn't installed. Run scripts/install-desktop.sh first."; exit 1; }
+  xdg-open "$LINK" >/dev/null 2>&1 &
+  echo "Opened Dork Bot on this desktop to sign in to $ADMIN. It brings in your bots from Hermes."
+  exit 0
+fi
 qrencode -t ansiutf8 -m 2 "$LINK"
 echo "Scan with the iPhone camera to let Dork Bot create bots on $ADMIN."
 echo "(Stays signed in while you use it at least once every 30 days.)"
