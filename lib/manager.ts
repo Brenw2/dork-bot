@@ -161,6 +161,15 @@ export class HermesManager {
     return conn;
   }
 
+  /**
+   * Sets the bot's own model in its Hermes settings (what new chats start on, and what its
+   * provider is). Same call as the Hermes dashboard's model picker.
+   */
+  async setBotModel(name: string, choice: { provider: string; model: string }): Promise<void> {
+    const res = await this.api('/api/model/set', 'POST', { scope: 'main', provider: choice.provider, model: choice.model, profile: name });
+    if (!res.ok) throw await fail(res, `Couldn't set ${name} to ${choice.model}`);
+  }
+
   /** Permanently deletes the profile: its config, memory, chats and routines. */
   async deleteBot(name: string): Promise<void> {
     if (name === 'default') throw new HermesError("The default profile can't be deleted.");

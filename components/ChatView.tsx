@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -12,6 +12,8 @@ import { activityLine, chatReducer, chatRows, initialChat, type ChatRow, type To
 import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
+import { useChatModel } from '@/components/useChatModel';
+import { providerName } from '@/lib/models';
 import { colors, mono } from '@/lib/theme';
 
 /** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the right pane on an open Duo. */
@@ -116,6 +118,7 @@ export function ChatView({ bot, maxWidth, inPane = false }: { bot: string; maxWi
           <ConnectorsButton bot={bot} />
         </View>
       ) : null}
+      <ModelBar bot={bot} style={column} />
       <FlatList
         inverted
         data={rows}
@@ -205,6 +208,30 @@ export function ConnectorsButton({ bot }: { bot: string }) {
   );
 }
 
+/** The chat's model ("claude-opus-5-5 · Anthropic"); tap to switch. Turns red when the model can't work. */
+function ModelBar({ bot, style }: { bot: string; style: ViewStyle | null }) {
+  const { choice, problem, catalog, error } = useChatModel(bot);
+  const label = choice
+    ? `${choice.model}${choice.provider ? ` · ${providerName(catalog, choice.provider)}` : ''}`
+    : error
+      ? "Couldn't load the model list"
+      : 'Loading model…';
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.modelBar, style, pressed && { opacity: 0.6 }]}
+      onPress={() => router.push({ pathname: '/model/[bot]', params: { bot } })}
+      accessibilityRole="button"
+      accessibilityLabel={`Model: ${label}. Change model`}
+      hitSlop={4}
+    >
+      <Text style={[styles.modelText, problem ? { color: colors.bad } : null]} numberOfLines={problem ? 3 : 1}>
+        {problem ?? label}
+      </Text>
+      <Text style={styles.modelChange}>Change</Text>
+    </Pressable>
+  );
+}
+
 function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
   switch (row.kind) {
     case 'message':
@@ -281,6 +308,17 @@ const styles = StyleSheet.create({
   thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
   thinkingText: { color: colors.dim, fontSize: 14 },
   paneTitle: { fontSize: 17, fontWeight: '600' },
+  modelBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  modelText: { flex: 1, color: colors.dim, fontSize: 13 },
+  modelChange: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
   listBody: { flexGrow: 1, padding: 14, gap: 10 },
   // An inverted list draws its empty state upside down unless it's flipped back.

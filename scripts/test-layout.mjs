@@ -90,6 +90,15 @@ const PROFILES = [
   },
 ];
 
+// The real model list from b-lab (test/fixtures/model-options.json), as a Dork-pinned bot sees it.
+const RAW_MODELS = JSON.parse(readFileSync(join(ROOT, 'test', 'fixtures', 'model-options.json'), 'utf8'));
+const MODEL_OPTIONS = {
+  ...RAW_MODELS,
+  model: 'gemma4:31b',
+  provider: 'custom',
+  providers: RAW_MODELS.providers.map((p) => ({ ...p, is_current: p.slug === 'custom:dork' })),
+};
+
 const SERVERS = [
   { name: 'trello', transport: 'http', url: 'https://mcp.trello.com/v1', auth: 'oauth', enabled: true, source: 'config' },
   { name: 'linear', transport: 'http', url: 'https://mcp.linear.app/mcp', auth: 'oauth', enabled: true, source: 'config' },
@@ -110,8 +119,9 @@ const CATALOG = [
 function seedFor(screen) {
   const store = {};
   if (screen.bots !== false) {
-    store['dork-bots'] = JSON.stringify(BOTS.map((bot, i) => ({ bot, url: HERMES, addedAt: i })));
-    for (const bot of BOTS) store[`dork-bot-key.${bot}`] = KEY;
+    const bots = [...BOTS, ...(screen.extraBots ?? [])];
+    store['dork-bots'] = JSON.stringify(bots.map((bot, i) => ({ bot, url: HERMES, addedAt: i })));
+    for (const bot of bots) store[`dork-bot-key.${bot}`] = KEY;
   }
   if (screen.paired) store['dork-hermes-manager'] = JSON.stringify({ adminUrl: ADMIN, chatUrl: HERMES, refreshToken: 'r'.repeat(40) });
   return store;
@@ -126,6 +136,8 @@ const SCREENS = [
   { name: 'new', paired: true, path: () => '/new', waitFor: 'Already on Hermes' },
   { name: 'add', path: () => '/add', waitFor: 'Hermes address' },
   { name: 'connectors', paired: true, path: () => '/connectors/assistant', waitFor: 'Needs you to sign in' },
+  { name: 'chat-model-problem', extraBots: ['chief'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=chief' : '/chat/chief'), waitFor: 'which doesn' },
+  { name: 'model', path: () => '/model/assistant', waitFor: 'claude-opus-5-5' },
   { name: 'connectors-unpaired', path: () => '/connectors/assistant', waitFor: 'Connect to Hermes first' },
 ];
 
@@ -140,6 +152,9 @@ async function fakeHermes(route) {
   if (/\/api\/sessions$/.test(p) && req.method() === 'GET') return json(200, { data: [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
   if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: MESSAGES });
+  if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
+  // chief: moved to Anthropic while its chat still says gemma4:31b (what broke it on 2026-11-03).
+  if (p.endsWith('/api/model/options')) return json(200, bot === 'chief' ? RAW_MODELS : MODEL_OPTIONS);
   // hermes serve.
   if (p === '/auth/native/refresh')
     return json(200, { access_token: 'a'.repeat(40), refresh_token: 'r'.repeat(40), expires_at: Date.now() / 1000 + 3600 });
@@ -238,7 +253,7 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'] };
+const FIXED = { chat: ['Message assistant', 'Send', 'Change model'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
 const SEEN = { chat: ['Any time.'] };
 
 function serve(dir) {
