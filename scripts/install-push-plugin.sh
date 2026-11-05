@@ -15,7 +15,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 SRC="hermes-plugin/dork-bot-push"
 NAME="dork-bot-push"
-HERMES_ROOT="${HERMES_HOME:-$HOME/.hermes}"
+# The real Hermes root, not the active profile: inside a profile session HERMES_HOME points at that
+# profile, which made --all install "default" into it. hermes -p <bot> needs it unset too.
+unset HERMES_HOME
+HERMES_ROOT="$HOME/.hermes"
 
 remove=0
 bots=()
