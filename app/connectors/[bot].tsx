@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
+import { useBotName } from '@/components/useBotName';
 import { Column, useColumnStyle } from '@/components/Column';
 import { desktop } from '@/components/desktop';
 import { loadManager } from '@/components/manager';
@@ -21,6 +22,7 @@ type Health = { state: 'checking' } | { state: 'ok'; tools: number } | { state: 
 
 export default function ConnectorsScreen() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
+  const botName = useBotName(bot);
   const column = useColumnStyle();
   const [api, setApi] = useState<Connectors | null | undefined>(undefined);
   const [mine, setMine] = useState<Connector[] | null>(null);
@@ -89,7 +91,7 @@ export default function ConnectorsScreen() {
     try {
       const tools = await work((status) => setBusy({ name, status }));
       connectorNotes.added(bot, name);
-      setNotice({ ok: true, text: `${name} is connected (${tools} tools). ${bot} can use it in about a minute.` });
+      setNotice({ ok: true, text: `${name} is connected (${tools} tools). ${botName} can use it in about a minute.` });
       setSetupFor(null);
       setValues({});
       await refresh(api);
@@ -119,7 +121,7 @@ export default function ConnectorsScreen() {
     );
 
   const remove = (c: Connector) =>
-    Alert.alert(`Remove ${c.name}?`, `${bot} loses its ${c.name} tools. You can connect it again any time.`, [
+    Alert.alert(`Remove ${c.name}?`, `${botName} loses its ${c.name} tools. You can connect it again any time.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -135,14 +137,14 @@ export default function ConnectorsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: `${bot}'s connectors` }} />
+      <Stack.Screen options={{ title: `${botName}'s connectors` }} />
       {notice ? <Text style={notice.ok ? styles.ok : styles.error}>{notice.text}</Text> : null}
 
       <Text style={styles.label}>Connected</Text>
       {mine === null ? (
         <ActivityIndicator color={colors.dim} />
       ) : mine.length === 0 ? (
-        <Text style={styles.hint}>Nothing yet. Pick one below and sign in; {bot} gets its tools.</Text>
+        <Text style={styles.hint}>Nothing yet. Pick one below and sign in; {botName} gets its tools.</Text>
       ) : (
         mine.map((c) => {
           const h = health[c.name] ?? { state: 'checking' };

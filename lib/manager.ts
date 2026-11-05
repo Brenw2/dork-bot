@@ -6,6 +6,7 @@
 // signs in on b-lab and hands the app a refresh token; the app trades it for
 // short-lived bearer tokens at /auth/native/refresh and keeps the newest one.
 import { HermesClient, HermesError, normalizeUrl, type BotConnection, type FetchLike, type FetchResponse } from './hermes';
+import { cleanDisplayName } from './names';
 import { isValidBotName } from './pairing';
 import type { ModelChoice } from './models';
 import { cleanPush, type PushMeta } from './push';
@@ -229,6 +230,8 @@ export interface BotMeta {
   model?: ModelChoice;
   /** Hidden from the app on every device; the bot stays on Hermes. */
   hidden?: boolean;
+  /** Display name; the profile id never changes (lib/names.ts). */
+  name?: string;
   /** Push notifications (lib/push.ts): the phones' tokens and the bot's mute switch. */
   push?: PushMeta;
 }
@@ -247,6 +250,8 @@ export function cleanMeta(raw: unknown): BotMeta {
     meta.model = { provider: model.provider, model: model.model };
   }
   if (typeof r.hidden === 'boolean') meta.hidden = r.hidden;
+  const name = cleanDisplayName(r.name);
+  if (name) meta.name = name;
   const push = cleanPush(r.push);
   if (push) meta.push = push;
   return meta;

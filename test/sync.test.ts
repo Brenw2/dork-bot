@@ -23,7 +23,7 @@ function world(opts: { profiles: Profile[]; meta?: Record<string, BotMeta>; loca
       return { url: CHAT, bot, key: 'k'.repeat(64) } satisfies BotConnection;
     },
     local: async () => local,
-    save: async (conn, m) => void local.push({ bot: conn.bot, url: conn.url, look: m.look, model: m.model }),
+    save: async (conn, m) => void local.push({ bot: conn.bot, url: conn.url, look: m.look, model: m.model, displayName: m.name }),
     update: async (bot, m) => void (local = local.map((b) => (b.bot === bot ? { ...b, ...m } : b))),
     remove: async (bot) => void (local = local.filter((b) => b.bot !== bot)),
   };

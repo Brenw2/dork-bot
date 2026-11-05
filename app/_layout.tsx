@@ -7,6 +7,7 @@ import { DialogHost } from '@/components/Dialogs';
 import { NotificationRoutes } from '@/components/notifications';
 import { Overlay } from '@/components/Overlay';
 import { TestInsets } from '@/components/TestInsets';
+import { useBotName } from '@/components/useBotName';
 import { applyInitialOrientation, OrientationController } from '@/components/useLayoutClass';
 import { colors } from '@/lib/theme';
 
@@ -36,14 +37,20 @@ export default function RootLayout() {
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
 const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]']);
 
-function popupTitle(name: string, params: { bot?: string } | undefined, title: string | undefined): string {
-  const bot = params?.bot;
-  if (bot && name === 'look/[bot]') return `${bot}'s look`;
-  if (bot && name === 'connectors/[bot]') return `${bot}'s connectors`;
-  if (bot && name === 'chats/[bot]') return `${bot}'s chats`;
-  if (bot && name === 'routines/[bot]') return `${bot}'s routines`;
-  if (bot && name === 'routine-results/[bot]') return `${bot}'s routine results`;
+function popupTitle(name: string, bot: string | undefined, shown: string, title: string | undefined): string {
+  if (bot && name === 'look/[bot]') return `${shown}'s look`;
+  if (bot && name === 'connectors/[bot]') return `${shown}'s connectors`;
+  if (bot && name === 'chats/[bot]') return `${shown}'s chats`;
+  if (bot && name === 'routines/[bot]') return `${shown}'s routines`;
+  if (bot && name === 'routine-results/[bot]') return `${shown}'s routine results`;
   return title || '';
+}
+
+/** The desktop panel; a component so the bot's display name can follow a rename. */
+function PopupOverlay({ route, title, children }: { route: { name: string; params?: object }; title: string | undefined; children: ReactNode }) {
+  const bot = (route.params as { bot?: string } | undefined)?.bot;
+  const shown = useBotName(bot ?? '');
+  return <Overlay title={popupTitle(route.name, bot, shown, title)}>{children}</Overlay>;
 }
 
 function Screens(): ReactNode {
@@ -66,7 +73,7 @@ function Screens(): ReactNode {
         isDesktop
           ? ({ route, options, children }) =>
               POPUPS.has(route.name) ? (
-                <Overlay title={popupTitle(route.name, route.params as { bot?: string }, options.title)}>{children}</Overlay>
+                <PopupOverlay route={route} title={options.title}>{children}</PopupOverlay>
               ) : (
                 children
               )

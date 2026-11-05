@@ -5,6 +5,7 @@ import { BotSprite } from '@/components/BotSprite';
 import { ChatActions, ChatView } from '@/components/ChatView';
 import { openChat } from '@/components/currentChat';
 import { useBotLook } from '@/components/useBotLook';
+import { useBotName } from '@/components/useBotName';
 import { colors } from '@/lib/theme';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH, foldNavFor } from '@/lib/layoutClass';
@@ -15,6 +16,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (chat) openChat(bot, chat);
   }, [bot, chat]);
+  const name = useBotName(bot);
   const cls = useLayoutClass();
   const prevCls = useRef(cls);
 
@@ -29,12 +31,12 @@ export default function ChatScreen() {
     <>
       <Stack.Screen
         options={{
-          title: bot,
+          title: name,
           headerTitle: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <BotSprite bot={bot} size={28} />
               <Text style={{ color: colors.text, fontSize: 17, fontWeight: '600' }} numberOfLines={1}>
-                {bot}
+                {name}
               </Text>
             </View>
           ),

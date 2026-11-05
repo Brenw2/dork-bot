@@ -3,12 +3,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useColumnStyle } from '@/components/Column';
 import { loadManager } from '@/components/manager';
+import { useBotName } from '@/components/useBotName';
 import { getPushToken, notificationsSupported, turnOffNotifications, turnOnNotifications } from '@/components/notifications';
 import { listBots } from '@/lib/bots';
 import type { BotMeta } from '@/lib/manager';
 import { mutePatch } from '@/lib/push';
 import { sameHost } from '@/lib/sync';
 import { button, colors } from '@/lib/theme';
+
+/** The bot's display name (not its profile id). */
+function BotLabel({ bot }: { bot: string }) {
+  return <Text style={styles.bot}>{useBotName(bot)}</Text>;
+}
 
 // Notifications: one switch for this phone, then a switch per bot. A bot's switch is on Hermes
 // (dork_bot.push.muted), so it applies to every phone; the Hermes plugin dork-bot-push does the
@@ -93,7 +99,7 @@ export default function NotificationsScreen() {
         {muted && Object.keys(muted).length ? <Text style={styles.label}>Per bot</Text> : null}
         {Object.entries(muted ?? {}).map(([bot, isMuted]) => (
           <View key={bot} style={styles.row}>
-            <Text style={styles.bot}>{bot}</Text>
+            <BotLabel bot={bot} />
             <Switch
               value={!isMuted}
               onValueChange={(v) => void setBotNotifications(bot, v)}

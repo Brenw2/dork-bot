@@ -10,6 +10,8 @@ import { loadManager } from '@/components/manager';
 import { notificationsSupported } from '@/components/notifications';
 import { pushMeta, syncNow } from '@/components/sync';
 import { useBotMood } from '@/components/useBotMood';
+import { renameBot } from '@/components/useBotName';
+import { nameOf } from '@/lib/names';
 import { getConnection, listBots, onBotsChanged, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { botColor, button, colors } from '@/lib/theme';
@@ -53,7 +55,7 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
   useFocusEffect(load);
 
   const hide = (bot: string) =>
-    Alert.alert(`Hide ${bot}?`, 'It goes from Dork Bot on your phone and desktop, but stays on Hermes. Add it back from New bot.', [
+    Alert.alert(`Hide ${nameOf(bot, bots?.find((b) => b.bot === bot)?.displayName)}?`, 'It goes from Dork Bot on your phone and desktop, but stays on Hermes. Add it back from New bot.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Hide', style: 'destructive', onPress: () => removeBot(bot).then(() => pushMeta(bot, { hidden: true })).then(load) },
     ]);
@@ -85,8 +87,10 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
       'plain-text',
     );
 
-  const showActions = (bot: string, anchor?: { x: number; y: number }) =>
-    Menu.show(bot, [
+  const showActions = (bot: string, anchor?: { x: number; y: number }) => {
+    const shown = nameOf(bot, bots?.find((b) => b.bot === bot)?.displayName);
+    Menu.show(shown, [
+      { text: 'Rename…', onPress: () => renameBot(bot, shown) },
       { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
       { text: 'Chats…', onPress: () => router.push({ pathname: '/chats/[bot]', params: { bot } }) },
       { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
@@ -97,7 +101,7 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
       ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),
       { text: 'Cancel', style: 'cancel' },
     ], anchor);
-
+  };
   if (bots === null) return <View style={styles.screen} />;
 
   return (
@@ -120,18 +124,18 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
               onPress={() => onSelect(item.bot)}
               onLongPress={() => showActions(item.bot)}
               accessibilityRole="button"
-              accessibilityLabel={`${item.bot}, ${s === 'ok' ? 'connected' : s === 'checking' || !s ? 'checking' : s}`}
+              accessibilityLabel={`${nameOf(item.bot, item.displayName)}, ${s === 'ok' ? 'connected' : s === 'checking' || !s ? 'checking' : s}`}
               accessibilityHint="Opens the chat. Long-press for more."
             >
               <BotSprite bot={item.bot} size={compact ? 34 : 48} mood={s && s !== 'ok' && s !== 'checking' ? 'sleeping' : undefined} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={1}>{item.bot}</Text>
+                <Text style={[styles.name, compact && styles.nameCompact]} numberOfLines={1}>{nameOf(item.bot, item.displayName)}</Text>
                 <StatusLine bot={item.bot} status={s} />
               </View>
               <View style={[styles.dot, { backgroundColor: s === 'ok' ? colors.ok : s === 'checking' ? colors.dim : colors.bad }]} />
               {/* No long-press with a mouse: the same menu behind a button. */}
               {isDesktop ? (
-                <Pressable onPress={(e) => showActions(item.bot, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${item.bot}`}>
+                <Pressable onPress={(e) => showActions(item.bot, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${nameOf(item.bot, item.displayName)}`}>
                   <Text style={styles.more}>⋯</Text>
                 </Pressable>
               ) : null}

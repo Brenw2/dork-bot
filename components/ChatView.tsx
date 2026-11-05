@@ -21,6 +21,7 @@ import { notificationsSupported, useOnScreen } from '@/components/notifications'
 import { Alert } from '@/components/alert';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
+import { renameBot, useBotName } from '@/components/useBotName';
 import { useChatModel } from '@/components/useChatModel';
 import { liveRuns, liveRunsReady } from '@/components/liveRuns';
 import { elapsedLabel } from '@/lib/liveRuns';
@@ -300,6 +301,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = (!!draft.trim() || attached.length > 0) && !!client;
   const { color } = useBotLook(bot);
+  const name = useBotName(bot);
   const onBot = onColor(color);
   useImageDrop(addImages, !!client);
   const attach = (source: PickSource) => void pickImages(source, attached.length).then(addImages).catch((e: Error) => setAttachError(e.message));
@@ -329,7 +331,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
             </Pressable>
           ) : null}
           <BotSprite bot={bot} size={30} />
-          <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
+          <Text style={[styles.paneTitle, { color }]}>{name}</Text>
           <View style={{ flex: 1 }} />
           <ChatActions bot={bot} />
         </View>
@@ -358,7 +360,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
         ListEmptyComponent={
           <View style={WEB ? styles.emptyWeb : styles.flip}>
             {client ? (
-              <Text style={styles.hint}>Say something to {bot}.</Text>
+              <Text style={styles.hint}>Say something to {name}.</Text>
             ) : state.error ? null : (
               <ActivityIndicator style={{ marginTop: 40 }} />
             )}
@@ -368,7 +370,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
           <Row
             row={item}
             bot={bot}
-            thinking={`${bot} ${resumed ? 'is still working' : 'is thinking'}… ${elapsedLabel(elapsed * 1000)}`}
+            thinking={`${name} ${resumed ? 'is still working' : 'is thinking'}… ${elapsedLabel(elapsed * 1000)}`}
           />
         )}
       />
@@ -420,9 +422,9 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
           onBlur={() => setFocused(false)}
           value={draft}
           onChangeText={setDraft}
-          placeholder={`Message ${bot}`}
+          placeholder={`Message ${name}`}
           placeholderTextColor={colors.dim}
-          accessibilityLabel={`Message ${bot}`}
+          accessibilityLabel={`Message ${name}`}
           multiline
           // Desktop: Enter sends, Shift+Enter is a new line.
           {...(Platform.OS === 'web'
@@ -485,10 +487,12 @@ function useConnectorWarmup(bot: string) {
  */
 export function ChatActions({ bot }: { bot: string }) {
   const { color } = useBotLook(bot);
+  const name = useBotName(bot);
   const more = (anchor?: { x: number; y: number }) =>
     Menu.show(
-      bot,
+      name,
       [
+        { text: 'Rename bot…', onPress: () => renameBot(bot, name) },
         { text: 'New chat', onPress: () => void startNewChat(bot) },
         { text: 'Rename this chat…', onPress: () => void renameOpenChat(bot) },
         { text: 'Delete this chat…', style: 'destructive' as const, onPress: () => void deleteOpenChat(bot) },
@@ -505,7 +509,7 @@ export function ChatActions({ bot }: { bot: string }) {
       <Pressable
         onPress={() => router.push({ pathname: '/chats/[bot]', params: { bot } })}
         accessibilityRole="button"
-        accessibilityLabel={`${bot}'s chats`}
+        accessibilityLabel={`${name}'s chats`}
         hitSlop={8}
       >
         <Text style={[styles.headerButton, { color }]}>Chats</Text>
@@ -513,7 +517,7 @@ export function ChatActions({ bot }: { bot: string }) {
       <Pressable
         onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
         accessibilityRole="button"
-        accessibilityLabel={`More for this chat with ${bot}`}
+        accessibilityLabel={`More for this chat with ${name}`}
         hitSlop={8}
       >
         <Text style={[styles.headerButton, styles.moreButton, { color }]}>⋯</Text>
@@ -610,10 +614,11 @@ function ApprovalCard({
   style: ViewStyle | null;
 }) {
   const { color } = useBotLook(bot);
+  const name = useBotName(bot);
   const onBot = onColor(color);
   return (
     <View style={[styles.approval, { borderColor: mix(color, 0.6) }, style]} accessibilityLiveRegion="polite">
-      <Text style={styles.approvalTitle}>{bot} wants to run a command that needs your OK</Text>
+      <Text style={styles.approvalTitle}>{name} wants to run a command that needs your OK</Text>
       {request.description ? <Text style={styles.approvalWhy}>{request.description}</Text> : null}
       {request.command ? (
         <ScrollView horizontal style={styles.approvalCode} contentContainerStyle={{ padding: 10 }}>
@@ -690,9 +695,10 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
 /** A bot reply: formatted text across the chat's width, under the bot's name in its color. */
 function Reply({ text, bot }: { text: string; bot: string }) {
   const { color } = useBotLook(bot);
+  const name = useBotName(bot);
   return (
     <View style={styles.reply}>
-      <Text style={[styles.who, { color }]}>{bot}</Text>
+      <Text style={[styles.who, { color }]}>{name}</Text>
       <Markdown text={text} accent={color} />
     </View>
   );

@@ -4,6 +4,7 @@ import { ActivityIndicator, AppState, RefreshControl, ScrollView, type ScrollVie
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
+import { useBotName } from '@/components/useBotName';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
 import { getConnection } from '@/lib/bots';
@@ -16,6 +17,7 @@ import { colors, mix } from '@/lib/theme';
 // the routine's name and when it ran. Separate from the bot's normal chats; read-only.
 export default function RoutineResultsScreen() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
+  const botName = useBotName(bot);
   const column = useColumnStyle();
   const { color } = useBotLook(bot);
   const [api, setApi] = useState<RoutineResults | null>(null);
@@ -51,7 +53,7 @@ export default function RoutineResultsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${bot}'s routine results` }} />
+      <Stack.Screen options={{ title: `${botName}'s routine results` }} />
       <ScrollView
         ref={scroller}
         contentContainerStyle={[styles.body, column]}
@@ -64,7 +66,7 @@ export default function RoutineResultsScreen() {
       >
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {results === null && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}
-        {results?.length === 0 ? <Text style={styles.empty}>No routine results yet. When a routine of {bot} finishes with something to say, it shows up here.</Text> : null}
+        {results?.length === 0 ? <Text style={styles.empty}>No routine results yet. When a routine of {botName} finishes with something to say, it shows up here.</Text> : null}
         {results?.map((r) => (
           <View key={r.sessionId} style={[styles.entry, { borderColor: mix(color, 0.5) }]}>
             <View style={styles.head}>
