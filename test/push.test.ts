@@ -4,6 +4,7 @@ import {
   addToken,
   cleanPush,
   dropToken,
+  mutePatch,
   parsePushData,
   routeFor,
   setTokenOnBots,
@@ -116,11 +117,11 @@ describe('what a push opens', () => {
     expect(parsePushData(undefined)).toBeNull();
   });
 
-  it('a reply or approval opens that chat (in the right pane with two panes); a routine opens Routines', () => {
+  it('a reply or approval opens that chat (in the right pane with two panes); a routine opens Routine results', () => {
     const reply = { kind: 'reply' as const, bot: 'chief', chat: 'dork-bot-chief--abc' };
     expect(routeFor(reply, false)).toEqual({ pathname: '/chat/[bot]', params: { bot: 'chief', chat: 'dork-bot-chief--abc' } });
     expect(routeFor(reply, true)).toEqual({ pathname: '/', params: { bot: 'chief', chat: 'dork-bot-chief--abc' } });
-    expect(routeFor({ kind: 'routine', bot: 'chief' }, false)).toEqual({ pathname: '/routines/[bot]', params: { bot: 'chief' } });
+    expect(routeFor({ kind: 'routine', bot: 'chief' }, false)).toEqual({ pathname: '/routine-results/[bot]', params: { bot: 'chief' } });
   });
 
   it("while the app is open, a reply in the chat on screen doesn't pop a banner; everything else does", () => {
@@ -131,5 +132,16 @@ describe('what a push opens', () => {
     expect(showWhileOpen(reply, null)).toBe(true);
     expect(showWhileOpen({ ...reply, kind: 'approval' }, { bot: 'chief', chat: 'dork-bot-chief' })).toBe(true);
     expect(showWhileOpen(null, null)).toBe(true);
+  });
+});
+
+describe('per-bot switch', () => {
+  it('muting one bot leaves its phones and the other bots alone', async () => {
+    const h = hermes({ chief: { push: { tokens: [PHONE] } }, assistant: { push: { tokens: [PHONE] } } });
+    await h.setMeta('chief', { push: mutePatch(true) });
+    expect(h.meta.chief.push).toEqual({ tokens: [PHONE], muted: true });
+    expect(h.meta.assistant.push).toEqual({ tokens: [PHONE] });
+    await h.setMeta('chief', { push: mutePatch(false) });
+    expect(h.meta.chief.push).toEqual({ tokens: [PHONE], muted: false });
   });
 });

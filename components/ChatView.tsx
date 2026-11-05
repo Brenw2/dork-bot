@@ -493,6 +493,7 @@ export function ChatActions({ bot }: { bot: string }) {
         { text: 'Rename this chat…', onPress: () => void renameOpenChat(bot) },
         { text: 'Delete this chat…', style: 'destructive' as const, onPress: () => void deleteOpenChat(bot) },
         { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
+        { text: 'Routine results…', onPress: () => router.push({ pathname: '/routine-results/[bot]', params: { bot } }) },
         { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
         ...(notificationsSupported ? [{ text: 'Notifications…', onPress: () => router.push('/notifications') }] : []),
         { text: 'Cancel', style: 'cancel' as const },

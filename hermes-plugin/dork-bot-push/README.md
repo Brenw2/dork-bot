@@ -8,7 +8,7 @@ A Hermes plugin that sends the Dork Bot app a push notification when a bot:
 | needs Allow / Deny on a command in one of those chats | `pre_approval_request` | **chief**: needs approval |
 | finishes a routine (cron job) run | `post_llm_call` (+ `ctx.current_cron_execution()`) | **chief · Morning news**: first ~100 characters |
 
-Tapping it opens that chat (approvals and replies) or the bot's Routines screen. Nothing goes out for
+Tapping it opens that chat (approvals and replies) or the bot's Routine results chat (the app reads the routine runs' Hermes sessions; nothing is written for it). Nothing goes out for
 an empty or `[SILENT]` reply, Hermes's own smart approvals (`surface: smart`), chats the app didn't
 make (CLI, desktop Hermes, tests), or a muted bot. An approval push never carries the command, and a
 chat sends at most one approval push per 30 s.
@@ -22,7 +22,7 @@ only reads them:
 dork_bot:
   push:
     tokens: ["ExponentPushToken[…]"]   # each phone that turned notifications on
-    muted: false                        # the bot's mute switch
+    muted: false                        # the bot's switch in Notifications (mutes replies, approvals and routines)
 ```
 
 Pushes go to Expo (`https://exp.host/--/api/v2/push/send`), which hands them to Apple. No key is

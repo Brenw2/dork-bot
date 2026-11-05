@@ -161,6 +161,13 @@ class RoutineTests(unittest.TestCase):
         self.assertEqual(self.expo.requests, [])
 
 
+    def test_a_muted_bot_sends_no_routine_push(self):
+        Harness(self.expo, config(muted=True), cron=("j", "n")).notifier.on_reply(
+            session_id="cron_x", assistant_response="Three stories.", platform="cron"
+        )
+        self.assertEqual(self.expo.requests, [])
+
+
 class ApprovalTests(unittest.TestCase):
     def setUp(self):
         self.expo = FakeExpo()

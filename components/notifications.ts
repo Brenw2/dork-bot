@@ -2,7 +2,7 @@
 // - Turning them on is always Brennan's tap (the Notifications screen), never on launch: it asks
 //   iOS, gets this phone's Expo push token, and adds it to every bot's dork_bot.push block on
 //   Hermes. Sync (components/sync.ts) adds it to bots made later.
-// - A tap opens that bot's chat (or Routines); a reply for the chat on screen shows no banner.
+// - A tap opens that bot's chat (or Routine results); a reply for the chat on screen shows no banner.
 // The web build (desktop app, layout tests) gets notifications.web.ts, where all of this is off.
 import Constants from 'expo-constants';
 import { router, useIsFocused } from 'expo-router';

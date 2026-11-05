@@ -93,11 +93,11 @@ export function parsePushData(raw: unknown): PushData | null {
 export type PushRoute =
   | { pathname: '/chat/[bot]'; params: { bot: string; chat: string } }
   | { pathname: '/'; params: { bot: string; chat: string } }
-  | { pathname: '/routines/[bot]'; params: { bot: string } };
+  | { pathname: '/routine-results/[bot]'; params: { bot: string } };
 
-/** Where a tap goes. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane. */
+/** Where a tap goes: a routine's push opens that bot's Routine results chat. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane. */
 export function routeFor(data: PushData, twoPane: boolean): PushRoute {
-  if (data.kind === 'routine') return { pathname: '/routines/[bot]', params: { bot: data.bot } };
+  if (data.kind === 'routine') return { pathname: '/routine-results/[bot]', params: { bot: data.bot } };
   const params = { bot: data.bot, chat: data.chat };
   return twoPane ? { pathname: '/', params } : { pathname: '/chat/[bot]', params };
 }
@@ -116,4 +116,9 @@ export interface OnScreen {
 export function showWhileOpen(data: PushData | null, onScreen: OnScreen | null): boolean {
   if (!data || !onScreen || data.kind !== 'reply') return true;
   return !(onScreen.bot === data.bot && onScreen.chat === data.chat);
+}
+
+/** The patch for one bot's notification switch. Muting keeps the tokens, so turning it back on is one tap. */
+export function mutePatch(muted: boolean): PushMeta {
+  return { muted };
 }
