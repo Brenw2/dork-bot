@@ -6,7 +6,8 @@ import { useColumnStyle } from '@/components/Column';
 import { useChatModel } from '@/components/useChatModel';
 import { pushMeta } from '@/components/sync';
 import { setModelChoice } from '@/lib/bots';
-import { chatSessionId } from '@/lib/hermes';
+import { useCurrentChat } from '@/components/currentChat';
+import { firstChatId } from '@/lib/chats';
 import { filterCatalog, switchModel, type ModelChoice } from '@/lib/models';
 import { colors } from '@/lib/theme';
 
@@ -15,6 +16,7 @@ export default function PickModel() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const column = useColumnStyle();
   const { catalog, choice, problem, client, error } = useChatModel(bot);
+  const chat = useCurrentChat(bot) ?? firstChatId(bot);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -32,7 +34,8 @@ export default function PickModel() {
       const manager = await loadManager();
       await switchModel(next, catalog?.botDefault ?? null, {
         setBotModel: manager ? (c) => manager.setBotModel(bot, c) : null,
-        setChatModel: (c) => client.setModel(chatSessionId(bot), c),
+        // A new chat has no Hermes session until its first message: make it so it can hold the pick.
+        setChatModel: (c) => client.ensureSession(chat).then(() => client.setModel(chat, c)),
       });
       await setModelChoice(bot, next);
       void pushMeta(bot, { model: next });

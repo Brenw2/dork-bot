@@ -147,6 +147,25 @@ const MODEL_OPTIONS = {
   providers: RAW_MODELS.providers.map((p) => ({ ...p, is_current: p.slug === 'custom:dork' })),
 };
 
+// A bot's chats (GET /api/sessions?source=api_server), and a routine (GET /api/jobs).
+const NOW_S = Date.now() / 1000;
+const CHATS = [
+  { id: 'dork-bot-assistant--mh3x1abc1', source: 'api_server', title: 'Mets tickets for Saturday, two seats on the first base side if they have them', message_count: 9, last_active: NOW_S - 120, preview: 'what time is the mets game tonight and will it rain' },
+  { id: 'dork-bot-assistant', source: 'api_server', title: 'Dork Bot: assistant', message_count: 95, last_active: NOW_S - 86400 * 2, preview: 'What model are you running?' },
+  { id: 'dork-bot-assistant--mh2aaaaa1', source: 'api_server', title: null, message_count: 2, last_active: NOW_S - 86400 * 20, preview: 'why does this test fail?\n\n[Image attached at: /x/api_aa.png]\n[screenshot]' },
+];
+const JOBS = [
+  {
+    id: 'e9c3318a1531', name: 'daily_digest', prompt: 'Write my morning digest for today: calendar, email that needs me, and anything due this week.',
+    schedule_display: '0 8 * * *', enabled: true, state: 'scheduled', next_run_at: new Date(Date.now() + 36e5 * 12).toISOString(),
+    last_run_at: new Date(Date.now() - 36e5 * 8).toISOString(), last_status: 'ok', last_error: null,
+  },
+  {
+    id: 'f00', name: 'mets_score_with_a_really_long_routine_name_that_has_to_be_cut_off', prompt: 'Check the Mets score.',
+    schedule_display: 'every 1h', enabled: false, state: 'paused', next_run_at: null, last_run_at: null, last_status: null, last_error: null,
+  },
+];
+
 const SERVERS = [
   { name: 'trello', transport: 'http', url: 'https://mcp.trello.com/v1', auth: 'oauth', enabled: true, source: 'config' },
   { name: 'linear', transport: 'http', url: 'https://mcp.linear.app/mcp', auth: 'oauth', enabled: true, source: 'config' },
@@ -189,6 +208,8 @@ const SCREENS = [
   { name: 'connectors-unpaired', path: () => '/connectors/assistant', waitFor: 'Connect to Hermes first' },
   // Two panes with the bot list hidden: the chat takes the whole width.
   { name: 'chat-list-hidden', postures: ['duo-open-landscape'], click: 'Hide the bot list', path: () => '/?bot=assistant', waitFor: 'Any time.' },
+  { name: 'chats', path: () => '/chats/assistant', waitFor: 'Mets tickets' },
+  { name: 'routines', path: () => '/routines/assistant', waitFor: 'daily_digest' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
 ];
 
@@ -200,7 +221,9 @@ async function fakeHermes(route) {
   // Gateway API server, one bot per /p/<bot>/.
   const bot = p.match(/^\/p\/([^/]+)\//)?.[1];
   if (bot === 'scout' && p.endsWith('/api/sessions')) return json(401, { error: 'unauthorized' }); // shows a red status
-  if (/\/api\/sessions$/.test(p) && req.method() === 'GET') return json(200, { data: [] });
+  if (/\/api\/sessions$/.test(p) && req.method() === 'GET')
+    return json(200, { data: bot === 'assistant' && url.searchParams.get('source') === 'api_server' ? CHATS : [] });
+  if (/\/api\/jobs$/.test(p)) return json(200, { jobs: bot === 'assistant' ? JOBS : [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
   if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: bot === 'coder' ? RICH_MESSAGES : MESSAGES });
   if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
@@ -306,7 +329,7 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
+const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat'], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'] };
 
 function serve(dir) {

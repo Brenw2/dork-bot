@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from '@/components/net';
 import { Menu } from '@/components/alert';
+import { chatName } from '@/lib/chats';
 import { BotSprite } from '@/components/BotSprite';
 import { Markdown } from '@/components/Markdown';
 import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
@@ -14,7 +15,9 @@ import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
 import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
-import { chatSessionId, HermesClient, type ChatMessage, type FetchLike } from '@/lib/hermes';
+import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
+import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
+import { Alert } from '@/components/alert';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
 import { useChatModel } from '@/components/useChatModel';
@@ -25,19 +28,31 @@ import { button, colors, mix, mono, onColor } from '@/lib/theme';
 
 const WEB = Platform.OS === 'web';
 
-/** One bot's ongoing chat. Used full screen (app/chat/[bot].tsx) and as the chat pane next to the bot list. */
-export function ChatView({
-  bot,
-  maxWidth,
-  inPane = false,
-  list,
-}: {
+interface ChatViewProps {
   bot: string;
   maxWidth?: number;
   inPane?: boolean;
   /** In a pane next to the bot list: the button that hides or shows that list. */
   list?: { hidden: boolean; toggle: () => void };
-}) {
+}
+
+/**
+ * The bot's open chat (its most recent one unless another was picked). Used full screen
+ * (app/chat/[bot].tsx) and as the chat pane next to the bot list.
+ */
+export function ChatView(props: ChatViewProps) {
+  const chat = useCurrentChat(props.bot);
+  if (!chat) {
+    return (
+      <View style={styles.screen}>
+        <ActivityIndicator style={{ marginTop: 40 }} />
+      </View>
+    );
+  }
+  return <ChatThread key={chat} {...props} chat={chat} />;
+}
+
+function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps & { chat: string }) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const [client, setClient] = useState<HermesClient | null>(null);
@@ -57,43 +72,53 @@ export function ChatView({
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const startedAt = useRef(0);
-  const sessionId = chatSessionId(bot);
+  const sessionId = chat;
+  // Bumped to retry the first load (b-lab was unreachable): every 5 s, and when the app comes back.
+  const [attempt, setAttempt] = useState(0);
 
-  // Connect, make sure the bot's one chat exists, and load its history. If a reply was still
-  // running when this chat was last open (or the app was closed), show that it's still working.
+  // Connect and load the chat's history (a new chat has none; Hermes creates it on the first
+  // message). If a reply was still running when this chat was last open (or the app was closed),
+  // show that it's still working.
   useEffect(() => {
     let live = true;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let sub: { remove: () => void } | null = null;
     (async () => {
       const conn = await getConnection(bot);
       if (!conn) return dispatch({ type: 'failed', message: `No saved key for ${bot}.` });
       const c = new HermesClient(conn, fetch as unknown as FetchLike);
       try {
-        await c.ensureSession(sessionId, `Dork Bot: ${bot}`);
         const [messages] = await Promise.all([c.messages(sessionId), liveRunsReady]);
         if (live) {
           setClient(c);
           dispatch({ type: 'loaded', messages });
-          const run = liveRuns.get(bot);
+          const run = liveRuns.get(sessionId);
           const sentElsewhere = awaitingReply(messages, Date.now() / 1000);
-          if (run && !liveRuns.isStreaming(bot)) {
+          if (run && !liveRuns.isStreaming(sessionId)) {
             startedAt.current = run.startedAt;
             dispatch({ type: 'resumed', runId: run.runId });
-          } else if (sentElsewhere !== null && !liveRuns.isStreaming(bot)) {
+            if (run.approval) dispatch({ type: 'approval', request: run.approval });
+          } else if (sentElsewhere !== null && !liveRuns.isStreaming(sessionId)) {
             startedAt.current = sentElsewhere * 1000;
             dispatch({ type: 'remote' });
           }
         }
       } catch (e) {
-        if (live) dispatch({ type: 'failed', message: (e as Error).message });
+        if (!live) return;
+        dispatch({ type: 'failed', message: (e as Error).message });
+        retry = setTimeout(() => setAttempt((n) => n + 1), 5000);
+        sub = AppState.addEventListener('change', (s) => s === 'active' && setAttempt((n) => n + 1));
       }
     })();
     return () => {
       live = false;
+      if (retry) clearTimeout(retry);
+      sub?.remove();
       // Hanging up doesn't stop the reply on Hermes: hand it to the background checks.
-      liveRuns.detach(bot);
+      liveRuns.detach(sessionId);
       abortRef.current?.abort();
     };
-  }, [bot, sessionId]);
+  }, [bot, sessionId, attempt]);
 
   // A reply this screen isn't streaming finished: load it from the history.
   const resumed = !!state.pending?.resumed;
@@ -104,8 +129,9 @@ export function ChatView({
         .messages(sessionId)
         .then((messages) => dispatch({ type: 'loaded', messages }))
         .catch(() => undefined);
-    const off = liveRuns.subscribe((b) => {
-      if (b !== bot) return;
+    const off = liveRuns.subscribe((c, run) => {
+      if (c !== sessionId) return;
+      if (run) return dispatch({ type: 'approval', request: run.approval ?? null });
       reload().then(() => dispatch({ type: 'settled' }));
     });
     // While waiting, refresh now and then so steps Hermes has saved show up.
@@ -168,7 +194,7 @@ export function ChatView({
     activity.set(bot, mood);
   }, [bot, mood]);
   // Leaving the chat: idle, unless the reply is still running (the background checks keep it "working").
-  useEffect(() => () => void (liveRuns.get(bot) ? activity.set(bot, 'working') : activity.set(bot, 'idle')), [bot]);
+  useEffect(() => () => void (liveRuns.botBusy(bot) ? activity.set(bot, 'working') : activity.set(bot, 'idle')), [bot]);
 
   // Local models can take a while before the first word; show a timer.
   const running = state.pending !== null;
@@ -197,6 +223,7 @@ export function ChatView({
     abortRef.current = abort;
     let runId: string | null = null;
     try {
+      await client.ensureSession(sessionId);
       await client.chat(
         sessionId,
         messageBody(text, images),
@@ -204,9 +231,9 @@ export function ChatView({
           if (event.type === 'tool' && event.phase === 'started') connectorNotes.toolUsed(bot, event.name);
           if (event.type === 'started' && event.runId) {
             runId = event.runId;
-            liveRuns.start(bot, runId);
+            liveRuns.start(bot, sessionId, runId);
           }
-          if (event.type === 'finished') liveRuns.finish(bot);
+          if (event.type === 'finished') liveRuns.finish(sessionId);
           dispatch({ type: 'event', event });
         },
         abort.signal,
@@ -214,19 +241,36 @@ export function ChatView({
       );
       // The stream can end without run.completed (the phone dropped the connection): if Hermes
       // still has the run, keep showing that the bot is working.
-      if (runId && liveRuns.get(bot)) {
-        liveRuns.detach(bot);
+      if (runId && liveRuns.get(sessionId)) {
+        liveRuns.detach(sessionId);
         dispatch({ type: 'resumed', runId });
       } else dispatch({ type: 'ended' });
     } catch (e) {
       if (abort.signal.aborted) dispatch({ type: 'ended' });
-      else if (runId && liveRuns.get(bot)) {
+      else if (runId && liveRuns.get(sessionId)) {
         // Network dropped or the app was backgrounded mid-reply; the reply carries on on Hermes.
-        liveRuns.detach(bot);
+        liveRuns.detach(sessionId);
         dispatch({ type: 'resumed', runId });
       } else dispatch({ type: 'failed', message: (e as Error).message });
     } finally {
-      startedAt.current = liveRuns.get(bot)?.startedAt ?? 0;
+      startedAt.current = liveRuns.get(sessionId)?.startedAt ?? 0;
+    }
+  };
+
+  const [answering, setAnswering] = useState(false);
+  const answer = async (choice: ApprovalChoice) => {
+    const request = state.approval;
+    const runId = state.runId ?? liveRuns.get(sessionId)?.runId;
+    if (!client || !request || !runId) return;
+    setAnswering(true);
+    try {
+      await client.approve(runId, choice, request.requestId);
+      dispatch({ type: 'approval', request: null });
+    } catch (e) {
+      dispatch({ type: 'approval', request: null });
+      Alert.alert("Couldn't answer", (e as Error).message);
+    } finally {
+      setAnswering(false);
     }
   };
 
@@ -285,7 +329,7 @@ export function ChatView({
           <BotSprite bot={bot} size={30} />
           <Text style={[styles.paneTitle, { color }]}>{bot}</Text>
           <View style={{ flex: 1 }} />
-          <ConnectorsButton bot={bot} />
+          <ChatActions bot={bot} />
         </View>
       ) : null}
       <ModelBar bot={bot} style={column} color={color} />
@@ -327,6 +371,7 @@ export function ChatView({
         )}
       />
       {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
+      {state.approval ? <ApprovalCard request={state.approval} bot={bot} busy={answering} onAnswer={answer} style={column} /> : null}
       {warming.length ? (
         <Text style={[styles.warming, column]} accessibilityLiveRegion="polite">
           {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
@@ -432,18 +477,167 @@ function useConnectorWarmup(bot: string) {
   return warming;
 }
 
-/** Opens the bot's connectors (Notion, Linear, ...). In the chat header and the open-Duo pane header. */
-export function ConnectorsButton({ bot }: { bot: string }) {
+/**
+ * The chat header's buttons: Chats (the bot's chats, and New chat) and ⋯ (new chat, rename or
+ * delete this chat, routines, connectors). In the chat header and the open-Duo pane header.
+ */
+export function ChatActions({ bot }: { bot: string }) {
   const { color } = useBotLook(bot);
+  const more = (anchor?: { x: number; y: number }) =>
+    Menu.show(
+      bot,
+      [
+        { text: 'New chat', onPress: () => void startNewChat(bot) },
+        { text: 'Rename this chat…', onPress: () => void renameOpenChat(bot) },
+        { text: 'Delete this chat…', style: 'destructive' as const, onPress: () => void deleteOpenChat(bot) },
+        { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
+        { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+      anchor,
+    );
   return (
-    <Pressable
-      onPress={() => router.push({ pathname: '/connectors/[bot]', params: { bot } })}
-      accessibilityRole="button"
-      accessibilityLabel={`${bot}'s connectors`}
-      hitSlop={8}
-    >
-      <Text style={[styles.headerButton, { color }]}>Connectors</Text>
-    </Pressable>
+    <View style={styles.actions}>
+      <Pressable
+        onPress={() => router.push({ pathname: '/chats/[bot]', params: { bot } })}
+        accessibilityRole="button"
+        accessibilityLabel={`${bot}'s chats`}
+        hitSlop={8}
+      >
+        <Text style={[styles.headerButton, { color }]}>Chats</Text>
+      </Pressable>
+      <Pressable
+        onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+        accessibilityRole="button"
+        accessibilityLabel={`More for this chat with ${bot}`}
+        hitSlop={8}
+      >
+        <Text style={[styles.headerButton, styles.moreButton, { color }]}>⋯</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+async function chatClient(bot: string): Promise<HermesClient | null> {
+  const conn = await getConnection(bot);
+  return conn ? new HermesClient(conn, fetch as unknown as FetchLike) : null;
+}
+
+/** Renames the open chat (an empty name hands naming back to Hermes). */
+export async function renameChat(bot: string, chat: string): Promise<void> {
+  const client = await chatClient(bot);
+  if (!client) return;
+  const current = (await client.listChats().catch(() => [])).find((c) => c.id === chat);
+  if (!current) return Alert.alert('Nothing to rename yet', 'Send a message first; the chat starts then.');
+  Alert.prompt(
+    'Rename chat',
+    `Now: ${chatName(bot, current)}`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Rename',
+        onPress: (title?: string) => {
+          client.renameChat(chat, title ?? '').then(notifyChatsChanged, (e: Error) => Alert.alert("Couldn't rename it", e.message));
+        },
+      },
+    ],
+    'plain-text',
+  );
+}
+
+/** Deletes a chat on Hermes (after a confirm) and opens the bot's next most recent one. */
+export async function deleteChat(bot: string, chat: string): Promise<void> {
+  const client = await chatClient(bot);
+  if (!client) return;
+  Alert.alert('Delete this chat?', 'Its messages are deleted on Hermes, on every device. The bot keeps its memory.', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Delete',
+      style: 'destructive',
+      onPress: async () => {
+        try {
+          await client.deleteChat(chat);
+          notifyChatsChanged();
+          if (currentChat(bot) === chat) {
+            const next = (await client.listChats().catch(() => [])).find((c) => c.id !== chat);
+            if (next) openChat(bot, next.id);
+            else startNewChat(bot);
+          }
+        } catch (e) {
+          Alert.alert("Couldn't delete it", (e as Error).message);
+        }
+      },
+    },
+  ]);
+}
+
+const renameOpenChat = async (bot: string) => renameChat(bot, currentChat(bot) ?? (await latestChat(bot)));
+const deleteOpenChat = async (bot: string) => deleteChat(bot, currentChat(bot) ?? (await latestChat(bot)));
+
+const chatsListeners = new Set<() => void>();
+/** The chat list re-reads when a chat is renamed or deleted from a menu. */
+export function onChatsChanged(fn: () => void): () => void {
+  chatsListeners.add(fn);
+  return () => void chatsListeners.delete(fn);
+}
+function notifyChatsChanged() {
+  chatsListeners.forEach((fn) => fn());
+}
+
+const CHOICE_LABEL: Record<ApprovalChoice, string> = {
+  once: 'Allow once',
+  session: 'Allow in this chat',
+  always: 'Always allow',
+  deny: 'Deny',
+};
+
+/** Hermes paused the reply to ask before running a risky command: show it with the answers it takes. */
+function ApprovalCard({
+  request,
+  bot,
+  busy,
+  onAnswer,
+  style,
+}: {
+  request: ApprovalRequest;
+  bot: string;
+  busy: boolean;
+  onAnswer: (choice: ApprovalChoice) => void;
+  style: ViewStyle | null;
+}) {
+  const { color } = useBotLook(bot);
+  const onBot = onColor(color);
+  return (
+    <View style={[styles.approval, { borderColor: mix(color, 0.6) }, style]} accessibilityLiveRegion="polite">
+      <Text style={styles.approvalTitle}>{bot} wants to run a command that needs your OK</Text>
+      {request.description ? <Text style={styles.approvalWhy}>{request.description}</Text> : null}
+      {request.command ? (
+        <ScrollView horizontal style={styles.approvalCode} contentContainerStyle={{ padding: 10 }}>
+          <Text style={styles.approvalCommand} selectable>
+            {request.command}
+          </Text>
+        </ScrollView>
+      ) : null}
+      <View style={styles.approvalButtons}>
+        {request.choices.map((c) => (
+          <Pressable
+            key={c}
+            disabled={busy}
+            onPress={() => onAnswer(c)}
+            accessibilityRole="button"
+            accessibilityLabel={CHOICE_LABEL[c]}
+            style={({ pressed }) => [
+              styles.approvalButton,
+              c === 'deny' ? { borderColor: colors.bad } : c === 'once' ? { backgroundColor: color, borderColor: color } : { borderColor: mix(color, 0.6) },
+              (pressed || busy) && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={[styles.approvalButtonText, c === 'deny' ? { color: colors.bad } : c === 'once' ? { color: onBot } : { color }]}>{CHOICE_LABEL[c]}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.approvalNote}>No answer in 5 minutes counts as Deny.</Text>
+    </View>
   );
 }
 
@@ -600,6 +794,17 @@ function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   headerButton: { color: colors.accent, fontSize: 16 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingRight: 8 },
+  moreButton: { fontSize: 20, fontWeight: '700', paddingHorizontal: 2 },
+  approval: { marginHorizontal: 12, marginBottom: 8, padding: 12, gap: 8, borderRadius: 14, borderWidth: 1.5, backgroundColor: colors.card },
+  approvalTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  approvalWhy: { color: colors.dim, fontSize: 13 },
+  approvalCode: { flexGrow: 0, borderRadius: 8, backgroundColor: '#000' },
+  approvalCommand: { color: colors.text, fontFamily: mono, fontSize: 13 },
+  approvalButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  approvalButton: { borderWidth: 1.5, borderRadius: 18, paddingHorizontal: 14, height: 36, alignItems: 'center', justifyContent: 'center' },
+  approvalButtonText: { fontSize: 14, fontWeight: '600' },
+  approvalNote: { color: colors.dim, fontSize: 12 },
   listToggle: { marginRight: 4 },
   paneHeader: {
     flexDirection: 'row',

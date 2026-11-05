@@ -32,12 +32,14 @@ export default function RootLayout() {
 }
 
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'look/[bot]', 'connectors/[bot]', 'model/[bot]']);
+const POPUPS = new Set(['new', 'add', 'connect', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]']);
 
 function popupTitle(name: string, params: { bot?: string } | undefined, title: string | undefined): string {
   const bot = params?.bot;
   if (bot && name === 'look/[bot]') return `${bot}'s look`;
   if (bot && name === 'connectors/[bot]') return `${bot}'s connectors`;
+  if (bot && name === 'chats/[bot]') return `${bot}'s chats`;
+  if (bot && name === 'routines/[bot]') return `${bot}'s routines`;
   return title || '';
 }
 
@@ -77,6 +79,8 @@ function Screens(): ReactNode {
       <Stack.Screen name="gallery" options={{ title: 'Gallery' }} />
       <Stack.Screen name="connectors/[bot]" options={popup('Connectors')} />
       <Stack.Screen name="model/[bot]" options={popup('Model')} />
+      <Stack.Screen name="chats/[bot]" options={popup('Chats')} />
+      <Stack.Screen name="routines/[bot]" options={popup('Routines')} />
     </Stack>
   );
 }

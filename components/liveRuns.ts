@@ -14,8 +14,8 @@ const POLL_MS = 3000;
 export const liveRuns = new LiveRuns({
   check: async (bot, runId) => {
     const conn = await getConnection(bot);
-    if (!conn) return 'gone';
-    return new HermesClient(conn, fetch as unknown as FetchLike).runStatus(runId);
+    if (!conn) return { status: 'gone' };
+    return new HermesClient(conn, fetch as unknown as FetchLike).runInfo(runId);
   },
   save: (runs) => SecureStore.setItemAsync(KEY, JSON.stringify(runs)),
   setMood: (bot, mood) => activity.set(bot, mood),
@@ -26,7 +26,7 @@ export const liveRuns = new LiveRuns({
 export const liveRunsReady: Promise<void> = SecureStore.getItemAsync(KEY)
   .then((raw) => {
     try {
-      liveRuns.restore(raw ? (JSON.parse(raw) as Record<string, LiveRun>) : null);
+      liveRuns.restore(raw ? (JSON.parse(raw) as Record<string, Partial<LiveRun>>) : null);
     } catch {
       // a bad save just means nothing to resume
     }

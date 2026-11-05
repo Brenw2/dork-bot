@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { BotList } from '@/components/BotList';
+import { openChat } from '@/components/currentChat';
 import { ChatView } from '@/components/ChatView';
 import { isDesktop } from '@/components/desktop';
 import { useLayoutClass } from '@/components/useLayoutClass';
@@ -18,7 +19,10 @@ const DESKTOP_CHAT_MAX = 820;
 export default function Home() {
   const { width } = useWindowDimensions();
   const cls = useLayoutClass();
-  const params = useLocalSearchParams<{ bot?: string }>();
+  const params = useLocalSearchParams<{ bot?: string; chat?: string }>();
+  useEffect(() => {
+    if (params.bot && params.chat) openChat(params.bot, params.chat);
+  }, [params.bot, params.chat]);
   const [selected, setSelected] = useState<string | null>(params.bot ?? null);
   const listHidden = useListHidden();
   const prevCls = useRef(cls);
