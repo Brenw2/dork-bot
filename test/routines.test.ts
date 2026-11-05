@@ -54,9 +54,10 @@ describe('routines', () => {
   });
 
   it('labels run times', () => {
-    const now = new Date('2026-11-04T20:00:00-05:00');
-    expect(whenLabel('2026-11-05T08:00:00-05:00', now)).toMatch(/^Tomorrow 8:00/);
-    expect(whenLabel('2026-11-04T11:32:07-05:00', now)).toMatch(/^Today 11:32/);
+    // Local times, so it passes in any timezone (CI runs in UTC).
+    const now = new Date(2026, 10, 4, 20, 0);
+    expect(whenLabel(new Date(2026, 10, 5, 8, 0).toISOString(), now)).toMatch(/^Tomorrow 8:00/);
+    expect(whenLabel(new Date(2026, 10, 4, 11, 32).toISOString(), now)).toMatch(/^Today 11:32/);
     expect(whenLabel(null)).toBe('');
   });
 
