@@ -8,6 +8,7 @@
 import { HermesClient, HermesError, normalizeUrl, type BotConnection, type FetchLike, type FetchResponse } from './hermes';
 import { isValidBotName } from './pairing';
 import type { ModelChoice } from './models';
+import { cleanPush, type PushMeta } from './push';
 import { CHARACTER_IDS, type CharacterId, type Look } from './sprites';
 
 export interface ManagerAuth {
@@ -228,6 +229,8 @@ export interface BotMeta {
   model?: ModelChoice;
   /** Hidden from the app on every device; the bot stays on Hermes. */
   hidden?: boolean;
+  /** Push notifications (lib/push.ts): the phones' tokens and the bot's mute switch. */
+  push?: PushMeta;
 }
 
 /** Keeps only well-formed fields: the block lives in a YAML file anyone can edit. */
@@ -244,6 +247,8 @@ export function cleanMeta(raw: unknown): BotMeta {
     meta.model = { provider: model.provider, model: model.model };
   }
   if (typeof r.hidden === 'boolean') meta.hidden = r.hidden;
+  const push = cleanPush(r.push);
+  if (push) meta.push = push;
   return meta;
 }
 
