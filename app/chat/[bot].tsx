@@ -2,6 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { BotSprite } from '@/components/BotSprite';
+import { useBusyWatch } from '@/components/busyWatch';
 import { ChatActions, ChatView } from '@/components/ChatView';
 import { openChat } from '@/components/currentChat';
 import { useBotLook } from '@/components/useBotLook';
@@ -18,6 +19,7 @@ export default function ChatScreen() {
   }, [bot, chat]);
   const name = useBotName(bot);
   const cls = useLayoutClass();
+  useBusyWatch();
   const prevCls = useRef(cls);
 
   // Unfolding to two panes: go back to the list with this chat open in the right pane.

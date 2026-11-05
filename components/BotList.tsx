@@ -6,6 +6,7 @@ import { isDesktop } from '@/components/desktop';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from '@/components/net';
 import { BotSprite } from '@/components/BotSprite';
+import { useBusyWatch } from '@/components/busyWatch';
 import { loadManager } from '@/components/manager';
 import { notificationsSupported } from '@/components/notifications';
 import { pushMeta, syncNow } from '@/components/sync';
@@ -26,6 +27,7 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, Status>>({});
   const { bottom } = useSafeAreaInsets();
+  useBusyWatch();
 
   const load = useCallback(() => {
     let live = true;

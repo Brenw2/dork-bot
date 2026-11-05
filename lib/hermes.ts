@@ -2,6 +2,7 @@
 // Plain TypeScript with an injectable fetch, so it runs in the app (expo/fetch,
 // which can stream) and in Node tests and scripts (global fetch).
 import { splitStoredImages, type ContentPart } from './attachments';
+import { parseSessionRows, turnPending, type SessionRow } from './busy';
 import { firstChatId, toChatSummaries, type ChatSummary } from './chats';
 import { parseModelOptions, type ModelCatalog, type ModelChoice } from './models';
 import { SseParser } from './sse';
@@ -166,6 +167,21 @@ export class HermesClient {
     if (!res.ok) throw new HermesError(`Couldn't list the chats: HTTP ${res.status}`, res.status);
     const body = (await res.json()) as { data?: Parameters<typeof toChatSummaries>[1] };
     return toChatSummaries(this.conn.bot, body.data ?? []);
+  }
+
+  /** The newest sessions of every kind (chats, terminal runs, routines), for lib/busy.ts. */
+  async recentSessions(limit = 8): Promise<SessionRow[]> {
+    const res = await this.request(`/api/sessions?limit=${limit}`);
+    if (!res.ok) throw new HermesError(`Couldn't list the sessions: HTTP ${res.status}`, res.status);
+    return parseSessionRows(((await res.json()) as { data?: unknown }).data);
+  }
+
+  /** Whether this chat's saved messages end mid-turn, i.e. a reply is still being worked on (lib/busy.ts). */
+  async turnPending(id: string): Promise<boolean> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}/messages`);
+    if (res.status === 404) return false;
+    if (!res.ok) throw new HermesError(`Couldn't load the chat: HTTP ${res.status}`, res.status);
+    return turnPending(((await res.json()) as { data?: unknown }).data, Date.now() / 1000);
   }
 
   /** Renames a chat. An empty title clears it (Hermes titles it again by itself). */
