@@ -17,3 +17,4 @@ dist-web/
 artifacts/
 desktop/web/
 desktop/icon.png
+__pycache__/
