@@ -87,6 +87,8 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
   const showActions = (bot: string, anchor?: { x: number; y: number }) =>
     Menu.show(bot, [
       { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
+      { text: 'Chats…', onPress: () => router.push({ pathname: '/chats/[bot]', params: { bot } }) },
+      { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
       { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
       { text: 'Hide', onPress: () => hide(bot) },
       ...(bot === 'default' ? [] : [{ text: 'Delete bot…', style: 'destructive' as const, onPress: () => deleteFromHermes(bot) }]),

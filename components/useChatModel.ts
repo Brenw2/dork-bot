@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetch } from '@/components/net';
 import { getConnection, listBots, onBotsChanged } from '@/lib/bots';
-import { chatSessionId, HermesClient, type FetchLike } from '@/lib/hermes';
+import { HermesClient, type FetchLike } from '@/lib/hermes';
+import { useCurrentChat } from '@/components/currentChat';
 import { chatModel, type ChatModel, type ModelCatalog } from '@/lib/models';
 
 export interface ChatModelState extends ChatModel {
@@ -16,6 +17,7 @@ export interface ChatModelState extends ChatModel {
  * changes (setModelChoice fires that), so the chat's model line updates after a pick.
  */
 export function useChatModel(bot: string): ChatModelState {
+  const chat = useCurrentChat(bot);
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [client, setClient] = useState<HermesClient | null>(null);
   const [sessionModel, setSessionModel] = useState<string | null>(null);
@@ -28,13 +30,14 @@ export function useChatModel(bot: string): ChatModelState {
 
   useEffect(() => {
     let live = true;
+    if (!chat) return;
     (async () => {
       const conn = await getConnection(bot);
       if (!conn) return;
       const c = new HermesClient(conn, fetch as unknown as FetchLike);
       if (live) setClient(c);
       try {
-        const [list, model, bots] = await Promise.all([c.modelOptions(), c.sessionModel(chatSessionId(bot)), listBots()]);
+        const [list, model, bots] = await Promise.all([c.modelOptions(), c.sessionModel(chat), listBots()]);
         if (!live) return;
         setCatalog(list);
         setSessionModel(model);
@@ -47,7 +50,7 @@ export function useChatModel(bot: string): ChatModelState {
     return () => {
       live = false;
     };
-  }, [bot, tick]);
+  }, [bot, chat, tick]);
 
   return { ...chatModel(sessionModel, saved, catalog), catalog, client, error, reload };
 }

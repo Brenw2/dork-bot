@@ -20,7 +20,7 @@ describe.skipIf(!live)(`live resume: ${bot} at ${url}`, () => {
     const id = `dork-bot-live-resume-${Date.now()}`;
     const moods: string[] = [];
     const runs = new LiveRuns({
-      check: (_b, runId) => client.runStatus(runId),
+      check: (_b, runId) => client.runInfo(runId),
       save: () => undefined,
       setMood: (_b, m) => void moods.push(m),
       now: () => Date.now(),
@@ -34,13 +34,13 @@ describe.skipIf(!live)(`live resume: ${bot} at ${url}`, () => {
       await client
         .chat(id, 'Reply with exactly: resumed ok', (e) => {
           if (e.type === 'started') {
-            runs.start(bot, e.runId);
+            runs.start(bot, id, e.runId);
             abort.abort();
           }
         }, abort.signal)
         .catch(() => undefined);
-      runs.detach(bot);
-      const run = runs.get(bot);
+      runs.detach(id);
+      const run = runs.get(id);
       expect(run?.runId).toMatch(/^run_/);
       console.log(`hung up ${Date.now() - t0} ms after sending; run ${run?.runId}`);
 

@@ -1,6 +1,6 @@
 // Chat screen state as a pure reducer, so the streaming logic is unit-tested
 // without React Native.
-import type { ChatEvent, ChatMessage } from './hermes';
+import type { ApprovalRequest, ChatEvent, ChatMessage } from './hermes';
 
 export interface ToolCall {
   name: string;
@@ -14,9 +14,11 @@ export interface ChatState {
   pending: { text: string; tools: ToolCall[]; thinking: boolean; resumed?: boolean; remote?: boolean } | null;
   runId: string | null;
   error: string | null;
+  /** The reply is paused until Brennan allows or denies a command. */
+  approval: ApprovalRequest | null;
 }
 
-export const initialChat: ChatState = { messages: [], pending: null, runId: null, error: null };
+export const initialChat: ChatState = { messages: [], pending: null, runId: null, error: null, approval: null };
 
 export type ChatAction =
   | { type: 'loaded'; messages: ChatMessage[] }
@@ -28,6 +30,8 @@ export type ChatAction =
   /** A resumed reply finished: the reloaded history already has it, so drop the partial copy. */
   | { type: 'settled' }
   | { type: 'failed'; message: string }
+  /** What the run is waiting on, from a status check (null: nothing any more). */
+  | { type: 'approval'; request: ApprovalRequest | null }
   | { type: 'ended' };
 
 let localId = 0;
@@ -47,6 +51,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         pending: { text: '', tools: [], thinking: true },
         runId: null,
         error: null,
+        approval: null,
       };
     case 'event':
       return applyEvent(state, action.event);
@@ -63,7 +68,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       if (state.pending && !state.pending.remote) return state;
       return { ...state, runId: null, pending: { text: '', tools: [], thinking: true, resumed: true, remote: true }, error: null };
     case 'settled':
-      return { ...state, pending: null, runId: null };
+      return { ...state, pending: null, runId: null, approval: null };
+    case 'approval':
+      return { ...state, approval: action.request };
     case 'failed':
       return finish({ ...state, error: action.message });
     case 'ended':
@@ -80,6 +87,8 @@ function applyEvent(state: ChatState, e: ChatEvent): ChatState {
       return { ...state, pending: { ...p, text: p.text + e.text, thinking: false } };
     case 'thinking':
       return { ...state, pending: { ...p, thinking: true } };
+    case 'approval':
+      return { ...state, approval: e.request, pending: p };
     case 'tool': {
       const tools = [...p.tools];
       if (e.phase === 'started') tools.push({ name: e.name, preview: e.preview, status: 'running' });
@@ -89,7 +98,9 @@ function applyEvent(state: ChatState, e: ChatEvent): ChatState {
         if (i >= 0) tools[i] = { ...tools[i], status };
         else tools.push({ name: e.name, preview: e.preview, status });
       }
-      return { ...state, pending: { ...p, tools } };
+      // Once a tool reports back, the command it asked about went through (or was refused).
+      const approval = e.phase === 'started' ? state.approval : null;
+      return { ...state, approval, pending: { ...p, tools } };
     }
     case 'completed':
       return { ...state, pending: { ...p, text: e.content || p.text, thinking: false } };
@@ -102,12 +113,12 @@ function applyEvent(state: ChatState, e: ChatEvent): ChatState {
 
 function finish(state: ChatState): ChatState {
   const p = state.pending;
-  if (!p) return { ...state, runId: null };
+  if (!p) return { ...state, runId: null, approval: null };
   const messages = [...state.messages];
   for (const t of p.tools) messages.push({ id: nextId(), role: 'tool', content: t.preview ?? '', toolName: t.name });
   const text = p.text.trim();
   if (text) messages.push({ id: nextId(), role: 'assistant', content: text });
-  return { ...state, messages, pending: null, runId: null };
+  return { ...state, messages, pending: null, runId: null, approval: null };
 }
 
 function findLastIndex<T>(arr: T[], pred: (t: T) => boolean): number {

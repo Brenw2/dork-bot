@@ -2,6 +2,7 @@
 // Plain TypeScript with an injectable fetch, so it runs in the app (expo/fetch,
 // which can stream) and in Node tests and scripts (global fetch).
 import { splitStoredImages, type ContentPart } from './attachments';
+import { firstChatId, toChatSummaries, type ChatSummary } from './chats';
 import { parseModelOptions, type ModelCatalog, type ModelChoice } from './models';
 import { SseParser } from './sse';
 
@@ -32,9 +33,42 @@ export type ChatEvent =
   | { type: 'delta'; text: string }
   | { type: 'tool'; phase: 'started' | 'completed' | 'failed'; name: string; preview: string | null }
   | { type: 'thinking' }
+  | { type: 'approval'; request: ApprovalRequest }
   | { type: 'completed'; content: string }
   | { type: 'finished'; status: 'completed' | 'cancelled' | 'failed' }
   | { type: 'error'; message: string };
+
+/**
+ * Hermes stopped a reply to ask before running a risky command (approvals.mode smart/manual).
+ * Answer with HermesClient.approve; unanswered, Hermes denies it after approvals.timeout (300 s).
+ */
+export interface ApprovalRequest {
+  requestId?: string;
+  /** The command, with secrets redacted by Hermes. */
+  command: string;
+  /** Why it was flagged ("recursive delete", …). */
+  description: string;
+  /** What Hermes accepts: once, session, always, deny (smart denials only allow once/deny). */
+  choices: ApprovalChoice[];
+}
+export type ApprovalChoice = 'once' | 'session' | 'always' | 'deny';
+
+export function toApproval(p: unknown): ApprovalRequest | null {
+  if (!p || typeof p !== 'object') return null;
+  const r = p as Record<string, unknown>;
+  const command = typeof r.command === 'string' ? r.command : '';
+  const description = typeof r.description === 'string' ? r.description : '';
+  if (!command && !description) return null;
+  const all: ApprovalChoice[] = ['once', 'session', 'always', 'deny'];
+  const choices = Array.isArray(r.choices) ? all.filter((c) => (r.choices as unknown[]).includes(c)) : ['once' as const, 'deny' as const];
+  const id = typeof r.request_id === 'string' && r.request_id ? r.request_id : typeof r.prompt_id === 'string' && r.prompt_id ? r.prompt_id : null;
+  return {
+    ...(id ? { requestId: id } : {}),
+    command,
+    description,
+    choices: choices.length ? choices : ['once', 'deny'],
+  };
+}
 
 export class HermesError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -56,6 +90,9 @@ export type FetchLike = (
   init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<FetchResponse>;
 
+/** What the app says when b-lab doesn't answer at all (no network, Tailscale off, b-lab asleep). */
+export const UNREACHABLE = "Can't reach b-lab. Check that Tailscale is on and b-lab is awake; this retries by itself.";
+
 export function normalizeUrl(url: string): string {
   let u = url.trim().replace(/\/+$/, '');
   if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
@@ -67,9 +104,9 @@ export function botBase(conn: BotConnection): string {
   return conn.bot === 'default' ? base : `${base}/p/${encodeURIComponent(conn.bot)}`;
 }
 
-/** The one ongoing chat per bot lives in this Hermes session. */
+/** The chat every bot started with. Bots can have more now: see lib/chats.ts. */
 export function chatSessionId(bot: string): string {
-  return `dork-bot-${bot}`;
+  return firstChatId(bot);
 }
 
 export class HermesClient {
@@ -92,7 +129,7 @@ export class HermesClient {
         headers: this.headers(init.headers),
       });
     } catch (err) {
-      throw new HermesError(`Can't reach Hermes at ${normalizeUrl(this.conn.url)}: ${errMessage(err)}`);
+      throw new HermesError(`${UNREACHABLE} (${errMessage(err)})`);
     }
     if (res.status === 401) throw new HermesError(`The key for "${this.conn.bot}" was rejected (401).`, 401);
     return res;
@@ -105,22 +142,49 @@ export class HermesClient {
     if (!res.ok) throw new HermesError(`Hermes answered HTTP ${res.status}: ${await safeText(res)}`, res.status);
   }
 
-  /** Creates the bot's chat session if it doesn't exist yet. */
-  async ensureSession(id: string, title: string): Promise<void> {
+  /** Creates the chat's Hermes session if it doesn't exist yet. Without a title, Hermes names it after the first reply. */
+  async ensureSession(id: string, title?: string): Promise<void> {
     const create = (body: Record<string, string>) =>
       this.request('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-    let res = await create({ id, title, source: 'dork-bot' });
+    let res = await create(title ? { id, title, source: 'dork-bot' } : { id, source: 'dork-bot' });
     // Hermes titles are unique per profile. If another session already has
     // this one, create the chat without a title rather than fail.
-    if (res.status === 400 && (await safeText(res)).includes('invalid_title')) {
+    if (title && res.status === 400 && (await safeText(res)).includes('invalid_title')) {
       res = await create({ id, source: 'dork-bot' });
     }
     if (res.status === 201 || res.status === 200 || res.status === 409) return;
     throw new HermesError(`Couldn't create the chat: HTTP ${res.status} ${await safeText(res)}`, res.status);
+  }
+
+  /** This bot's chats, most recently used first (empty ones left out). */
+  async listChats(): Promise<ChatSummary[]> {
+    const res = await this.request('/api/sessions?source=api_server&limit=200');
+    if (!res.ok) throw new HermesError(`Couldn't list the chats: HTTP ${res.status}`, res.status);
+    const body = (await res.json()) as { data?: Parameters<typeof toChatSummaries>[1] };
+    return toChatSummaries(this.conn.bot, body.data ?? []);
+  }
+
+  /** Renames a chat. An empty title clears it (Hermes titles it again by itself). */
+  async renameChat(id: string, title: string): Promise<void> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim() || null }),
+    });
+    if (res.status === 400) throw new HermesError(`Couldn't rename the chat: ${await errorText(res)}`, 400);
+    if (!res.ok) throw new HermesError(`Couldn't rename the chat: HTTP ${res.status}`, res.status);
+  }
+
+  /** Deletes a chat and its history on Hermes. Refused (409) while a reply is still running in it. */
+  async deleteChat(id: string): Promise<void> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (res.status === 404) return;
+    if (res.status === 409) throw new HermesError('A reply is still running in that chat. Stop it first.', 409);
+    if (!res.ok) throw new HermesError(`Couldn't delete the chat: HTTP ${res.status}`, res.status);
   }
 
   async messages(id: string): Promise<ChatMessage[]> {
@@ -211,15 +275,58 @@ export class HermesClient {
    * so a chat that was left or backgrounded mid-reply checks this until it's done.
    */
   async runStatus(runId: string): Promise<string> {
+    return (await this.runInfo(runId)).status;
+  }
+
+  /** The run's status, plus what it's asking when it's waiting for an approval. */
+  async runInfo(runId: string): Promise<{ status: string; approval: ApprovalRequest | null; generation?: number }> {
     const res = await this.request(`/v1/runs/${encodeURIComponent(runId)}`);
-    if (res.status === 404) return 'gone';
+    if (res.status === 404) return { status: 'gone', approval: null };
     if (!res.ok) throw new HermesError(`Couldn't check the reply: HTTP ${res.status}`, res.status);
-    const body = (await res.json()) as { status?: unknown };
-    return typeof body.status === 'string' ? body.status : 'running';
+    const body = (await res.json()) as { status?: unknown; approval?: unknown; pending_controls?: unknown; execution_generation?: unknown };
+    // Older gateways put the request in `approval`; with the session authority it's one of the
+    // run's `pending_controls` (kind "approval"), answered with the run's execution_generation.
+    const pending = Array.isArray(body.pending_controls)
+      ? body.pending_controls.find((p) => (p as { kind?: unknown })?.kind === 'approval')
+      : undefined;
+    return {
+      status: typeof body.status === 'string' ? body.status : 'running',
+      approval: toApproval(body.approval) ?? toApproval(pending),
+      ...(typeof body.execution_generation === 'number' ? { generation: body.execution_generation } : {}),
+    };
+  }
+
+  /** Answers an approval the run is waiting on. 409 means it was already answered or timed out. */
+  async approve(runId: string, choice: ApprovalChoice, requestId?: string): Promise<void> {
+    const info = await this.runInfo(runId);
+    const id = requestId ?? info.approval?.requestId;
+    const body =
+      info.generation !== undefined && id
+        ? { request_id: id, execution_generation: info.generation, choice }
+        : id
+          ? { choice, request_id: id }
+          : { choice };
+    const res = await this.request(`/v1/runs/${encodeURIComponent(runId)}/approval`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 409 || (res.status === 400 && (await safeText(res)).includes('not_pending'))) {
+      throw new HermesError('That request already ended (answered, or it timed out).', 409);
+    }
+    if (!res.ok) throw new HermesError(`Couldn't answer: HTTP ${res.status} ${await errorText(res)}`, res.status);
   }
 
   async stop(runId: string): Promise<void> {
     await this.request(`/v1/runs/${encodeURIComponent(runId)}/stop`, { method: 'POST' });
+  }
+
+  /** A plain call on the bot's API server (routines use it, lib/routines.ts). */
+  async call(path: string, method = 'GET', body?: unknown): Promise<FetchResponse> {
+    return this.request(path, {
+      method,
+      ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    });
   }
 }
 
@@ -271,6 +378,10 @@ export function mapEvent(event: string, data: string): ChatEvent | null {
       };
     case 'tool.progress':
       return { type: 'thinking' };
+    case 'approval.request': {
+      const request = toApproval(p);
+      return request ? { type: 'approval', request } : null;
+    }
     case 'assistant.completed':
       return { type: 'completed', content: str(p.content) };
     case 'run.completed':
@@ -297,5 +408,16 @@ async function safeText(res: FetchResponse): Promise<string> {
     return (await res.text()).slice(0, 300);
   } catch {
     return '';
+  }
+}
+
+/** Hermes's error message from a JSON error body, else the raw text. */
+async function errorText(res: FetchResponse): Promise<string> {
+  const text = await safeText(res);
+  try {
+    const body = JSON.parse(text) as { error?: { message?: string } | string };
+    return typeof body.error === 'string' ? body.error : body.error?.message || text;
+  } catch {
+    return text;
   }
 }

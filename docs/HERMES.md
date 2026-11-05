@@ -110,6 +110,18 @@ Lock a hand-added provider as plain `custom`, not `custom:dork`: Hermes checks t
 
 The model line at the top of every chat opens the picker. A chat whose model doesn't match the bot's provider shows in red. Providers come from Hermes (signed-in ones only; `-acp` duplicates hidden), the bot's own first, then Dork. A brand-new bot can see a shorter list for its first minute while Hermes fills its model cache, and deleting a bot while that runs can leave `profiles/<bot>/provider_models_cache.json.lock` behind.
 
+## Several chats per bot
+
+Each chat is a Hermes session in the bot's profile: the first one is `dork-bot-<bot>` (from when bots had one chat), new ones are `dork-bot-<bot>--<id>`. The Chats screen lists `GET /p/<bot>/api/sessions?source=api_server&limit=200` filtered to those ids with messages, newest first (`lib/chats.ts`). A new chat's session is only created on its first message (`POST /api/sessions` without a title), and Hermes titles it after the first reply. Rename: `PATCH /api/sessions/<id>` `{title}` (null hands naming back to Hermes). Delete: `DELETE /api/sessions/<id>` (409 `session_active_turn` while a reply runs). Nothing about which chat is open is saved on the device: a bot opens on its most recently used chat, so the phone picks up where the desktop left off.
+
+## Approvals
+
+With `approvals.mode` smart (the default) Hermes's own check decides most risky commands; the ones it escalates (or every one, in manual mode) pause the reply. The session stream sends `approval.request` `{request_id, command, description, choices}`, and `GET /v1/runs/<id>` reports `waiting_for_approval`. b-lab's gateway runs the session authority, so the request is in `pending_controls` (`prompt_id` = `request_id`) and the answer must carry the run's `execution_generation`: `POST /v1/runs/<id>/approval` `{request_id, execution_generation, choice}` (`once`, `session`, `always`, `deny`); any other body is 400 `invalid_params`. Unanswered, Hermes denies after `approvals.timeout` (300 s). `DORK_LIVE=1 npx vitest run test/live-approval.test.ts --silent=false` checks it with a throwaway Haiku bot in manual mode (2026-11-04: request in ~4 s; Allow once ran it, Deny left the folder and the bot said so).
+
+## Routines
+
+Hermes cron jobs per bot: `GET /p/<bot>/api/jobs?include_disabled=true`, `POST /api/jobs` `{name, prompt, schedule}` (cron line, `every 2h`, `30m`, or an ISO time), `PATCH`/`DELETE /api/jobs/<id>`, `POST /api/jobs/<id>/pause|resume|run`. Each run is its own session (`source: cron`, title `<name> · Nov 04 11:32`); the screen shows the last reply of the newest one (`lib/routines.ts`).
+
 ## Tests against the real thing
 
 ```bash
