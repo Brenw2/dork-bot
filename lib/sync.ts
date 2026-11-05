@@ -6,6 +6,7 @@
 import type { BotConnection } from './hermes';
 import type { BotMeta, Profile } from './manager';
 import type { ModelChoice } from './models';
+import { addToken } from './push';
 import type { Look } from './sprites';
 
 /** The saved-bot fields sync reads (lib/bots.ts SavedBot). */
@@ -29,6 +30,8 @@ export interface SyncDeps {
   /** Stores a look/model that came from another device. */
   update: (bot: string, patch: { look?: Look; model?: ModelChoice; displayName?: string }) => Promise<void>;
   remove: (bot: string) => Promise<void>;
+  /** This phone's push token once notifications are on (lib/push.ts); added to every bot that lacks it. */
+  pushToken?: string | null;
 }
 
 export interface SyncResult {
@@ -37,6 +40,8 @@ export interface SyncResult {
   updated: string[];
   /** Pushed this device's look/model up because Hermes had none yet (first sync after the update). */
   pushed: string[];
+  /** Bots that got this phone's push token (new bots, or notifications just turned on). */
+  notify: string[];
   /** Per-bot problems; the rest of the sync still ran. */
   errors: Record<string, string>;
 }
@@ -44,7 +49,13 @@ export interface SyncResult {
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 export async function syncBots(deps: SyncDeps): Promise<SyncResult> {
-  const result: SyncResult = { added: [], removed: [], updated: [], pushed: [], errors: {} };
+  const result: SyncResult = { added: [], removed: [], updated: [], pushed: [], notify: [], errors: {} };
+  const addPushToken = async (bot: string, meta: BotMeta) => {
+    const patch = deps.pushToken ? addToken(meta.push, deps.pushToken) : null;
+    if (!patch) return;
+    await deps.setMeta(bot, { push: patch });
+    result.notify.push(bot);
+  };
   const [profiles, local] = await Promise.all([deps.listProfiles(), deps.local()]);
   const onHermes = new Set(profiles.map((p) => p.name));
   const localByName = new Map(local.map((b) => [b.bot, b]));
@@ -77,8 +88,10 @@ export async function syncBots(deps: SyncDeps): Promise<SyncResult> {
         const conn = await deps.connect(p.name);
         await deps.save(conn, meta);
         result.added.push(p.name);
+        await addPushToken(p.name, meta);
         continue;
       }
+      await addPushToken(p.name, meta);
       // Hermes wins; but the first time, it has nothing yet, so this device's picks go up.
       const up: BotMeta = {};
       if (!meta.look && mine.look) up.look = mine.look;

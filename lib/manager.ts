@@ -9,6 +9,7 @@ import { HermesClient, HermesError, normalizeUrl, type BotConnection, type Fetch
 import { cleanDisplayName } from './names';
 import { isValidBotName } from './pairing';
 import type { ModelChoice } from './models';
+import { cleanPush, type PushMeta } from './push';
 import { CHARACTER_IDS, type CharacterId, type Look } from './sprites';
 
 export interface ManagerAuth {
@@ -231,6 +232,8 @@ export interface BotMeta {
   hidden?: boolean;
   /** Display name; the profile id never changes (lib/names.ts). */
   name?: string;
+  /** Push notifications (lib/push.ts): the phones' tokens and the bot's mute switch. */
+  push?: PushMeta;
 }
 
 /** Keeps only well-formed fields: the block lives in a YAML file anyone can edit. */
@@ -249,6 +252,8 @@ export function cleanMeta(raw: unknown): BotMeta {
   if (typeof r.hidden === 'boolean') meta.hidden = r.hidden;
   const name = cleanDisplayName(r.name);
   if (name) meta.name = name;
+  const push = cleanPush(r.push);
+  if (push) meta.push = push;
   return meta;
 }
 

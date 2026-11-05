@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isDesktop } from '@/components/desktop';
 import { DialogHost } from '@/components/Dialogs';
+import { NotificationRoutes } from '@/components/notifications';
 import { Overlay } from '@/components/Overlay';
 import { TestInsets } from '@/components/TestInsets';
 import { useBotName } from '@/components/useBotName';
@@ -27,19 +28,21 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <OrientationController />
       <Screens />
+      <NotificationRoutes />
       <DialogHost />
     </TestInsets>
   );
 }
 
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]']);
+const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]']);
 
 function popupTitle(name: string, bot: string | undefined, shown: string, title: string | undefined): string {
   if (bot && name === 'look/[bot]') return `${shown}'s look`;
   if (bot && name === 'connectors/[bot]') return `${shown}'s connectors`;
   if (bot && name === 'chats/[bot]') return `${shown}'s chats`;
   if (bot && name === 'routines/[bot]') return `${shown}'s routines`;
+  if (bot && name === 'routine-results/[bot]') return `${shown}'s routine results`;
   return title || '';
 }
 
@@ -88,6 +91,8 @@ function Screens(): ReactNode {
       <Stack.Screen name="model/[bot]" options={popup('Model')} />
       <Stack.Screen name="chats/[bot]" options={popup('Chats')} />
       <Stack.Screen name="routines/[bot]" options={popup('Routines')} />
+      <Stack.Screen name="routine-results/[bot]" options={popup('Routine results')} />
+      <Stack.Screen name="notifications" options={popup('Notifications')} />
     </Stack>
   );
 }
