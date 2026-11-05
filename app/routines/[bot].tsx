@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
+import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
@@ -16,6 +17,7 @@ import { button, colors, mix, onColor } from '@/lib/theme';
 // digest. Add, pause, run now, delete; each shows its next run and what its last run said.
 export default function RoutinesScreen() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
+  const botName = useBotName(bot);
   const column = useColumnStyle();
   const { color } = useBotLook(bot);
   const [api, setApi] = useState<Routines | null>(null);
@@ -50,13 +52,13 @@ export default function RoutinesScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${bot}'s routines` }} />
+      <Stack.Screen options={{ title: `${botName}'s routines` }} />
       <ScrollView
         contentContainerStyle={[styles.body, column]}
         keyboardShouldPersistTaps="handled"
         refreshControl={isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.dim} />}
       >
-        <Text style={styles.intro}>Things {bot} does on a schedule by itself. Each run is saved on Hermes; its result shows here.</Text>
+        <Text style={styles.intro}>Things {botName} does on a schedule by itself. Each run is saved on Hermes; its result shows here.</Text>
         {adding && api ? (
           <NewRoutine
             bot={bot}
@@ -88,6 +90,7 @@ export default function RoutinesScreen() {
 }
 
 function NewRoutine({ bot, api, color, onDone }: { bot: string; api: Routines; color: string; onDone: (added: boolean) => void }) {
+  const botName = useBotName(bot);
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [schedule, setSchedule] = useState(SCHEDULES[0].value);
@@ -110,7 +113,7 @@ function NewRoutine({ bot, api, color, onDone }: { bot: string; api: Routines; c
     <View style={styles.card}>
       <Text style={styles.label}>Name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Morning digest" placeholderTextColor={colors.dim} accessibilityLabel="Routine name" maxLength={200} />
-      <Text style={styles.label}>What should {bot} do?</Text>
+      <Text style={styles.label}>What should {botName} do?</Text>
       <TextInput
         style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
         value={prompt}
@@ -187,6 +190,7 @@ function NewRoutine({ bot, api, color, onDone }: { bot: string; api: Routines; c
 }
 
 function RoutineCard({ routine: r, bot, api, color, onChanged }: { routine: Routine; bot: string; api: Routines; color: string; onChanged: () => void }) {
+  const botName = useBotName(bot);
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<{ at: number; text: string } | null | undefined>(undefined);
   const [busy, setBusy] = useState<string | null>(null);
@@ -212,7 +216,7 @@ function RoutineCard({ routine: r, bot, api, color, onChanged }: { routine: Rout
     }
   };
   const remove = () =>
-    Alert.alert(`Delete "${r.name}"?`, `${bot} stops doing it. Past runs stay on Hermes.`, [
+    Alert.alert(`Delete "${r.name}"?`, `${botName} stops doing it. Past runs stay on Hermes.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => void act('Delete', () => api.remove(r.id)) },
     ]);

@@ -6,6 +6,7 @@
 // signs in on b-lab and hands the app a refresh token; the app trades it for
 // short-lived bearer tokens at /auth/native/refresh and keeps the newest one.
 import { HermesClient, HermesError, normalizeUrl, type BotConnection, type FetchLike, type FetchResponse } from './hermes';
+import { cleanDisplayName } from './names';
 import { isValidBotName } from './pairing';
 import type { ModelChoice } from './models';
 import { CHARACTER_IDS, type CharacterId, type Look } from './sprites';
@@ -228,6 +229,8 @@ export interface BotMeta {
   model?: ModelChoice;
   /** Hidden from the app on every device; the bot stays on Hermes. */
   hidden?: boolean;
+  /** Display name; the profile id never changes (lib/names.ts). */
+  name?: string;
 }
 
 /** Keeps only well-formed fields: the block lives in a YAML file anyone can edit. */
@@ -244,6 +247,8 @@ export function cleanMeta(raw: unknown): BotMeta {
     meta.model = { provider: model.provider, model: model.model };
   }
   if (typeof r.hidden === 'boolean') meta.hidden = r.hidden;
+  const name = cleanDisplayName(r.name);
+  if (name) meta.name = name;
   return meta;
 }
 

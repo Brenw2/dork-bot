@@ -2,6 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Menu } from '@/components/alert';
+import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { currentChat, openChat, startNewChat, useCurrentChat } from '@/components/currentChat';
 import { deleteChat, onChatsChanged, renameChat } from '@/components/ChatView';
@@ -17,6 +18,7 @@ import { button, colors, mix, onColor } from '@/lib/theme';
 // it, New chat for a fresh one, long-press (⋯ on desktop) to rename or delete.
 export default function Chats() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
+  const botName = useBotName(bot);
   const column = useColumnStyle();
   const open = useCurrentChat(bot);
   const { color } = useBotLook(bot);
@@ -61,7 +63,7 @@ export default function Chats() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${bot}'s chats` }} />
+      <Stack.Screen options={{ title: `${botName}'s chats` }} />
       <View style={[styles.fill, column]}>
         <Pressable
           style={({ pressed }) => [styles.new, { backgroundColor: color }, pressed && { opacity: 0.7 }]}
@@ -78,7 +80,7 @@ export default function Chats() {
           keyExtractor={(c) => c.id}
           contentContainerStyle={styles.list}
           refreshControl={isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load().finally(() => setRefreshing(false)); }} tintColor={colors.dim} />}
-          ListEmptyComponent={chats ? <Text style={styles.empty}>No chats with {bot} yet. Say something and it shows up here.</Text> : undefined}
+          ListEmptyComponent={chats ? <Text style={styles.empty}>No chats with {botName} yet. Say something and it shows up here.</Text> : undefined}
           renderItem={({ item }) => {
             const isOpen = item.id === (open ?? currentChat(bot));
             const name = chatName(bot, item);

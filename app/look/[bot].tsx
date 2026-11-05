@@ -2,6 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Sprite } from '@/components/BotSprite';
+import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { LookPicker } from '@/components/LookPicker';
 import { useBotLook } from '@/components/useBotLook';
@@ -13,6 +14,7 @@ import { button, colors } from '@/lib/theme';
 // Change a bot's look (long-press a bot → Change look…): color, character, and its style.
 export default function ChangeLook() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
+  const botName = useBotName(bot);
   const current = useBotLook(bot);
   const [picked, setPicked] = useState<Look>(current);
   const column = useColumnStyle();
@@ -26,7 +28,7 @@ export default function ChangeLook() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]}>
-      <Stack.Screen options={{ title: bot }} />
+      <Stack.Screen options={{ title: botName }} />
       <View style={styles.preview}>
         {MOODS.filter((m) => m !== 'sleeping').map((m) => (
           <Sprite key={m} character={picked.character} variant={picked.variant} color={picked.color} mood={m} size={40} seed={m.length} />

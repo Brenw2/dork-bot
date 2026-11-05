@@ -27,8 +27,8 @@ export function syncNow(force = false): Promise<SyncResult | null> {
         setMeta: (bot, patch) => manager.setMeta(bot, patch),
         connect: (bot) => manager.connectExisting(bot, randomKey),
         local: listBots,
-        save: (conn, meta) => saveBot(conn, meta.look, meta.model),
-        update: (bot, meta) => updateBot(bot, meta),
+        save: (conn, meta) => saveBot(conn, meta.look, meta.model, meta.name),
+        update: (bot, patch) => updateBot(bot, patch),
         remove: removeBot,
       });
     } catch {

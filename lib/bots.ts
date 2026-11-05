@@ -15,6 +15,8 @@ export interface SavedBot {
   look?: Look;
   /** The model this phone last switched the bot's chat to (Hermes only reports the model name, not the provider). */
   model?: ModelChoice;
+  /** Display name (lib/names.ts); unset means the profile id. */
+  displayName?: string;
 }
 
 // Screens showing a bot's character re-read the list when it changes.
@@ -44,12 +46,12 @@ export async function getConnection(bot: string): Promise<BotConnection | null> 
   return saved && key ? { url: saved.url, bot, key } : null;
 }
 
-export async function saveBot(conn: BotConnection, look?: Look, model?: ModelChoice): Promise<void> {
+export async function saveBot(conn: BotConnection, look?: Look, model?: ModelChoice, displayName?: string): Promise<void> {
   await SecureStore.setItemAsync(keyName(conn.bot), conn.key);
   const all = await listBots();
   const old = all.find((b) => b.bot === conn.bot);
   const bots = all.filter((b) => b.bot !== conn.bot);
-  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look, model: model ?? old?.model });
+  bots.push({ bot: conn.bot, url: conn.url, addedAt: Date.now(), look: look ?? old?.look, model: model ?? old?.model, displayName: displayName ?? old?.displayName });
   bots.sort((a, b) => a.bot.localeCompare(b.bot));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
@@ -61,8 +63,8 @@ export async function setModelChoice(bot: string, model: ModelChoice): Promise<v
   changed();
 }
 
-/** Look and/or model picked on another device (lib/sync.ts). */
-export async function updateBot(bot: string, patch: { look?: Look; model?: ModelChoice }): Promise<void> {
+/** Look, model and/or name changed on another device (lib/sync.ts). */
+export async function updateBot(bot: string, patch: { look?: Look; model?: ModelChoice; displayName?: string }): Promise<void> {
   const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, ...patch } : b));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
@@ -70,6 +72,12 @@ export async function updateBot(bot: string, patch: { look?: Look; model?: Model
 
 export async function setLook(bot: string, look: Look): Promise<void> {
   const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, look } : b));
+  await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
+  changed();
+}
+
+export async function setDisplayName(bot: string, displayName: string): Promise<void> {
+  const bots = (await listBots()).map((b) => (b.bot === bot ? { ...b, displayName } : b));
   await SecureStore.setItemAsync(INDEX, JSON.stringify(bots));
   changed();
 }

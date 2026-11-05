@@ -2,6 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { loadManager } from '@/components/manager';
+import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { useChatModel } from '@/components/useChatModel';
 import { pushMeta } from '@/components/sync';
@@ -14,6 +15,7 @@ import { colors } from '@/lib/theme';
 // Switch a bot's model (tap the model line at the top of the chat). Applies from the next message.
 export default function PickModel() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
+  const botName = useBotName(bot);
   const column = useColumnStyle();
   const { catalog, choice, problem, client, error } = useChatModel(bot);
   const chat = useCurrentChat(bot) ?? firstChatId(bot);
@@ -51,7 +53,7 @@ export default function PickModel() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${bot}'s model` }} />
+      <Stack.Screen options={{ title: `${botName}'s model` }} />
       <View style={[styles.fill, column]}>
         <TextInput
           style={styles.search}
@@ -73,7 +75,7 @@ export default function PickModel() {
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.list}
-          ListFooterComponent={catalog ? <Text style={styles.note}>Picking one sets {bot}'s model, for this chat and new ones. It applies from your next message.</Text> : undefined}
+          ListFooterComponent={catalog ? <Text style={styles.note}>Picking one sets {botName}'s model, for this chat and new ones. It applies from your next message.</Text> : undefined}
           renderSectionHeader={({ section }) => (
             <Text style={styles.header}>
               {section.group.name}

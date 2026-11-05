@@ -14,6 +14,7 @@ export interface LocalBot {
   url: string;
   look?: Look;
   model?: ModelChoice;
+  displayName?: string;
 }
 
 export interface SyncDeps {
@@ -26,7 +27,7 @@ export interface SyncDeps {
   local: () => Promise<LocalBot[]>;
   save: (conn: BotConnection, meta: BotMeta) => Promise<void>;
   /** Stores a look/model that came from another device. */
-  update: (bot: string, meta: BotMeta) => Promise<void>;
+  update: (bot: string, patch: { look?: Look; model?: ModelChoice; displayName?: string }) => Promise<void>;
   remove: (bot: string) => Promise<void>;
 }
 
@@ -82,14 +83,16 @@ export async function syncBots(deps: SyncDeps): Promise<SyncResult> {
       const up: BotMeta = {};
       if (!meta.look && mine.look) up.look = mine.look;
       if (!meta.model && mine.model) up.model = mine.model;
-      if (up.look || up.model) {
+      if (!meta.name && mine.displayName) up.name = mine.displayName;
+      if (up.look || up.model || up.name) {
         await deps.setMeta(p.name, up);
         result.pushed.push(p.name);
       }
-      const down: BotMeta = {};
+      const down: { look?: Look; model?: ModelChoice; displayName?: string } = {};
       if (meta.look && !same(meta.look, mine.look)) down.look = meta.look;
       if (meta.model && !same(meta.model, mine.model)) down.model = meta.model;
-      if (down.look || down.model) {
+      if (meta.name && meta.name !== mine.displayName) down.displayName = meta.name;
+      if (down.look || down.model || down.displayName) {
         await deps.update(p.name, down);
         result.updated.push(p.name);
       }
