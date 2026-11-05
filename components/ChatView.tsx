@@ -23,6 +23,8 @@ import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
 import { useChatModel } from '@/components/useChatModel';
 import { liveRuns, liveRunsReady } from '@/components/liveRuns';
+import { keepWorking } from '@/components/busyWatch';
+import { leaveAction } from '@/lib/busy';
 import { elapsedLabel } from '@/lib/liveRuns';
 import { providerName } from '@/lib/models';
 import { button, colors, mix, mono, onColor } from '@/lib/theme';
@@ -192,11 +194,27 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
 
   // Tell the rest of the app what this bot is doing, so its character animates everywhere.
   const mood = moodFromChat(state);
+  const firstMood = useRef(true);
   useEffect(() => {
+    // Opening a chat while the bot is busy elsewhere (a terminal run, a routine, a reply left running):
+    // an idle chat must not turn that "working" into "done".
+    const first = firstMood.current;
+    firstMood.current = false;
+    if (first && mood === 'idle' && activity.get(bot) === 'working') return;
     activity.set(bot, mood);
   }, [bot, mood]);
-  // Leaving the chat: idle, unless the reply is still running (the background checks keep it "working").
-  useEffect(() => () => void (liveRuns.botBusy(bot) ? activity.set(bot, 'working') : activity.set(bot, 'idle')), [bot]);
+  // Leaving the chat: idle, unless the reply is still running. A run Hermes is tracking stays "working"
+  // until the background checks see it end; a reply with no run yet is handed to the busy watch. Either
+  // way "done" only shows once the reply really finished.
+  useEffect(
+    () => () => {
+      const action = leaveAction({ runTracked: liveRuns.botBusy(bot), replying: !!pendingRef.current });
+      if (action === 'hold') activity.set(bot, 'working');
+      else if (action === 'adopt') keepWorking(bot);
+      else activity.set(bot, 'idle');
+    },
+    [bot],
+  );
 
   // Local models can take a while before the first word; show a timer.
   const running = state.pending !== null;

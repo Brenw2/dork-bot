@@ -48,24 +48,55 @@ export function runningOutsideChat(rows: SessionRow[], nowS: number): boolean {
   return rows.some((r) => r.source !== CHAT_SOURCE && r.endedAt === null && nowS - r.lastActive <= STALE_S);
 }
 
-/** The newest chat touched lately, whose last message might be waiting for a reply. */
-export function recentChat(rows: SessionRow[], nowS: number): SessionRow | null {
-  let best: SessionRow | null = null;
-  for (const r of rows) {
-    if (r.source !== CHAT_SOURCE || r.messageCount === 0 || nowS - r.lastActive > CHAT_WINDOW_S) continue;
-    if (!best || r.lastActive > best.lastActive) best = r;
+/** How many of a bot's most recent chats are looked at; a bot has a handful, and only the active ones cost a request. */
+export const MAX_CHATS = 3;
+
+/** The chats touched lately, newest first, whose last message might be waiting for a reply. */
+export function recentChats(rows: SessionRow[], nowS: number, max = MAX_CHATS): SessionRow[] {
+  return rows
+    .filter((r) => r.source === CHAT_SOURCE && r.messageCount > 0 && nowS - r.lastActive <= CHAT_WINDOW_S)
+    .sort((a, b) => b.lastActive - a.lastActive)
+    .slice(0, max);
+}
+
+/** How long a bot is held as working for a reply Hermes hasn't shown yet (a chat left right after sending). */
+export const ADOPT_GRACE_MS = 20_000;
+
+/**
+ * Whether a chat's saved messages (raw, as GET /api/sessions/<id>/messages sends them) end in the
+ * middle of a turn: the last message is the user's, a tool result, or an assistant step that
+ * called tools (it may say "let me check…" first, so having text doesn't mean it's the answer).
+ * A finished turn ends in an assistant message with no tool calls (then a session_meta row).
+ * Only counts while that last message is recent.
+ */
+export function turnPending(raw: unknown, nowS: number, windowS = CHAT_WINDOW_S): boolean {
+  if (!Array.isArray(raw)) return false;
+  for (let i = raw.length - 1; i >= 0; i--) {
+    const m = raw[i] as { role?: unknown; tool_calls?: unknown; timestamp?: unknown } | null;
+    if (!m || typeof m.role !== 'string' || m.role === 'session_meta') continue;
+    const recent = typeof m.timestamp === 'number' && nowS - m.timestamp <= windowS;
+    if (m.role === 'user' || m.role === 'tool') return recent;
+    if (m.role === 'assistant') return recent && Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
+    return false;
   }
-  return best;
+  return false;
+}
+
+/** What a chat does with the bot's mood when it is left: keep it working (Hermes is tracking the run), hand it to the busy watch (a reply is in flight but not tracked yet), or go idle. */
+export function leaveAction(opts: { runTracked: boolean; replying: boolean }): 'hold' | 'adopt' | 'idle' {
+  return opts.runTracked ? 'hold' : opts.replying ? 'adopt' : 'idle';
 }
 
 export interface BusyDeps {
   bots: () => Promise<string[]>;
   /** The bot's newest sessions. Throwing means "couldn't tell", which keeps the last answer. */
   sessions: (bot: string) => Promise<SessionRow[]>;
-  /** Whether the chat's last saved message is a user message sent lately (HermesClient.messages + awaitingReply). */
+  /** Whether the chat's saved messages end mid-turn (HermesClient.turnPending). */
   chatWaiting: (bot: string, chatId: string) => Promise<boolean>;
   getMood: (bot: string) => Mood;
   setMood: (bot: string, mood: Mood) => void;
+  /** Back to idle with no "done" flash: the work this showed never turned out to exist. */
+  clearMood: (bot: string) => void;
   /** This device already has the bot working (a run it started and is checking on). */
   heldHere: (bot: string) => boolean;
   now: () => number;
@@ -77,6 +108,8 @@ export class BusyWatch {
   private busy = new Map<string, boolean>();
   /** Bots whose "working" mood this watcher set, so it only ever takes back its own. */
   private mine = new Set<string>();
+  /** Bots handed over by a screen that was left mid-reply, until Hermes has confirmed the work (bot → when). */
+  private adopted = new Map<string, number>();
   /** Per chat: the answer for the message count it was asked at, so a quiet chat costs nothing. */
   private chats = new Map<string, { key: string; waiting: boolean }>();
   private running = false;
@@ -102,6 +135,17 @@ export class BusyWatch {
     }
   }
 
+  /**
+   * A chat was left while the bot was still replying. Keep it working until Hermes says it is over,
+   * with no "done" before that. The reply may not be saved on Hermes yet, so give it a moment to show
+   * up; if it never does, drop the mood without a "done".
+   */
+  adopt(bot: string): void {
+    this.deps.setMood(bot, 'working');
+    this.mine.add(bot);
+    this.adopted.set(bot, this.deps.now());
+  }
+
   /** Stops showing outside work (the watch is switched off): moods this watcher set go back to idle. */
   reset(): void {
     for (const bot of [...this.busy.keys()]) this.forget(bot);
@@ -120,8 +164,12 @@ export class BusyWatch {
       const rows = await this.deps.sessions(bot);
       busy = runningOutsideChat(rows, nowS);
       if (!busy) {
-        const chat = recentChat(rows, nowS);
-        if (chat) busy = await this.waiting(bot, chat);
+        for (const chat of recentChats(rows, nowS)) {
+          if (await this.waiting(bot, chat)) {
+            busy = true;
+            break;
+          }
+        }
       }
     } catch {
       return; // offline or Hermes restarting: keep what is shown
@@ -132,22 +180,31 @@ export class BusyWatch {
 
   private async waiting(bot: string, chat: SessionRow): Promise<boolean> {
     const key = `${chat.id}:${chat.messageCount}`;
-    const seen = this.chats.get(bot);
+    const seen = this.chats.get(chat.id);
     // Same message count as the last look: nothing was added, so only the time window can change it.
     if (seen?.key === key && !seen.waiting) return false;
     const waiting = await this.deps.chatWaiting(bot, chat.id);
-    this.chats.set(bot, { key, waiting });
+    this.chats.set(chat.id, { key, waiting });
     return waiting;
   }
 
   private apply(bot: string, busy: boolean): void {
     const mood = this.deps.getMood(bot);
     if (busy) {
+      this.adopted.delete(bot); // Hermes has it: from here a finish is real
       // Don't talk over the chat screen's own mood (thinking, talking…); fill in only when it shows nothing.
       if (IDLE_LIKE.includes(mood)) {
         this.deps.setMood(bot, 'working');
         this.mine.add(bot);
       }
+      return;
+    }
+    const since = this.adopted.get(bot);
+    if (since !== undefined) {
+      if (this.deps.now() - since < ADOPT_GRACE_MS) return; // Hermes may not have saved the message yet
+      this.adopted.delete(bot);
+      this.mine.delete(bot);
+      if (mood === 'working' && !this.deps.heldHere(bot)) this.deps.clearMood(bot);
       return;
     }
     if (this.mine.delete(bot) && mood === 'working' && !this.deps.heldHere(bot)) this.deps.setMood(bot, 'idle');

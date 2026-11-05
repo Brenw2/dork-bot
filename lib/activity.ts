@@ -47,6 +47,16 @@ export class ActivityStore {
     this.emit();
   }
 
+  /** Straight back to idle with no "done" flash, for a busy mood that turned out to be nothing. */
+  clear(bot: string): void {
+    const t = this.timers.get(bot);
+    if (t) this.cancel(t);
+    this.timers.delete(bot);
+    if (this.get(bot) === 'idle') return;
+    this.moods.set(bot, 'idle');
+    this.emit();
+  }
+
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => void this.listeners.delete(fn);

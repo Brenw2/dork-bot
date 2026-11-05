@@ -7,7 +7,6 @@ import { AppState } from 'react-native';
 import { fetch } from '@/components/net';
 import { liveRuns } from '@/components/liveRuns';
 import { activity } from '@/lib/activity';
-import { awaitingReply } from '@/lib/chatState';
 import { BusyWatch } from '@/lib/busy';
 import { getConnection, listBots } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
@@ -24,9 +23,10 @@ async function client(bot: string): Promise<HermesClient> {
 const watch = new BusyWatch({
   bots: async () => (await listBots()).map((b) => b.bot),
   sessions: async (bot) => (await client(bot)).recentSessions(),
-  chatWaiting: async (bot, chatId) => awaitingReply(await (await client(bot)).messages(chatId), Date.now() / 1000) !== null,
+  chatWaiting: async (bot, chatId) => (await client(bot)).turnPending(chatId),
   getMood: (bot) => activity.get(bot),
   setMood: (bot, mood) => activity.set(bot, mood),
+  clearMood: (bot) => activity.clear(bot),
   heldHere: (bot) => liveRuns.botBusy(bot),
   now: () => Date.now(),
 });
@@ -51,6 +51,11 @@ AppState.addEventListener('change', (state) => {
   foreground = state === 'active';
   sync();
 });
+
+/** A chat was left mid-reply: the bot stays "working" until Hermes says the reply is over (no "done" before). */
+export function keepWorking(bot: string): void {
+  watch.adopt(bot);
+}
 
 /** Keeps bots' busy state fresh while the calling screen is showing. */
 export function useBusyWatch(): void {
