@@ -29,6 +29,12 @@
       ],
       "expo-web-browser",
       [
+        "expo-notifications",
+        {
+          "mode": "production"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Dork Bot sends the pictures you pick to your bots.",

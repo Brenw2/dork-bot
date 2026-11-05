@@ -19,7 +19,11 @@ Last updated: 2026-11-04 (evening)
 
 Several chats per bot (Chats screen, New chat, rename, delete; Hermes titles new chats), approvals (Allow once / in this chat / always / Deny card; verified live with test/live-approval.test.ts), Routines screen (add, pause, run now, delete, last result), "‹ Bots" back button without the glass capsule on the chat screen, "can't reach b-lab" message with auto-retry. Needs a Duo check: the back button and ⋯ look, approvals on a real bot.
 
-## Not done: notifications
+## In flight: notifications (PR #26, branch app/notifications)
+
+Built and tested in Node: the dork-bot-push Hermes plugin (install with scripts/install-push-plugin.sh; not installed on any bot yet), the Notifications screen (phone switch + per-bot switch), tap-to-open, and the per-bot Routine results screen (reads the cron sessions, skips empty/[SILENT]; docs/HERMES.md). Not tried on a device or against a real routine run. Install the plugin and a real push need Brennan's yes (plugin enable rescans without a restart); a TestFlight build is Chief/Brennan's call.
+
+Still needed for real push:
 
 Real push needs an Apple push key on EAS (none exists) and a provisioning profile with the Push capability, which takes Brennan's Apple login once. Plan: a Hermes plugin (post_llm_call / pre_approval_request hooks) that sends Expo push to device tokens kept in each bot's `dork_bot` config, plus expo-notifications in the app.
 

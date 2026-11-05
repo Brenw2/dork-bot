@@ -1,10 +1,11 @@
 // Wires lib/sync.ts to the app: runs when the bot list shows and when the app comes back, at
 // most every few seconds, and pushes look/model/hidden changes made on this device to Hermes.
+// With notifications on, it also adds this phone's push token to bots that don't have it yet.
 // Without the Hermes sign-in (scripts/pair-hermes.sh) there's nothing to sync with: the bot list
 // stays this device's own, as before.
 import { AppState } from 'react-native';
 import { loadManager, randomKey } from '@/components/manager';
-import { listBots, removeBot, saveBot, updateBot } from '@/lib/bots';
+import { getPushToken, listBots, removeBot, saveBot, updateBot } from '@/lib/bots';
 import type { BotMeta } from '@/lib/manager';
 import { syncBots, type SyncResult } from '@/lib/sync';
 
@@ -30,6 +31,7 @@ export function syncNow(force = false): Promise<SyncResult | null> {
         save: (conn, meta) => saveBot(conn, meta.look, meta.model),
         update: (bot, meta) => updateBot(bot, meta),
         remove: removeBot,
+        pushToken: await getPushToken(),
       });
     } catch {
       // Hermes unreachable or signed out: keep what's on the device; the next sync tries again.

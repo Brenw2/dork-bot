@@ -17,6 +17,7 @@ import { getConnection } from '@/lib/bots';
 import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
+import { notificationsSupported, useOnScreen } from '@/components/notifications';
 import { Alert } from '@/components/alert';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
@@ -42,6 +43,7 @@ interface ChatViewProps {
  */
 export function ChatView(props: ChatViewProps) {
   const chat = useCurrentChat(props.bot);
+  useOnScreen(props.bot);
   if (!chat) {
     return (
       <View style={styles.screen}>
@@ -491,7 +493,9 @@ export function ChatActions({ bot }: { bot: string }) {
         { text: 'Rename this chat…', onPress: () => void renameOpenChat(bot) },
         { text: 'Delete this chat…', style: 'destructive' as const, onPress: () => void deleteOpenChat(bot) },
         { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
+        { text: 'Routine results…', onPress: () => router.push({ pathname: '/routine-results/[bot]', params: { bot } }) },
         { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
+        ...(notificationsSupported ? [{ text: 'Notifications…', onPress: () => router.push('/notifications') }] : []),
         { text: 'Cancel', style: 'cancel' as const },
       ],
       anchor,

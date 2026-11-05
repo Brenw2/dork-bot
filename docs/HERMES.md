@@ -130,3 +130,7 @@ DORK_LIVE=1 DORK_HERMES_URL=https://b-lab.tail7e27a7.ts.net npm test   # through
 node scripts/smoke-chat.mjs [bot] ["message"]                          # one streamed chat, prints timings
 DORK_LIVE=1 npx vitest run test/live-models.test.ts --silent=false     # switch models mid-chat (one Haiku call)
 ```
+
+## Routine results chat
+
+Each bot has a "Routine results" screen (⋯ menu → Routine results…, or tap a routine's notification). It is not a Hermes session and has no store of its own: it reads `GET /p/<bot>/api/sessions?source=cron&limit=100` (every routine run is a session titled `<routine> · Nov 04 11:32`), takes the newest 30, loads each run's messages and shows the final assistant reply in full, oldest first so the newest is at the bottom, labeled with the routine name and run time (`lib/routineResults.ts`). Runs that ended empty or `[SILENT]` are skipped, the same rule the push plugin uses. Normal chats (`dork-bot-<bot>…`) are untouched. Read-only. Per-bot notification switch: Notifications screen → `dork_bot.push.muted`.

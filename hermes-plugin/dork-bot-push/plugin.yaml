@@ -1,0 +1,7 @@
+name: dork-bot-push
+version: 0.1.0
+description: "Push notifications for the Dork Bot iPhone app: a finished reply, an approval the bot is waiting on, or a routine result is sent through Expo push to the phones registered in this profile's dork_bot config."
+author: "Brenw2"
+provides_hooks:
+  - post_llm_call
+  - pre_approval_request

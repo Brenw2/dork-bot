@@ -101,3 +101,15 @@ export async function saveManagerAuth(auth: ManagerAuth): Promise<void> {
 export async function forgetManagerAuth(): Promise<void> {
   await SecureStore.deleteItemAsync(MANAGER);
 }
+
+// This phone's Expo push token while notifications are on here (components/notifications.ts).
+const PUSH_TOKEN = 'dork-push-token';
+
+export function getPushToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(PUSH_TOKEN);
+}
+
+export async function savePushToken(token: string | null): Promise<void> {
+  if (token) await SecureStore.setItemAsync(PUSH_TOKEN, token);
+  else await SecureStore.deleteItemAsync(PUSH_TOKEN);
+}
