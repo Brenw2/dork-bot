@@ -15,7 +15,11 @@ Last updated: 2026-11-04 (evening)
 - Hermes chat accepts images inline (`message: [{type: text}, {type: image_url, image_url: {url: data:…}}]`, 10 MB request limit; probe: chief read "BLUE 42" from a PNG in 2 s). History keeps them as `[Image attached at: <profile>/cache/documents/native-inputs/…]`. gemma4:31b reports vision.
 - Ollama's model runner crashed once on 2026-11-04 11:23 (a desktop test turn hung until stopped). Watch for it.
 
-## Blocked: card 14, private sudo/secret entry (branch app/private-secrets, no code yet)
+## Spike: card 14, private sudo/secret entry over /api/ws (draft PR, branch app/private-secrets)
+
+Brennan picked option A on 2026-11-10: spike `hermes serve`'s /api/ws, don't switch the app's chat yet. Result: it works. `lib/gatewayWs.ts` + `test/live-ws-sudo.test.ts` (DORK_LIVE=1) stream a reply, get the `sudo` and `secret` request frames, and a fake test password / secret never shows up in the profile, session export, history or logs (the secret only in the bot's `.env`). Skip, Stop and the 120 s timeout all end cleanly. Auth is the app's existing bearer token (`?token=`), over Tailscale :8443 and local :9119. `docs/WS-PLAN.md` has the mapping from every API-server feature, what gets worse, and the step plan (hybrid: REST for everything but the turn). Nothing in the app uses the socket yet; no restart, plugin install or build was done.
+
+## Blocked (resolved): card 14 first investigation (2026-11-10)
 
 Investigated 2026-11-10 (Hermes v0.22.5). The app's chat path cannot receive Hermes's sudo/secret prompts, and nothing Hermes exposes to a plugin changes that:
 
