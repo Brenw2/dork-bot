@@ -15,6 +15,15 @@ Last updated: 2026-11-04 (evening)
 - Hermes chat accepts images inline (`message: [{type: text}, {type: image_url, image_url: {url: data:…}}]`, 10 MB request limit; probe: chief read "BLUE 42" from a PNG in 2 s). History keeps them as `[Image attached at: <profile>/cache/documents/native-inputs/…]`. gemma4:31b reports vision.
 - Ollama's model runner crashed once on 2026-11-04 11:23 (a desktop test turn hung until stopped). Watch for it.
 
+## Blocked: card 14, private sudo/secret entry (branch app/private-secrets, no code yet)
+
+Investigated 2026-11-10 (Hermes v0.22.5). The app's chat path cannot receive Hermes's sudo/secret prompts, and nothing Hermes exposes to a plugin changes that:
+
+- The app chats via `POST /api/sessions/{id}/chat/stream` on the API server (gateway/platforms/api_server.py:98, :1672, :3581), platform API_SERVER. Its run loop (api_server_runs.py `_run_agent_sync`, :889-955) registers only an approval notify; it never calls `sudo_prompt_scope`/`secret_prompt_scope`. api_server*.py has no sudo/secret event, so the SSE stream carries no such request.
+- Those scopes run only in gateway/run_turn_runner.py:1313-1315, and both return at once unless `local_viewer_turn()` (gateway/run_turn_progress.py:1010-1014: platform == Platform.LOCAL plus a session authority). Without the callback the terminal tool fails headless (tools/terminal_tool_sudo.py:91-104).
+- Plugin hooks (hermes_cli/plugins.py:108+ VALID_HOOKS) are observers/transformers; none registers the sudo or secret-capture callback.
+- Only route that works: the `/api/ws` JSON-RPC session gateway on `hermes serve` (what the desktop uses; hermes_cli/web_server_chat.py:483; gateway/session_controls.py:238 and :833 settle `srq-` response frames). Using it means moving Dork Bot chat off the API server (chat ids, sync, approvals via /v1/runs, history). Product/architecture call for Chief.
+
 ## Done 2026-11-04 evening (app/chats, for 0.8.0)
 
 Several chats per bot (Chats screen, New chat, rename, delete; Hermes titles new chats), approvals (Allow once / in this chat / always / Deny card; verified live with test/live-approval.test.ts), Routines screen (add, pause, run now, delete, last result), "‹ Bots" back button without the glass capsule on the chat screen, "can't reach b-lab" message with auto-retry. Needs a Duo check: the back button and ⋯ look, approvals on a real bot.
