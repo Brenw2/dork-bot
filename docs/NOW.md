@@ -39,6 +39,10 @@ Chat header button no longer drawn as a grey liquid-glass capsule on iOS 26+ (cl
 
 Custom ⋯ menu and dialogs on desktop; chat buttons in the bot's color; formatted replies with highlighted code and Copy; photos and screenshots (camera/library on the phone, pick/paste/drop on desktop), shown on both devices.
 
+## Design: UI review and locked comps (card 18, branch design/ui-review)
+
+docs/design/REVIEW.md ranks the top 10 clunky spots, each with before screenshots and a spec, plus the group chat screens (card 8). Locked comps are in docs/design/comps/ at iPhone 393x852 and desktop 1280x800. Mobile builds the fixes in card 19 and group chat in card 8. A UI PR merges only with Design's PASS against these comps. Six "Chief to confirm" calls are listed at the end of REVIEW.md.
+
 ## Next up (milestone 1)
 
 1. Brennan: try 0.7.0 on the Duo: looks match the desktop, a message sent on one shows on the other, Hide on one hides on both, take a photo and send it, Copy a code block, the header button look, the hideable bot list in landscape, text across the fold.
