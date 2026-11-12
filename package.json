@@ -17,6 +17,7 @@
     "test:layout": "node scripts/test-layout.mjs"
   },
   "dependencies": {
+    "@bacons/apple-targets": "^5.0.0",
     "@expo/metro-runtime": "~58.0.16",
     "babel-preset-expo": "~58.0.0",
     "expo": "~58.0.23",

@@ -1,6 +1,6 @@
 # Now
 
-Last updated: 2026-11-04 (evening)
+Last updated: 2026-11-12
 
 ## State
 
@@ -18,6 +18,10 @@ Last updated: 2026-11-04 (evening)
 ## Done 2026-11-04 evening (app/chats, for 0.8.0)
 
 Several chats per bot (Chats screen, New chat, rename, delete; Hermes titles new chats), approvals (Allow once / in this chat / always / Deny card; verified live with test/live-approval.test.ts), Routines screen (add, pause, run now, delete, last result), "‹ Bots" back button without the glass capsule on the chat screen, "can't reach b-lab" message with auto-retry. Needs a Duo check: the back button and ⋯ look, approvals on a real bot.
+
+## In flight: notification avatars (branch app/notification-avatars, card 15)
+
+A bot's notification shows the bot's own picture and display name (Communication Notifications; docs/NOTIFICATION-AVATARS.md). Built and unit-tested in Node: the app renders each bot's idle sprite to a PNG into the App Group on launch and on every look change/sync (lib/avatar.ts), the dork-bot-push plugin (0.2.0) sends mutableContent with the display name, and a Notification Service Extension (targets/notification-service, @bacons/apple-targets) donates the INSendMessageIntent. **Not compiled or run** (no Mac): the Swift extension needs a TestFlight build to check. Needs Brennan once: the credentials step in docs/NOTIFICATION-AVATARS.md (new App ID + App Group + Communication Notifications, Apple ID login). The plugin update on the real bots (scripts/install-push-plugin.sh), a gateway restart and a build all wait for his yes.
 
 ## In flight: notifications (PR #26, branch app/notifications)
 

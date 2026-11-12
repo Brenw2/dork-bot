@@ -97,8 +97,42 @@ class ReplyTests(unittest.TestCase):
         self.assertTrue(m["body"].startswith("Done. The build passed"))
         self.assertLessEqual(len(m["body"]), push.PREVIEW_CHARS)
         self.assertTrue(m["body"].endswith("…"))
-        self.assertEqual(m["data"], {"bot": "chief", "kind": "reply", "chat": "dork-bot-chief--lq2x9a1b"})
+        self.assertEqual(m["data"], {"bot": "chief", "name": "chief", "kind": "reply", "chat": "dork-bot-chief--lq2x9a1b"})
         self.assertEqual(m["sound"], "default")
+
+    def test_every_push_is_mutable_so_the_avatar_extension_runs(self):
+        h = Harness(self.expo, config(tokens=(TOKEN, TOKEN2)), cron=None)
+        h.notifier.on_reply(session_id="dork-bot-chief", assistant_response="hi", platform="api_server")
+        h.notifier.on_approval(surface="gateway", session_key="dork-bot-chief")
+        h.cron = ("j", "Morning news")
+        h.notifier.on_reply(session_id="cron_j", assistant_response="ok", platform="cron")
+        self.assertEqual(len(self.expo.messages), 6)
+        self.assertTrue(all(m["mutableContent"] is True for m in self.expo.messages))
+
+    def test_the_title_is_the_display_name_and_the_data_keeps_the_profile_id(self):
+        cfg = config()
+        cfg["dork_bot"]["name"] = "  Big   Chief "
+        h = Harness(self.expo, cfg)
+        h.notifier.on_reply(session_id="dork-bot-chief--a1", assistant_response="hi", platform="api_server")
+        h.notifier.on_approval(surface="gateway", session_key="dork-bot-chief--a1")
+        self.assertEqual([m["title"] for m in self.expo.messages], ["Big Chief", "Big Chief"])
+        for m in self.expo.messages:
+            self.assertEqual((m["data"]["bot"], m["data"]["name"]), ("chief", "Big Chief"))
+            self.assertEqual(m["data"]["chat"], "dork-bot-chief--a1")  # a tap still opens the right chat
+
+    def test_a_missing_or_bad_display_name_falls_back_to_the_profile_id(self):
+        for bad in (None, "", "   ", 7, ["x"], "x" * 31):
+            cfg = config()
+            cfg["dork_bot"]["name"] = bad
+            Harness(self.expo, cfg).notifier.on_reply(session_id="dork-bot-chief", assistant_response="hi")
+        self.assertEqual({m["title"] for m in self.expo.messages}, {"chief"})
+        self.assertEqual({m["data"]["name"] for m in self.expo.messages}, {"chief"})
+
+    def test_a_muted_renamed_bot_still_sends_nothing(self):
+        cfg = config(muted=True)
+        cfg["dork_bot"]["name"] = "Big Chief"
+        Harness(self.expo, cfg).notifier.on_reply(session_id="dork-bot-chief", assistant_response="hi")
+        self.assertEqual(self.expo.requests, [])
 
     def test_the_first_chat_counts_too(self):
         Harness(self.expo).notifier.on_reply(session_id="dork-bot-chief", assistant_response="hi", platform="api_server")
@@ -150,7 +184,17 @@ class RoutineTests(unittest.TestCase):
         [m] = self.expo.messages
         self.assertEqual(m["title"], "chief · Morning news")
         self.assertEqual(m["body"], "Three stories today.")
-        self.assertEqual(m["data"], {"bot": "chief", "kind": "routine", "job": "job42"})
+        self.assertEqual(m["data"], {"bot": "chief", "name": "chief", "kind": "routine", "job": "job42"})
+
+    def test_a_routine_result_leads_with_the_display_name(self):
+        cfg = config()
+        cfg["dork_bot"]["name"] = "Big Chief"
+        Harness(self.expo, cfg, cron=("job42", "Morning news")).notifier.on_reply(
+            session_id="cron_job42", assistant_response="Three stories today.", platform="cron"
+        )
+        [m] = self.expo.messages
+        self.assertEqual(m["title"], "Big Chief · Morning news")
+        self.assertEqual((m["data"]["bot"], m["data"]["name"]), ("chief", "Big Chief"))
 
     def test_platform_cron_without_the_run_identity_still_counts(self):
         Harness(self.expo).notifier.on_reply(session_id="cron_x", assistant_response="ok", platform="cron")
@@ -181,7 +225,7 @@ class ApprovalTests(unittest.TestCase):
         )
         [m] = self.expo.messages
         self.assertEqual((m["title"], m["body"]), ("chief", "needs approval"))
-        self.assertEqual(m["data"], {"bot": "chief", "kind": "approval", "chat": "dork-bot-chief--abc"})
+        self.assertEqual(m["data"], {"bot": "chief", "name": "chief", "kind": "approval", "chat": "dork-bot-chief--abc"})
         self.assertNotIn("secret", json.dumps(self.expo.requests))
 
     def test_the_chat_can_come_from_session_id_or_the_session_env(self):

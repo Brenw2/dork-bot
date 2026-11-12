@@ -36,11 +36,22 @@ _IMAGE_MARK = re.compile(r"\[Image attached at:[^\]]*\]|\[screenshot\]")
 class PushSettings:
     tokens: list[str] = field(default_factory=list)
     muted: bool = False
+    #: The bot's display name (Rename…, lib/names.ts); None means the profile id is shown.
+    name: Optional[str] = None
     #: Tests only: a fake Expo server on this machine (`endpoint: http://127.0.0.1:<port>/`).
     endpoint: Optional[str] = None
 
 
 _LOOPBACK = re.compile(r"^http://(127\.0\.0\.1|localhost)(:\d+)?(/|$)")
+MAX_NAME_LENGTH = 30  # lib/names.ts
+
+
+def clean_name(raw: Any) -> Optional[str]:
+    """Same rule as the app's cleanDisplayName: inner whitespace collapsed, 1 to 30 characters."""
+    if not isinstance(raw, str):
+        return None
+    name = re.sub(r"\s+", " ", raw).strip()
+    return name if name and len(name) <= MAX_NAME_LENGTH else None
 
 
 @dataclass
@@ -56,14 +67,15 @@ def settings_from_config(config: Any) -> PushSettings:
     """The `dork_bot.push` block, keeping only well-formed values (anyone can edit the YAML)."""
     block = config.get("dork_bot") if isinstance(config, dict) else None
     push = block.get("push") if isinstance(block, dict) else None
+    name = clean_name(block.get("name")) if isinstance(block, dict) else None
     if not isinstance(push, dict):
-        return PushSettings()
+        return PushSettings(name=name)
     raw = push.get("tokens")
     tokens = [t for t in raw if isinstance(t, str) and _TOKEN.match(t)] if isinstance(raw, list) else []
     endpoint = push.get("endpoint")
     # Only a server on this machine: a pushed preview never goes anywhere but Expo or a local test.
     endpoint = endpoint if isinstance(endpoint, str) and _LOOPBACK.match(endpoint) else None
-    return PushSettings(tokens=list(dict.fromkeys(tokens)), muted=push.get("muted") is True, endpoint=endpoint)
+    return PushSettings(tokens=list(dict.fromkeys(tokens)), muted=push.get("muted") is True, name=name, endpoint=endpoint)
 
 
 def is_bot_chat(bot: str, session_id: str) -> bool:
@@ -87,29 +99,42 @@ def _silent(text: str) -> bool:
     return not text.strip() or text.strip() == "[SILENT]"
 
 
-def reply_notice(bot: str, session_id: str, text: str) -> Optional[Notice]:
+def reply_notice(bot: str, session_id: str, text: str, name: Optional[str] = None) -> Optional[Notice]:
     """A finished reply in one of the app's chats. None for an empty or silent reply."""
     if _silent(text) or not is_bot_chat(bot, session_id):
         return None
-    return Notice(title=bot, body=preview(text), data={"bot": bot, "kind": "reply", "chat": session_id})
+    shown = name or bot
+    return Notice(title=shown, body=preview(text), data={"bot": bot, "name": shown, "kind": "reply", "chat": session_id})
 
 
-def routine_notice(bot: str, job_id: str, job_name: str, text: str) -> Optional[Notice]:
+def routine_notice(bot: str, job_id: str, job_name: str, text: str, name: Optional[str] = None) -> Optional[Notice]:
     """A routine (cron job) run that ended with something to say."""
     if _silent(text):
         return None
-    title = f"{bot} · {job_name}" if job_name else bot
-    return Notice(title=title, body=preview(text), data={"bot": bot, "kind": "routine", "job": job_id})
+    shown = name or bot
+    title = f"{shown} · {job_name}" if job_name else shown
+    return Notice(title=title, body=preview(text), data={"bot": bot, "name": shown, "kind": "routine", "job": job_id})
 
 
-def approval_notice(bot: str, session_id: str) -> Notice:
+def approval_notice(bot: str, session_id: str, name: Optional[str] = None) -> Notice:
     """A command waiting for Allow / Deny. The command itself never goes into the push."""
-    return Notice(title=bot, body="needs approval", data={"bot": bot, "kind": "approval", "chat": session_id})
+    shown = name or bot
+    return Notice(title=shown, body="needs approval", data={"bot": bot, "name": shown, "kind": "approval", "chat": session_id})
 
 
 def expo_messages(tokens: list[str], notice: Notice) -> list[dict[str, Any]]:
+    # mutableContent: lets the app's Notification Service Extension run, which swaps the Dork Bot icon
+    # for the sending bot's avatar. Without the extension (or its avatar file) iOS shows the push as is.
     return [
-        {"to": t, "title": notice.title, "body": notice.body, "data": notice.data, "sound": "default", "priority": "high"}
+        {
+            "to": t,
+            "title": notice.title,
+            "body": notice.body,
+            "data": notice.data,
+            "sound": "default",
+            "priority": "high",
+            "mutableContent": True,
+        }
         for t in tokens
     ]
 
@@ -182,11 +207,13 @@ class Notifier:
         self._last_approval: dict[str, float] = {}
         self._lock = threading.Lock()
 
-    def _deliver(self, notice: Optional[Notice]) -> None:
-        if notice is None:
-            return
+    def _deliver(self, make: Callable[[Optional[str]], Optional[Notice]]) -> None:
+        """`make` builds the notice from the bot's display name (None: not renamed)."""
         settings = settings_from_config(self._config())
         if settings.muted or not settings.tokens:
+            return
+        notice = make(settings.name)
+        if notice is None:
             return
         messages = expo_messages(settings.tokens, notice)
         url = settings.endpoint or self._url
@@ -200,9 +227,9 @@ class Notifier:
             text = assistant_response or ""
             if job is not None or platform == "cron":
                 job_id, job_name = job or ("", "")
-                self._deliver(routine_notice(bot, job_id, job_name, text))
+                self._deliver(lambda name: routine_notice(bot, job_id, job_name, text, name))
             else:
-                self._deliver(reply_notice(bot, session_id or "", text))
+                self._deliver(lambda name: reply_notice(bot, session_id or "", text, name))
         except Exception:
             logger.warning("dork-bot-push: reply hook failed", exc_info=True)
 
@@ -220,6 +247,6 @@ class Notifier:
                 if now - self._last_approval.get(chat, -APPROVAL_GAP_S) < APPROVAL_GAP_S:
                     return
                 self._last_approval[chat] = now
-            self._deliver(approval_notice(bot, chat))
+            self._deliver(lambda name: approval_notice(bot, chat, name))
         except Exception:
             logger.warning("dork-bot-push: approval hook failed", exc_info=True)

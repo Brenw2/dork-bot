@@ -14,7 +14,16 @@
       "buildNumber": "9",
       "supportsTablet": false,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserActivityTypes": [
+          "INSendMessageIntent"
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.brenw2.dorkbot"
+        ],
+        "com.apple.developer.usernotifications.communication": true
       }
     },
     "plugins": [
@@ -41,7 +50,8 @@
           "cameraPermission": "Dork Bot sends the photos you take to your bots.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true
