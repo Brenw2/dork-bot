@@ -241,7 +241,7 @@ const SCREENS = [
   { name: 'routines', path: () => '/routines/assistant', waitFor: 'daily_digest' },
   // Card 20: a bot's Work list, and one running work session opened read-only.
   { name: 'work', path: () => '/work/assistant', waitFor: 'Summarize this week' },
-  { name: 'work-session', path: () => '/work-session/assistant?id=local-3f9a1c', waitFor: 'moving the wait in' },
+  { name: 'work-session', path: () => '/work-session/assistant?id=local-3f9a1c', waitFor: 'The test reads the clock' },
   { name: 'work-session-done', path: () => '/work-session/assistant?id=local-77be02', waitFor: 'Three themes' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
 ];
@@ -365,7 +365,7 @@ function audit({ insets, keepOut, fixed, seen }) {
 }
 
 const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat', "assistant's work"], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
-const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['moving the wait in'], 'work-session-done': ['Three themes'] };
+const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 function serve(dir) {
   const types = {

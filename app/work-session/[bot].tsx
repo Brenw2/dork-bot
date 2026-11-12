@@ -71,9 +71,12 @@ export default function WorkSessionScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: item?.title ?? `${botName}'s work` }} />
+      <Stack.Screen options={{ title: `${botName}'s work` }} />
       {item ? (
         <View style={[styles.head, column]}>
+          <Text style={styles.title} numberOfLines={3}>
+            {item.title}
+          </Text>
           <Text style={[styles.status, { color: working ? color : item.status === 'failed' ? colors.bad : colors.dim }]}>{statusLabel(item.status)}</Text>
           <Text style={styles.meta} numberOfLines={1}>
             {[item.startedBy, whenLabel(new Date(item.startedAt * 1000).toISOString())].filter(Boolean).join(' · ')} · read-only
@@ -103,6 +106,7 @@ function WorkRowView({ row, bot }: { row: ChatRow; bot: string }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   head: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, gap: 2 },
+  title: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
   status: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   meta: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   body: { padding: 16, gap: 10 },
