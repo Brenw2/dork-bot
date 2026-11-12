@@ -75,7 +75,9 @@ export async function setTokenOnBots(
 /** What the plugin puts in a push's `data`. */
 export type PushData =
   | { kind: 'reply' | 'approval'; bot: string; chat: string }
-  | { kind: 'routine'; bot: string; job?: string };
+  | { kind: 'routine'; bot: string; job?: string }
+  /** Outside work (lib/work.ts) that ended: `session` is the Hermes session id. */
+  | { kind: 'work'; bot: string; session: string };
 
 /** A push's data, checked. Null for anything that isn't one of ours. */
 export function parsePushData(raw: unknown): PushData | null {
@@ -84,6 +86,9 @@ export function parsePushData(raw: unknown): PushData | null {
   if (typeof r.bot !== 'string' || !BOT_NAME.test(r.bot)) return null;
   const bot = r.bot;
   if (r.kind === 'routine') return { kind: 'routine', bot, ...(typeof r.job === 'string' ? { job: r.job } : {}) };
+  if (r.kind === 'work') {
+    return typeof r.session === 'string' && r.session && r.session.length <= 200 && !isBotChat(bot, r.session) ? { kind: 'work', bot, session: r.session } : null;
+  }
   if ((r.kind === 'reply' || r.kind === 'approval') && typeof r.chat === 'string' && isBotChat(bot, r.chat)) {
     return { kind: r.kind, bot, chat: r.chat };
   }
@@ -93,10 +98,12 @@ export function parsePushData(raw: unknown): PushData | null {
 export type PushRoute =
   | { pathname: '/chat/[bot]'; params: { bot: string; chat: string } }
   | { pathname: '/'; params: { bot: string; chat: string } }
-  | { pathname: '/routine-results/[bot]'; params: { bot: string } };
+  | { pathname: '/routine-results/[bot]'; params: { bot: string } }
+  | { pathname: '/work-session/[bot]'; params: { bot: string; id: string } };
 
-/** Where a tap goes: a routine's push opens that bot's Routine results chat. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane. */
+/** Where a tap goes: a routine's push opens that bot's Routine results chat, a finished work session opens that session. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane. */
 export function routeFor(data: PushData, twoPane: boolean): PushRoute {
+  if (data.kind === 'work') return { pathname: '/work-session/[bot]', params: { bot: data.bot, id: data.session } };
   if (data.kind === 'routine') return { pathname: '/routine-results/[bot]', params: { bot: data.bot } };
   const params = { bot: data.bot, chat: data.chat };
   return twoPane ? { pathname: '/', params } : { pathname: '/chat/[bot]', params };

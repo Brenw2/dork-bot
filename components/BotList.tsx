@@ -95,6 +95,7 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
       { text: 'Rename…', onPress: () => renameBot(bot, shown) },
       { text: 'Change look…', onPress: () => router.push({ pathname: '/look/[bot]', params: { bot } }) },
       { text: 'Chats…', onPress: () => router.push({ pathname: '/chats/[bot]', params: { bot } }) },
+      { text: 'Work…', onPress: () => router.push({ pathname: '/work/[bot]', params: { bot } }) },
       { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
       { text: 'Routine results…', onPress: () => router.push({ pathname: '/routine-results/[bot]', params: { bot } }) },
       { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
