@@ -357,6 +357,68 @@ function chromiumPath() {
   return undefined; // playwright-core's own download (npx playwright-core install chromium)
 }
 
+// Desktop window: the message box starts at one line, grows with its text, stops at 40% of the chat pane
+// (then scrolls), keeps Send level with its bottom, keeps the newest message in view, and shrinks after Send.
+const DESKTOP = { width: 1280, height: 800 };
+async function composerTest(browser, base) {
+  const problems = [];
+  const context = await browser.newContext({ viewport: DESKTOP, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+  await page.addInitScript(
+    ({ store }) => {
+      for (const [k, v] of Object.entries(store)) localStorage.setItem(`dorkbot.${k}`, v);
+    },
+    { store: seedFor({}) },
+  );
+  await page.route(`${HERMES}/**`, fakeHermes);
+  await page.goto(`${base}/?bot=assistant`); // wide windows show the chat in the right-hand pane
+  await page.getByText('Any time.', { exact: false }).first().waitFor({ timeout: 15_000 });
+  const box = page.getByLabel('Message assistant');
+  const measure = () =>
+    page.evaluate(() => {
+      const ta = document.querySelector('textarea');
+      const r = ta.getBoundingClientRect();
+      const send = [...document.querySelectorAll('[role=button]')].find((e) => e.getAttribute('aria-label') === 'Send')?.getBoundingClientRect();
+      const last = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === 'Any time.');
+      const lr = last?.getBoundingClientRect();
+      return { h: r.height, top: r.top, bottom: r.bottom, sendBottom: send?.bottom, scrolls: ta.scrollHeight > ta.clientHeight + 1, lastBottom: lr?.bottom, H: innerHeight };
+    });
+  const lines = (n) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join('\n');
+  await page.waitForTimeout(300);
+  const one = await measure();
+  await box.fill(lines(1));
+  const m1 = await measure();
+  await box.fill(lines(5));
+  const m5 = await measure();
+  await box.fill(lines(30));
+  const m30 = await measure();
+  const cap = DESKTOP.height * 0.4;
+  const check = (ok, msg) => ok || problems.push(msg);
+  check(Math.abs(m1.h - 44) < 1 && Math.abs(one.h - 44) < 1, `1 line should be 44 px tall, got ${one.h} / ${m1.h}`);
+  check(m5.h > m1.h + 60 && m5.h < cap && !m5.scrolls, `5 lines should grow past 1 line without scrolling, got ${m5.h} (1 line ${m1.h}, cap ${cap})`);
+  check(m30.h <= cap + 1 && m30.h > 0.3 * DESKTOP.height && m30.h > m5.h && m30.scrolls, `30 lines should stop at the cap (under 40% of the pane, so under ${cap}) and scroll, got ${m30.h}, scrolls ${m30.scrolls}`);
+  check(Math.abs(m30.sendBottom - m30.bottom) < 1, `Send should stay level with the bottom of the box (${m30.sendBottom} vs ${m30.bottom})`);
+  check(m30.lastBottom !== undefined && m30.lastBottom <= m30.top + 0.5, `newest message overlaps the box or is out of view (bottom ${m30.lastBottom}, box top ${m30.top})`);
+  // The cap follows the window.
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await page.waitForTimeout(300);
+  const small = await measure();
+  check(small.h <= 640 * 0.4 + 1 && small.h < m30.h, `after shrinking the window the cap should follow, got ${small.h}`);
+  await page.setViewportSize(DESKTOP);
+  await page.waitForTimeout(300);
+  // Enter sends and the box goes back to one line.
+  await box.press('Enter');
+  await page.waitForTimeout(300);
+  const after = await measure();
+  check(Math.abs(after.h - 44) < 1, `box should go back to one line after Send, got ${after.h}`);
+  await page.screenshot({ path: join(OUT, 'desktop--composer.png') });
+  await context.close();
+  console.log(`${problems.length ? 'FAIL' : 'ok  '} desktop 1280x800 composer (1 line ${m1.h}, 5 lines ${m5.h}, 30 lines ${m30.h}, cap ${cap}, after send ${after.h})`);
+  for (const p of problems) console.log(`       - ${p}`);
+  return problems;
+}
+
 async function main() {
   if (!args.includes('--no-build')) {
     execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', 'dist-web'], { cwd: ROOT, stdio: 'inherit' });
@@ -410,6 +472,11 @@ async function main() {
       for (const p of problems) console.log(`       - ${p}`);
       await context.close();
     }
+  }
+  if (!only) {
+    const composer = await composerTest(browser, base);
+    failed += composer.length ? 1 : 0;
+    report.push({ posture: 'desktop', screen: 'composer', path: "/?bot=assistant", problems: composer });
   }
   await browser.close();
   server.close();
