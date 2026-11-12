@@ -8,6 +8,8 @@ A Hermes plugin that sends the Dork Bot app a push notification when a bot:
 | needs Allow / Deny on a command in one of those chats | `pre_approval_request` | **chief**: needs approval |
 | finishes a routine (cron job) run | `post_llm_call` (+ `ctx.current_cron_execution()`) | **chief · Morning news**: first ~100 characters |
 
+The title is the bot's display name (`dork_bot.name`, set with Rename…), else its profile id. Every push is sent with `mutableContent`, so the app's Notification Service Extension can swap the Dork Bot icon for the sending bot's avatar (docs/NOTIFICATION-AVATARS.md); the push's `data` carries `bot` (profile id) and `name`. Without the extension or the bot's avatar file, iOS shows it as is.
+
 Tapping it opens that chat (approvals and replies) or the bot's Routine results chat (the app reads the routine runs' Hermes sessions; nothing is written for it). Nothing goes out for
 an empty or `[SILENT]` reply, Hermes's own smart approvals (`surface: smart`), chats the app didn't
 make (CLI, desktop Hermes, tests), or a muted bot. An approval push never carries the command, and a
@@ -20,6 +22,7 @@ only reads them:
 
 ```yaml
 dork_bot:
+  name: "Big Chief"                   # optional display name; read-only here, the app writes it
   push:
     tokens: ["ExponentPushToken[…]"]   # each phone that turned notifications on
     muted: false                        # the bot's switch in Notifications (mutes replies, approvals and routines)

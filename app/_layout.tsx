@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AvatarExport } from '@/components/avatars';
 import { isDesktop } from '@/components/desktop';
 import { DialogHost } from '@/components/Dialogs';
 import { NotificationRoutes } from '@/components/notifications';
@@ -29,6 +30,7 @@ export default function RootLayout() {
       <OrientationController />
       <Screens />
       <NotificationRoutes />
+      <AvatarExport />
       <DialogHost />
     </TestInsets>
   );

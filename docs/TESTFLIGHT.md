@@ -29,7 +29,9 @@ Same pipeline as Sports Week: Expo SDK 58, built on GitHub's `xcode-27` macOS ru
 
    The ASC secrets (`ASC_API_KEY_P8`, `ASC_API_KEY_ID`, `ASC_API_ISSUER_ID`) are optional if the key is assigned to the app on EAS (step 1 does that).
 
-3. ~~Put the App Store Connect app ID in `eas.json`~~ Done: `submit.production.ios.ascAppId` is `6829938917`.
+3. **Notification avatars** (the Notification Service Extension is a second App ID with its own profile): run `EXPO_APPLE_TEAM_ID=C7Z2H37BVG npx eas-cli@27.2.0 credentials:configure-build -p ios -e production` once and log in with the Apple ID. Steps and prompts: docs/NOTIFICATION-AVATARS.md. The workflow below needs no change.
+
+4. ~~Put the App Store Connect app ID in `eas.json`~~ Done: `submit.production.ios.ascAppId` is `6829938917`.
 
 ## Every release after that
 

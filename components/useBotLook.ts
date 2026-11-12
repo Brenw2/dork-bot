@@ -13,6 +13,11 @@ export function cleanLook(look: Look): Look {
   return look.variant < looksOf(look.character).length ? look : { ...look, variant: 0 };
 }
 
+/** The look to show for a bot: the one saved for it, else the default from its name. */
+export function lookFor(bot: string, saved?: Look): Look {
+  return saved ? cleanLook({ ...defaultLook(bot), ...saved }) : defaultLook(bot);
+}
+
 /** The bot's look (character, which version of it, color): the one picked for it, else the default. */
 export function useBotLook(bot: string): Look {
   const [look, setLook] = useState<Look>(() => defaultLook(bot));
@@ -21,7 +26,7 @@ export function useBotLook(bot: string): Look {
     const load = () =>
       listBots().then((list) => {
         const saved = list.find((b) => b.bot === bot)?.look;
-        if (live) setLook(saved ? cleanLook({ ...defaultLook(bot), ...saved }) : defaultLook(bot));
+        if (live) setLook(lookFor(bot, saved));
       });
     load();
     const off = onBotsChanged(load);
