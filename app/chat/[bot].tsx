@@ -5,6 +5,7 @@ import { BotSprite } from '@/components/BotSprite';
 import { useBusyWatch } from '@/components/busyWatch';
 import { ChatActions, ChatView } from '@/components/ChatView';
 import { openChat } from '@/components/currentChat';
+import { WorkingOn } from '@/components/WorkingOn';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import { colors } from '@/lib/theme';
@@ -37,9 +38,12 @@ export default function ChatScreen() {
           headerTitle: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <BotSprite bot={bot} size={28} />
-              <Text style={{ color: colors.text, fontSize: 17, fontWeight: '600' }} numberOfLines={1}>
-                {name}
-              </Text>
+              <View>
+                <Text style={{ color: colors.text, fontSize: 17, fontWeight: '600' }} numberOfLines={1}>
+                  {name}
+                </Text>
+                <WorkingOn bot={bot} />
+              </View>
             </View>
           ),
           // iOS 26+ wraps header buttons, the back button included, in a grey liquid-glass capsule.

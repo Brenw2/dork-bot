@@ -18,6 +18,7 @@ import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, type C
 import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
 import { notificationsSupported, useOnScreen } from '@/components/notifications';
+import { WorkingOn } from '@/components/WorkingOn';
 import { Alert } from '@/components/alert';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
@@ -368,7 +369,10 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
             </Pressable>
           ) : null}
           <BotSprite bot={bot} size={30} />
-          <Text style={[styles.paneTitle, { color }]}>{name}</Text>
+          <View>
+            <Text style={[styles.paneTitle, { color }]}>{name}</Text>
+            <WorkingOn bot={bot} />
+          </View>
           <View style={{ flex: 1 }} />
           <ChatActions bot={bot} />
         </View>
@@ -534,6 +538,7 @@ export function ChatActions({ bot }: { bot: string }) {
         { text: 'New chat', onPress: () => void startNewChat(bot) },
         { text: 'Rename this chat…', onPress: () => void renameOpenChat(bot) },
         { text: 'Delete this chat…', style: 'destructive' as const, onPress: () => void deleteOpenChat(bot) },
+        { text: 'Work…', onPress: () => router.push({ pathname: '/work/[bot]', params: { bot } }) },
         { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
         { text: 'Routine results…', onPress: () => router.push({ pathname: '/routine-results/[bot]', params: { bot } }) },
         { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
@@ -731,7 +736,7 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
 }
 
 /** A bot reply: formatted text across the chat's width, under the bot's name in its color. */
-function Reply({ text, bot }: { text: string; bot: string }) {
+export function Reply({ text, bot }: { text: string; bot: string }) {
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   return (
@@ -743,7 +748,7 @@ function Reply({ text, bot }: { text: string; bot: string }) {
 }
 
 /** What you sent: a bubble tinted with the bot's color, with any pictures above the text. */
-function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
+export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
   const { color } = useBotLook(bot);
   const local = message.localImages ?? [];
   const remote = local.length ? [] : (message.images ?? []);
@@ -811,7 +816,7 @@ function Picture({ uri, count }: { uri: string; count: number }) {
 
 // A run of tool calls is one line that updates in place ("… terminal · 3 steps"). Tap it for the steps,
 // tap a step for what it ran.
-function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
+export function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
   const [open, setOpen] = useState(false);
   const [openStep, setOpenStep] = useState<number | null>(null);
   return (

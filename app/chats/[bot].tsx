@@ -9,6 +9,7 @@ import { deleteChat, onChatsChanged, renameChat } from '@/components/ChatView';
 import { isDesktop } from '@/components/desktop';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
+import { useWork } from '@/components/workWatch';
 import { getConnection } from '@/lib/bots';
 import { agoLabel, chatName, cleanPreview, type ChatSummary } from '@/lib/chats';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
@@ -73,6 +74,7 @@ export default function Chats() {
         >
           <Text style={[styles.newText, { color: onColor(color) }]}>+ New chat</Text>
         </Pressable>
+        <WorkRowLink bot={bot} botName={botName} color={color} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {chats === null && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}
         <FlatList
@@ -119,8 +121,33 @@ export default function Chats() {
   );
 }
 
+/** "Work" row at the top of Chats: what the bot does outside the app, with how many are running now. */
+function WorkRowLink({ bot, botName, color }: { bot: string; botName: string; color: string }) {
+  const { items } = useWork(bot);
+  const running = items?.filter((i) => i.status === 'working').length ?? 0;
+  const note = items === null ? '' : running ? `${running} working now` : items.length ? `${items.length} recent` : `Nothing from outside the app yet`;
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.work, pressed && { backgroundColor: '#22252A' }]}
+      onPress={() => router.push({ pathname: '/work/[bot]', params: { bot } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${botName}'s work${note ? `, ${note}` : ''}`}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={styles.workName}>Work</Text>
+        {note ? <Text style={[styles.workNote, running ? { color } : null]}>{note}</Text> : null}
+      </View>
+      <Text style={styles.workChevron}>›</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  work: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, minHeight: 56, borderRadius: 12, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  workName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  workNote: { color: colors.dim, fontSize: 13, lineHeight: 18 },
+  workChevron: { color: '#4B4F56', fontSize: 20 },
   fill: { flex: 1 },
   new: { ...button.primary, marginHorizontal: 16, marginTop: 16, height: 46, borderRadius: 23 },
   newText: { ...button.text },

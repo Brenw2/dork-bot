@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .push import Notifier
+from .work_push import WorkNotifier
 
 
 def _load_config() -> Any:
@@ -44,3 +45,15 @@ def register(ctx: Any) -> None:
     )
     ctx.register_hook("post_llm_call", notifier.on_reply)
     ctx.register_hook("pre_approval_request", notifier.on_approval)
+
+    # Outside work that finished (work_push.py): remembers each non-app, non-routine session's task and
+    # latest reply, and pushes once when Hermes finalizes the session.
+    work = WorkNotifier(profile_name=lambda: ctx.profile_name, load_config=_load_config, cron_job=cron_job)
+
+    def on_reply(**kwargs: Any) -> None:
+        notifier.on_reply(**kwargs)
+        work.on_reply(**kwargs)
+
+    ctx.register_hook("post_llm_call", on_reply)
+    ctx.register_hook("pre_llm_call", work.on_task)
+    ctx.register_hook("on_session_finalize", work.on_finalize)

@@ -124,6 +124,18 @@ describe('what a push opens', () => {
     expect(routeFor({ kind: 'routine', bot: 'chief' }, false)).toEqual({ pathname: '/routine-results/[bot]', params: { bot: 'chief' } });
   });
 
+  it('a finished work session push opens that session (read-only), on one pane or two', () => {
+    expect(parsePushData({ bot: 'chief', kind: 'work', session: 'local-abc' })).toEqual({ kind: 'work', bot: 'chief', session: 'local-abc' });
+    expect(parsePushData({ bot: 'chief', kind: 'work' })).toBeNull();
+    expect(parsePushData({ bot: 'chief', kind: 'work', session: '' })).toBeNull();
+    expect(parsePushData({ bot: 'chief', kind: 'work', session: 'dork-bot-chief--abc' })).toBeNull(); // an app chat is not work
+    const work = { kind: 'work' as const, bot: 'chief', session: 'local-abc' };
+    const route = { pathname: '/work-session/[bot]', params: { bot: 'chief', id: 'local-abc' } };
+    expect(routeFor(work, false)).toEqual(route);
+    expect(routeFor(work, true)).toEqual(route);
+    expect(showWhileOpen(work, { bot: 'chief', chat: null })).toBe(true);
+  });
+
   it("while the app is open, a reply in the chat on screen doesn't pop a banner; everything else does", () => {
     const reply = { kind: 'reply' as const, bot: 'chief', chat: 'dork-bot-chief' };
     expect(showWhileOpen(reply, { bot: 'chief', chat: 'dork-bot-chief' })).toBe(false);

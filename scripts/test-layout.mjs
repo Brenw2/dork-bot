@@ -154,6 +154,35 @@ const CHATS = [
   { id: 'dork-bot-assistant', source: 'api_server', title: 'Dork Bot: assistant', message_count: 95, last_active: NOW_S - 86400 * 2, preview: 'What model are you running?' },
   { id: 'dork-bot-assistant--mh2aaaaa1', source: 'api_server', title: null, message_count: 2, last_active: NOW_S - 86400 * 20, preview: 'why does this test fail?\n\n[Image attached at: /x/api_aa.png]\n[screenshot]' },
 ];
+// A bot's Work: its non-app sessions (GET /api/sessions, no source filter): a terminal run that is still
+// going, a finished one, another bot's request that failed. The routine run and the app chat in the same
+// list must NOT show up in Work.
+const WORK_SESSIONS = [
+  { id: 'local-3f9a1c', source: 'oneshot', title: 'Fix the flaky Mets score test and open a PR for review by Design', message_count: 7, started_at: NOW_S - 95, last_active: NOW_S - 4, ended_at: null, end_reason: null, preview: 'From Chief. Fix the flaky test' },
+  { id: 'local-77be02', source: 'oneshot', title: "Summarize this week's notes", message_count: 5, started_at: NOW_S - 7200, last_active: NOW_S - 3700, ended_at: NOW_S - 3600, end_reason: 'cli_close', preview: "Summarize this week's notes" },
+  { id: 'local-12ff90', source: 'api_server', title: null, message_count: 3, started_at: NOW_S - 86400 * 2, last_active: NOW_S - 86400 * 2 + 60, ended_at: NOW_S - 86400 * 2 + 90, end_reason: 'error: provider timeout', preview: 'From chief: pull the latest standings and post them to the team doc' },
+  { id: 'cron_e9c3318a1531_20261112_0800', source: 'cron', title: 'daily_digest · Nov 12 08:00', message_count: 2, started_at: NOW_S - 3600 * 5, last_active: NOW_S - 3600 * 5, ended_at: NOW_S - 3600 * 5, end_reason: 'cron_complete', preview: 'Write my morning digest' },
+  { id: 'dork-bot-assistant', source: 'api_server', title: 'Dork Bot: assistant', message_count: 95, started_at: NOW_S - 86400 * 9, last_active: NOW_S - 120, ended_at: null, end_reason: null, preview: 'What model are you running?' },
+];
+const WORK_MESSAGES = {
+  'local-3f9a1c': [
+    { id: 1, role: 'user', content: 'From Chief. The Mets score test is flaky on CI. Find out why, fix it, and open a PR for Design to review.' },
+    { id: 2, role: 'assistant', content: 'Let me look at the test first.', tool_calls: [{}] },
+    { id: 3, role: 'tool', content: 'ok', tool_name: 'terminal' },
+    { id: 4, role: 'tool', content: 'ok', tool_name: 'read_file' },
+    { id: 5, role: 'tool', content: 'ok', tool_name: 'patch' },
+    { id: 6, role: 'assistant', content: "The test reads the clock before the fake server is up. I'm moving the wait in and re-running it now." },
+  ],
+  'local-77be02': [
+    { id: 1, role: 'user', content: "Summarize this week's notes" },
+    { id: 2, role: 'tool', content: 'ok', tool_name: 'read_file' },
+    { id: 3, role: 'assistant', content: '**Done.** Three themes this week: the Duo QA, the busy icon, and the push avatars. Details are in the notes file.' },
+  ],
+  'local-12ff90': [
+    { id: 1, role: 'user', content: 'From chief: pull the latest standings and post them to the team doc' },
+    { id: 2, role: 'assistant', content: "I couldn't finish: the model provider timed out." },
+  ],
+};
 const JOBS = [
   {
     id: 'e9c3318a1531', name: 'daily_digest', prompt: 'Write my morning digest for today: calendar, email that needs me, and anything due this week.',
@@ -210,6 +239,10 @@ const SCREENS = [
   { name: 'chat-list-hidden', postures: ['duo-open-landscape'], click: 'Hide the bot list', path: () => '/?bot=assistant', waitFor: 'Any time.' },
   { name: 'chats', path: () => '/chats/assistant', waitFor: 'Mets tickets' },
   { name: 'routines', path: () => '/routines/assistant', waitFor: 'daily_digest' },
+  // Card 20: a bot's Work list, and one running work session opened read-only.
+  { name: 'work', path: () => '/work/assistant', waitFor: 'Summarize this week' },
+  { name: 'work-session', path: () => '/work-session/assistant?id=local-3f9a1c', waitFor: 'The test reads the clock' },
+  { name: 'work-session-done', path: () => '/work-session/assistant?id=local-77be02', waitFor: 'Three themes' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
 ];
 
@@ -222,10 +255,12 @@ async function fakeHermes(route) {
   const bot = p.match(/^\/p\/([^/]+)\//)?.[1];
   if (bot === 'scout' && p.endsWith('/api/sessions')) return json(401, { error: 'unauthorized' }); // shows a red status
   if (/\/api\/sessions$/.test(p) && req.method() === 'GET')
-    return json(200, { data: bot === 'assistant' && url.searchParams.get('source') === 'api_server' ? CHATS : [] });
+    return json(200, { data: bot !== 'assistant' ? [] : url.searchParams.get('source') === 'api_server' ? CHATS : url.searchParams.get('source') ? [] : WORK_SESSIONS });
   if (/\/api\/jobs$/.test(p)) return json(200, { jobs: bot === 'assistant' ? JOBS : [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
-  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: bot === 'coder' ? RICH_MESSAGES : MESSAGES });
+  const sid = p.match(/\/api\/sessions\/([^/]+)/)?.[1];
+  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'coder' ? RICH_MESSAGES : MESSAGES) });
+  if (WORK_MESSAGES[sid] && /\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: WORK_SESSIONS.find((w) => w.id === sid) });
   if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
   // chief: moved to Anthropic while its chat still says gemma4:31b (what broke it on 2026-11-03).
   if (p.endsWith('/api/model/options')) return json(200, bot === 'chief' ? RAW_MODELS : MODEL_OPTIONS);
@@ -329,8 +364,8 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat'], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
-const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'] };
+const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat', "assistant's work"], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
+const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 function serve(dir) {
   const types = {
