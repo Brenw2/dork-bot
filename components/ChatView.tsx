@@ -6,6 +6,8 @@ import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from '@/components/net';
 import { Menu } from '@/components/alert';
 import { chatName } from '@/lib/chats';
+import { noteIndex, type RoutineNote } from '@/lib/routineNotes';
+import { whenLabel } from '@/lib/routines';
 import { BotSprite } from '@/components/BotSprite';
 import { Markdown } from '@/components/Markdown';
 import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
@@ -41,6 +43,8 @@ interface ChatViewProps {
   inPane?: boolean;
   /** In a pane next to the bot list: the button that hides or shows that list. */
   list?: { hidden: boolean; toggle: () => void };
+  /** A routine note to scroll to once the chat has it (a tapped "Notify me" notification): its time stamp. */
+  focusAt?: string;
 }
 
 /**
@@ -60,7 +64,7 @@ export function ChatView(props: ChatViewProps) {
   return <ChatThread key={chat} {...props} chat={chat} />;
 }
 
-function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps & { chat: string }) {
+function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: ChatViewProps & { chat: string }) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const [client, setClient] = useState<HermesClient | null>(null);
@@ -319,6 +323,17 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
     contentHeight.current = h;
     if (pinned.current) listRef.current?.scrollToOffset({ offset: h, animated: false });
   };
+  // A tapped "Notify me" notification: scroll to the routine's message once the chat has it (it can land a few seconds after the push).
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusAt || scrolledTo.current === focusAt) return;
+    const index = noteIndex(rows, focusAt);
+    if (index < 0) return;
+    scrolledTo.current = focusAt;
+    pinned.current = false;
+    const t = setTimeout(() => listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 60);
+    return () => clearTimeout(t);
+  }, [focusAt, rows]);
   // Desktop (web): the message box starts at one line and grows with its text up to 40% of the chat pane, then scrolls.
   const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const [paneHeight, setPaneHeight] = useState(0);
@@ -395,6 +410,11 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
           : null)}
         data={rows}
         keyExtractor={(r) => r.id}
+        onScrollToIndexFailed={(info) => {
+          // Rows not measured yet: go near, then try the exact one again.
+          listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+          setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 120);
+        }}
         style={styles.list}
         contentContainerStyle={[styles.listBody, column]}
         keyboardDismissMode="interactive"
@@ -720,6 +740,7 @@ function ModelBar({ bot, style, color }: { bot: string; style: ViewStyle | null;
 function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
   switch (row.kind) {
     case 'message':
+      if (row.message.routine) return <RoutineNoteView note={row.message.routine} bot={bot} />;
       return row.message.role === 'user' ? <Mine message={row.message} bot={bot} /> : <Reply text={row.message.content} bot={bot} />;
     case 'activity':
       return <Activity tools={row.tools} live={row.live} />;
@@ -733,6 +754,20 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
         </View>
       );
   }
+}
+
+/** A "Notify me" routine's result in the chat: from the bot, headed with the routine's name and when it ran. */
+function RoutineNoteView({ note, bot }: { note: RoutineNote; bot: string }) {
+  const { color } = useBotLook(bot);
+  // 1:1 chats show no bot name above the card (the left bar and header say who/what); a group room (G3) would add it.
+  return (
+    <View style={[styles.reply, styles.routineNote, { borderLeftColor: color }]} accessibilityLabel={`Routine ${note.name}, ${whenLabel(note.at)}`}>
+      <Text style={styles.routineHead}>
+        Routine · {note.name} · {whenLabel(note.at)}
+      </Text>
+      {note.text ? <Markdown text={note.text} accent={color} /> : null}
+    </View>
+  );
 }
 
 /** A bot reply: formatted text across the chat's width, under the bot's name in its color. */
@@ -892,6 +927,9 @@ const styles = StyleSheet.create({
   mine: { alignSelf: 'flex-end', gap: 6, alignItems: 'flex-end' },
   reply: { alignSelf: 'stretch', paddingVertical: 4, paddingRight: 4 },
   who: { fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 0.3 },
+  // Rows are 10 apart (listBody gap): 6 more above makes 16 from your bubble, 10 more below makes 20 to the next one.
+  routineNote: { borderLeftWidth: 3, paddingLeft: 10, paddingTop: 6, paddingBottom: 10 },
+  routineHead: { color: colors.dim, fontSize: 12, marginBottom: 10 },
   pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   picture: { borderRadius: 14, backgroundColor: colors.card },
   picturePlaceholder: { alignItems: 'center', justifyContent: 'center' },

@@ -1,15 +1,17 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
+import { loadManager } from '@/components/manager';
 import { Markdown } from '@/components/Markdown';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
 import { getConnection } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
+import { notifyOn, setNotify, type PushDeps } from '@/lib/push';
 import { Routines, SCHEDULES, scheduleLabel, whenLabel, type Routine } from '@/lib/routines';
 import { button, colors, mix, onColor } from '@/lib/theme';
 
@@ -25,15 +27,30 @@ export default function RoutinesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // "Notify me": the routines marked on Hermes (dork_bot.push.routines), shared by every device.
+  // null: not loaded yet, or no way to reach the bot's settings (the switch stays off and disabled).
+  const [marks, setMarks] = useState<string[] | null>(null);
+  const [pushDeps, setPushDeps] = useState<PushDeps | null>(null);
 
-  const load = useCallback(async (r: Routines) => {
-    try {
-      setList(await r.list());
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, []);
+  const load = useCallback(
+    async (r: Routines) => {
+      try {
+        setList(await r.list());
+        setError(null);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      try {
+        const manager = await loadManager();
+        if (!manager) return;
+        setPushDeps({ getPush: async (b) => (await manager.getMeta(b)).push, setPush: (b, push) => manager.setMeta(b, { push }) });
+        setMarks(((await manager.getMeta(bot)).push?.routines ?? []).slice());
+      } catch {
+        // the switches stay as they were; the list above still works
+      }
+    },
+    [bot],
+  );
 
   useEffect(() => {
     void getConnection(bot).then((conn) => {
@@ -50,6 +67,15 @@ export default function RoutinesScreen() {
     void load(api).finally(() => setRefreshing(false));
   };
 
+  const notify = {
+    ready: !!pushDeps && marks !== null,
+    isOn: (id: string) => marks?.includes(id) === true,
+    set: async (id: string, on: boolean) => {
+      if (!pushDeps) throw new Error('Connect to Hermes first.');
+      setMarks(await setNotify(pushDeps, bot, id, on));
+    },
+  };
+
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ title: `${botName}'s routines` }} />
@@ -64,6 +90,7 @@ export default function RoutinesScreen() {
             bot={bot}
             api={api}
             color={color}
+            notify={notify}
             onDone={(added) => {
               setAdding(false);
               if (added) void load(api);
@@ -83,25 +110,53 @@ export default function RoutinesScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {list === null && !error ? <ActivityIndicator style={{ marginTop: 20 }} /> : null}
         {list?.length === 0 ? <Text style={styles.empty}>No routines yet.</Text> : null}
-        {api ? list?.map((r) => <RoutineCard key={r.id} routine={r} bot={bot} api={api} color={color} onChanged={() => void load(api)} />) : null}
+        {api ? list?.map((r) => <RoutineCard key={r.id} routine={r} bot={bot} api={api} color={color} notify={notify} onChanged={() => void load(api)} />) : null}
       </ScrollView>
     </View>
   );
 }
 
-function NewRoutine({ bot, api, color, onDone }: { bot: string; api: Routines; color: string; onDone: (added: boolean) => void }) {
+/** The screen's hold on the "Notify me" marks (dork_bot.push.routines on Hermes). */
+interface NotifyMarks {
+  ready: boolean;
+  isOn: (id: string) => boolean;
+  set: (id: string, on: boolean) => Promise<void>;
+}
+
+/** "Notify me": the routine's result goes in the bot's chat and to the phone. Off unless switched on. */
+function NotifySwitch({ value, disabled, spacing, onChange }: { value: boolean; disabled: boolean; spacing: number; onChange: (on: boolean) => void }) {
+  return (
+    <View style={[styles.notifyRow, { marginVertical: spacing }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.notifyLabel}>Notify me</Text>
+        <Text style={styles.notifyHint}>Puts the result in the chat and sends a notification.</Text>
+      </View>
+      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel="Notify me" trackColor={{ true: colors.ok }} thumbColor="#FFFFFF" />
+    </View>
+  );
+}
+
+function NewRoutine({ bot, api, color, notify, onDone }: { bot: string; api: Routines; color: string; notify: NotifyMarks; onDone: (added: boolean) => void }) {
   const botName = useBotName(bot);
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [schedule, setSchedule] = useState(SCHEDULES[0].value);
   const [custom, setCustom] = useState(false);
+  const [notifyMe, setNotifyMe] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.create({ name, prompt, schedule });
+      const added = await api.create({ name, prompt, schedule });
+      if (notifyMe) {
+        try {
+          await notify.set(added.id, true);
+        } catch (e) {
+          Alert.alert("Added, but Notify me didn't save", `${(e as Error).message}\n\nTurn it on from the routine's card.`);
+        }
+      }
       onDone(true);
     } catch (e) {
       setError((e as Error).message);
@@ -170,6 +225,7 @@ function NewRoutine({ bot, api, color, onDone }: { bot: string; api: Routines; c
           <Text style={styles.hint}>A cron line (minute hour day month weekday), "every 2h", "30m" (once, in 30 minutes) or a date and time. Times are b-lab's (New York).</Text>
         </>
       ) : null}
+      <NotifySwitch value={notifyMe} disabled={!notify.ready || busy} spacing={16} onChange={setNotifyMe} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.row}>
         <Pressable onPress={() => onDone(false)} style={styles.secondary} accessibilityRole="button" accessibilityLabel="Cancel">
@@ -189,7 +245,7 @@ function NewRoutine({ bot, api, color, onDone }: { bot: string; api: Routines; c
   );
 }
 
-function RoutineCard({ routine: r, bot, api, color, onChanged }: { routine: Routine; bot: string; api: Routines; color: string; onChanged: () => void }) {
+function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routine: Routine; bot: string; api: Routines; color: string; notify: NotifyMarks; onChanged: () => void }) {
   const botName = useBotName(bot);
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<{ at: number; text: string } | null | undefined>(undefined);
@@ -218,8 +274,22 @@ function RoutineCard({ routine: r, bot, api, color, onChanged }: { routine: Rout
   const remove = () =>
     Alert.alert(`Delete "${r.name}"?`, `${botName} stops doing it. Past runs stay on Hermes.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => void act('Delete', () => api.remove(r.id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => void act('Delete', async () => {
+          await api.remove(r.id);
+          if (notify.isOn(r.id)) await notify.set(r.id, false).catch(() => undefined); // a stale mark is harmless, just tidy
+        }) },
     ]);
+
+  const flipNotify = async (on: boolean) => {
+    setBusy('Notify me');
+    try {
+      await notify.set(r.id, on);
+    } catch (e) {
+      Alert.alert("Couldn't save Notify me", (e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const status = paused ? 'Paused' : r.nextRunAt ? `Next: ${whenLabel(r.nextRunAt)}` : r.state;
   const last = r.lastRunAt ? `Last: ${whenLabel(r.lastRunAt)}${r.lastStatus && r.lastStatus !== 'ok' ? ` · ${r.lastStatus}` : ''}` : 'Not run yet';
@@ -233,7 +303,7 @@ function RoutineCard({ routine: r, bot, api, color, onChanged }: { routine: Rout
           <Text style={styles.toggle}>{open ? '▾' : '▸'}</Text>
         </View>
         <Text style={styles.sub}>
-          {scheduleLabel(r.schedule)} · {status}
+          {scheduleLabel(r.schedule)} · {status}{notify.isOn(r.id) ? ' · Notify me' : ''}
         </Text>
         <Text style={[styles.sub, r.lastStatus === 'error' && { color: colors.bad }]}>{last}</Text>
       </Pressable>
@@ -241,6 +311,7 @@ function RoutineCard({ routine: r, bot, api, color, onChanged }: { routine: Rout
         <View style={{ gap: 10, marginTop: 4 }}>
           <Text style={styles.prompt}>{r.prompt}</Text>
           {r.lastError ? <Text style={styles.error}>{r.lastError}</Text> : null}
+          <NotifySwitch value={notify.isOn(r.id)} disabled={!notify.ready || busy !== null} spacing={10} onChange={(on) => void flipNotify(on)} />
           <View style={[styles.result, { borderColor: mix(color, 0.4) }]}>
             <Text style={styles.label}>{result ? `Last result · ${whenLabel(new Date(result.at * 1000).toISOString())}` : 'Last result'}</Text>
             {result === undefined ? <ActivityIndicator /> : result?.text ? <Markdown text={result.text} accent={color} /> : <Text style={styles.sub}>Nothing yet.</Text>}
@@ -280,6 +351,9 @@ const styles = StyleSheet.create({
   result: { borderWidth: 1, borderRadius: 10, padding: 10, gap: 6 },
   label: { color: colors.dim, fontSize: 13 },
   hint: { color: colors.dim, fontSize: 12, lineHeight: 17 },
+  notifyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
+  notifyLabel: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  notifyHint: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   input: { color: colors.text, fontSize: 16, padding: 12, borderRadius: 12, backgroundColor: colors.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 12, height: 32, justifyContent: 'center' },

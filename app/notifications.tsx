@@ -80,7 +80,7 @@ export default function NotificationsScreen() {
       <Stack.Screen options={{ title: 'Notifications' }} />
       <ScrollView contentContainerStyle={[styles.body, column]}>
         <Text style={styles.intro}>
-          Get a notification when a bot finishes a reply, needs your OK, or finishes a routine. A routine's opens that bot's Routine results; the others open the chat.
+          Get a notification when a bot finishes a reply, needs your OK, or finishes a routine you turned Notify me on (its result is also added to the chat). Each one opens the chat; every routine run is kept in Routine results.
         </Text>
         {notificationsSupported ? (
           <Pressable

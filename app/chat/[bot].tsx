@@ -13,7 +13,7 @@ import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH, foldNavFor } from '@/lib/layoutClass';
 
 export default function ChatScreen() {
-  const { bot, chat } = useLocalSearchParams<{ bot: string; chat?: string }>();
+  const { bot, chat, at } = useLocalSearchParams<{ bot: string; chat?: string; at?: string }>();
   // A link to one chat (a notification): open that one.
   useEffect(() => {
     if (chat) openChat(bot, chat);
@@ -59,7 +59,7 @@ export default function ChatScreen() {
             : { headerRight: () => <ChatActions bot={bot} /> }),
         }}
       />
-      <ChatView bot={bot} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />
+      <ChatView bot={bot} focusAt={at} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />
     </>
   );
 }
