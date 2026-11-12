@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -31,6 +31,8 @@ import { providerName } from '@/lib/models';
 import { button, colors, mix, mono, onColor } from '@/lib/theme';
 
 const WEB = Platform.OS === 'web';
+const INPUT_MIN_HEIGHT = 44;
+const INPUT_PANE_SHARE = 0.4; // desktop: the message box grows to this share of the chat pane's height
 
 interface ChatViewProps {
   bot: string;
@@ -316,6 +318,22 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
     contentHeight.current = h;
     if (pinned.current) listRef.current?.scrollToOffset({ offset: h, animated: false });
   };
+  // Desktop (web): the message box starts at one line and grows with its text up to 40% of the chat pane, then scrolls.
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const [paneHeight, setPaneHeight] = useState(0);
+  const [inputHeight, setInputHeight] = useState<number | undefined>(undefined);
+  const inputCap = paneHeight ? Math.round(paneHeight * INPUT_PANE_SHARE) : undefined;
+  useLayoutEffect(() => {
+    if (!WEB) return;
+    const el = inputRef.current as unknown as HTMLTextAreaElement | null;
+    if (!el || !el.style) return;
+    const was = el.style.height; // React's own value; put it back so an unchanged height stays applied
+    el.style.height = '0px'; // measure the content on its own, so the box can shrink too
+    const border = el.offsetHeight - el.clientHeight; // scrollHeight leaves the border out
+    const h = el.scrollHeight < INPUT_MIN_HEIGHT + 10 ? INPUT_MIN_HEIGHT : el.scrollHeight + border;
+    el.style.height = was;
+    setInputHeight(Math.max(INPUT_MIN_HEIGHT, inputCap ? Math.min(h, inputCap) : h));
+  }, [draft, inputCap]);
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = (!!draft.trim() || attached.length > 0) && !!client;
   const { color } = useBotLook(bot);
@@ -334,6 +352,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={headerHeight}
+      onLayout={WEB ? (e) => setPaneHeight(e.nativeEvent.layout.height) : undefined}
     >
       {inPane ? (
         <View style={styles.paneHeader}>
@@ -435,7 +454,8 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list }: ChatViewProps
           <Text style={[styles.attachText, { color }]}>+</Text>
         </Pressable>
         <TextInput
-          style={[styles.input, { borderColor: focused ? mix(color, 0.7) : 'transparent' }, WEB && ({ outlineStyle: 'none' } as object)]}
+          ref={inputRef}
+          style={[styles.input, WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 }, { borderColor: focused ? mix(color, 0.7) : 'transparent' }, WEB && ({ outlineStyle: 'none' } as object)]}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           value={draft}
