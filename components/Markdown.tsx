@@ -8,13 +8,19 @@ import { marked, type Token, type Tokens } from 'marked';
 import { colorFor, highlight, languageFor } from '@/lib/highlight';
 import { onColor } from '@/lib/color';
 import { colors, mono } from '@/lib/theme';
+import { isDesktop } from '@/components/desktop';
+import { isBareLink, shortUrl } from '@/lib/shortUrl';
+import { CopyIcon } from '@/components/icons';
 
 // Code shows the exact characters: no ligatures (">=" must not turn into "≥"), and a real
 // programming font where the desktop has one.
 const CODE_FONT = Platform.OS === 'web' ? 'ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Mono", Menlo, Consolas, monospace' : mono;
 const NO_LIGATURES = Platform.OS === 'web' ? ({ fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' } as object) : null;
 
-const CODE_BG = '#15171B';
+const CODE_BG = '#0B0C0E';
+
+/** Reply text size: 17 on the phone, 16 on the desktop (design fix 7). Lines are 24 on both. */
+export const BODY_SIZE = isDesktop ? 16 : 17;
 
 export const Markdown = memo(function Markdown({ text, accent }: { text: string; accent: string }) {
   const tokens = useMemo(() => {
@@ -153,9 +159,20 @@ function inline(tokens: Token[] | undefined, accent: string): ReactNode[] {
         );
       case 'link': {
         const l = t as Tokens.Link;
+        // A bare address shows short (no scheme, one line, cut at 40); a link with its own words keeps them.
+        // Tap opens the full address and long-press copies it.
+        const bare = isBareLink(l.text, l.href);
         return (
-          <Text key={i} style={[styles.link, { color: accent }]} onPress={() => void Linking.openURL(l.href)} accessibilityRole="link">
-            {inline(l.tokens, accent)}
+          <Text
+            key={i}
+            style={[styles.link, { color: accent }]}
+            numberOfLines={bare ? 1 : undefined}
+            onPress={() => void Linking.openURL(l.href)}
+            onLongPress={() => void Clipboard.setStringAsync(l.href)}
+            accessibilityRole="link"
+            accessibilityHint={bare ? 'Opens the link. Press and hold to copy it.' : undefined}
+          >
+            {bare ? shortUrl(l.href) : inline(l.tokens, accent)}
           </Text>
         );
       }
@@ -199,8 +216,9 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
     <View style={styles.code}>
       <View style={styles.codeHeader}>
         <Text style={styles.codeLang}>{label}</Text>
-        <Pressable onPress={copy} hitSlop={8} accessibilityRole="button" accessibilityLabel={copied ? 'Copied' : 'Copy code'} style={styles.copy}>
-          <Text style={[styles.copyText, copied && { color: colors.ok }]}>{copied ? '✓ Copied' : 'Copy'}</Text>
+        <Pressable onPress={copy} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={copied ? 'Copied' : 'Copy code'} style={styles.copy}>
+          {copied ? null : <CopyIcon size={15} color={colors.text} />}
+          <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy'}</Text>
         </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.codeScroll}>
@@ -256,7 +274,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
   );
 }
 
-const BODY = 16;
+const BODY = BODY_SIZE;
 const HEADING: TextStyle[] = [
   { fontSize: 22, marginTop: 6 },
   { fontSize: 19, marginTop: 4 },
@@ -292,18 +310,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 14,
-    paddingRight: 8,
-    paddingVertical: 6,
-    backgroundColor: '#1C1F24',
+    height: 36,
+    paddingLeft: 12,
+    paddingRight: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   codeLang: { color: colors.dim, fontSize: 12, fontFamily: CODE_FONT, textTransform: 'lowercase' },
-  copy: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  copyText: { color: colors.dim, fontSize: 12, fontWeight: '600' },
-  codeScroll: { padding: 14 },
-  codeText: { fontFamily: CODE_FONT, fontSize: 13.5, lineHeight: 20, color: '#E7E9EC', ...NO_LIGATURES },
+  // 36 tall inside the header; hitSlop on the Pressable makes the touch area 44.
+  copy: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36 },
+  copyText: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  codeScroll: { paddingVertical: 10, paddingHorizontal: 12 },
+  codeText: { fontFamily: CODE_FONT, fontSize: 13, lineHeight: 20, color: '#E7E9EC', ...NO_LIGATURES },
   // Hugs the table, and scrolls sideways when it's wider than the chat.
   tableWrap: { alignSelf: 'flex-start', maxWidth: '100%', borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   tableBody: { flexGrow: 0 },
@@ -311,8 +329,8 @@ const styles = StyleSheet.create({
   check: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, marginTop: 3, alignItems: 'center', justifyContent: 'center' },
   checkMark: { fontSize: 12, fontWeight: '800', lineHeight: 14 },
   tr: { flexDirection: 'row' },
-  thead: { backgroundColor: '#1C1F24', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  zebra: { backgroundColor: '#14161A' },
-  th: { color: colors.text, fontWeight: '700', fontSize: 14, paddingHorizontal: 12, paddingVertical: 8 },
-  td: { color: colors.text, fontSize: 14, lineHeight: 20, paddingHorizontal: 12, paddingVertical: 8 },
+  thead: { backgroundColor: colors.card, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  zebra: { backgroundColor: 'transparent' },
+  th: { color: colors.dim, fontWeight: '600', fontSize: 13, lineHeight: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  td: { color: colors.text, fontSize: 15, lineHeight: 20, paddingHorizontal: 12, paddingVertical: 8 },
 });

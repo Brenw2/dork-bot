@@ -34,5 +34,5 @@ export function WorkingOn({ bot }: { bot: string }) {
 }
 
 const styles = StyleSheet.create({
-  line: { fontSize: 12, lineHeight: 16 },
+  line: { fontSize: 13, lineHeight: 18 },
 });

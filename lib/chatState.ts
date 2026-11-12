@@ -157,6 +157,25 @@ export function chatRows(state: Pick<ChatState, 'messages' | 'pending'>): ChatRo
   return rows;
 }
 
+/** Who a row belongs to, for spacing: you, or the bot (its chips, replies and routine cards). */
+function side(row: ChatRow): 'me' | 'bot' {
+  return row.kind === 'message' && row.message.role === 'user' && !row.message.routine ? 'me' : 'bot';
+}
+
+/**
+ * Space above a row in pt (design fix 7): 4 inside one sender's run, 16 from your bubble to the bot's
+ * chip or reply, 20 from a bot reply to your next bubble, 10 from a chip to its reply.
+ */
+export function rowGap(prev: ChatRow | undefined, row: ChatRow): number {
+  if (!prev) return 0;
+  const a = side(prev);
+  const b = side(row);
+  if (a === 'me' && b === 'bot') return 16;
+  if (a === 'bot' && b === 'me') return 20;
+  if (a === 'bot' && prev.kind === 'activity') return 10;
+  return 4;
+}
+
 /** One line for a run of tool calls: the latest one while it works, a count when it's done. */
 export function activityLine(tools: ToolCall[], live: boolean): string {
   const last = tools[tools.length - 1];

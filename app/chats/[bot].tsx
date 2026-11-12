@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   work: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, paddingHorizontal: 14, minHeight: 56, borderRadius: 12, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   workName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
   workNote: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  workChevron: { color: '#4B4F56', fontSize: 20 },
+  workChevron: { color: colors.disclosure, fontSize: 20 },
   fill: { flex: 1 },
   new: { ...button.primary, marginHorizontal: 16, marginTop: 16, height: 46, borderRadius: 23 },
   newText: { ...button.text },
