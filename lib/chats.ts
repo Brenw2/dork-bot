@@ -3,6 +3,7 @@
 // Hermes keeps them, so every device sees the same list, ordered by when each was last used,
 // and Hermes titles a new chat by itself after its first reply.
 // Plain TypeScript: the list logic is unit-tested in Node.
+import { notePreview } from './routineNotes';
 
 export interface ChatSummary {
   id: string;
@@ -67,6 +68,8 @@ export function chatName(bot: string, chat: Pick<ChatSummary, 'title' | 'preview
 
 /** A preview without the picture markers Hermes stores in the text. */
 export function cleanPreview(preview: string): string {
+  const note = notePreview(preview);
+  if (note) return note;
   return preview
     .replace(/\[Image attached at:[^\]]*\]/g, '')
     .replace(/\[screenshot\]/g, '')

@@ -5,6 +5,7 @@ import { splitStoredImages, type ContentPart } from './attachments';
 import { parseSessionRows, turnPending, type SessionRow } from './busy';
 import { firstChatId, toChatSummaries, type ChatSummary } from './chats';
 import { parseModelOptions, type ModelCatalog, type ModelChoice } from './models';
+import { parseRoutineNote, type RoutineNote } from './routineNotes';
 import { SseParser } from './sse';
 
 export interface BotConnection {
@@ -27,6 +28,8 @@ export interface ChatMessage {
   images?: string[];
   /** Pictures this device just sent, as data URLs, until the history reloads. */
   localImages?: string[];
+  /** Set when this is a routine's result added to the chat (a "Notify me" routine): drawn as a card from the bot. */
+  routine?: RoutineNote;
 }
 
 export type ChatEvent =
@@ -360,7 +363,11 @@ export function toChatMessages(raw: RawMessage[]): ChatMessage[] {
     const content = typeof m.content === 'string' ? m.content : '';
     const id = String(m.id ?? i);
     const at = typeof m.timestamp === 'number' ? { at: m.timestamp } : {};
-    if (m.role === 'user' && content) {
+    const note = m.role === 'user' ? parseRoutineNote(content) : null;
+    if (note) {
+      // A routine's result added to this chat (lib/routineNotes.ts): the bot's, not Brennan's bubble.
+      out.push({ id, role: 'assistant', content: note.text, routine: note, ...at });
+    } else if (m.role === 'user' && content) {
       const { text, images } = splitStoredImages(content);
       out.push({ id, role: 'user', content: text, ...at, ...(images.length ? { images } : {}) });
     }

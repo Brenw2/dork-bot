@@ -19,7 +19,7 @@ const DESKTOP_CHAT_MAX = 820;
 export default function Home() {
   const { width } = useWindowDimensions();
   const cls = useLayoutClass();
-  const params = useLocalSearchParams<{ bot?: string; chat?: string }>();
+  const params = useLocalSearchParams<{ bot?: string; chat?: string; at?: string }>();
   useEffect(() => {
     if (params.bot && params.chat) openChat(params.bot, params.chat);
   }, [params.bot, params.chat]);
@@ -68,6 +68,7 @@ export default function Home() {
             key={selected}
             bot={selected}
             inPane
+            focusAt={params.bot === selected ? params.at : undefined}
             maxWidth={isDesktop ? DESKTOP_CHAT_MAX : CHAT_MAX_WIDTH}
             list={{ hidden: !showList, toggle: () => setListHidden(showList) }}
           />

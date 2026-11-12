@@ -11,6 +11,7 @@
 //    lib/chatState.ts awaitingReply). That takes one extra request, only for a chat active lately.
 // Plain TypeScript with injected effects, so it's unit-tested without React Native.
 import type { Mood } from './sprites';
+import { parseRoutineNote } from './routineNotes';
 
 /** A session nobody has touched for this long, with no end, is a crashed process, not work. */
 export const STALE_S = 15 * 60;
@@ -75,7 +76,11 @@ export function turnPending(raw: unknown, nowS: number, windowS = CHAT_WINDOW_S)
     const m = raw[i] as { role?: unknown; tool_calls?: unknown; timestamp?: unknown } | null;
     if (!m || typeof m.role !== 'string' || m.role === 'session_meta') continue;
     const recent = typeof m.timestamp === 'number' && nowS - m.timestamp <= windowS;
-    if (m.role === 'user' || m.role === 'tool') return recent;
+    if (m.role === 'user' || m.role === 'tool') {
+      // A routine's result added to the chat is a user-role row but not a message waiting for a reply.
+      if (m.role === 'user' && parseRoutineNote((m as { content?: unknown }).content)) continue;
+      return recent;
+    }
     if (m.role === 'assistant') return recent && Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
     return false;
   }
