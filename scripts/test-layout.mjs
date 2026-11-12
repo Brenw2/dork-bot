@@ -432,14 +432,27 @@ async function composerTest(browser, base) {
       return { h: r.height, top: r.top, bottom: r.bottom, sendBottom: send?.bottom, scrolls: ta.scrollHeight > ta.clientHeight + 1, lastBottom: lr?.bottom, H: innerHeight };
     });
   const lines = (n) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join('\n');
+  // Layout settles a few frames after the text changes (the box grows, then the list below it resizes and
+  // scrolls back to the newest message). Measure once two reads in a row agree, not on the first frame: on a
+  // busy machine the first read still shows the old scroll position (it read bottom 580 vs box top 496).
+  const settled = async () => {
+    let prev = await measure();
+    for (let i = 0; i < 40; i++) {
+      await page.waitForTimeout(50);
+      const cur = await measure();
+      if (JSON.stringify(cur) === JSON.stringify(prev)) return cur;
+      prev = cur;
+    }
+    return prev;
+  };
   await page.waitForTimeout(300);
   const one = await measure();
   await box.fill(lines(1));
-  const m1 = await measure();
+  const m1 = await settled();
   await box.fill(lines(5));
-  const m5 = await measure();
+  const m5 = await settled();
   await box.fill(lines(30));
-  const m30 = await measure();
+  const m30 = await settled();
   const cap = DESKTOP.height * 0.4;
   const check = (ok, msg) => ok || problems.push(msg);
   check(Math.abs(m1.h - 44) < 1 && Math.abs(one.h - 44) < 1, `1 line should be 44 px tall, got ${one.h} / ${m1.h}`);
@@ -521,7 +534,7 @@ async function main() {
       await context.close();
     }
   }
-  if (!only) {
+  if (!only || only === 'composer') {
     const composer = await composerTest(browser, base);
     failed += composer.length ? 1 : 0;
     report.push({ posture: 'desktop', screen: 'composer', path: "/?bot=assistant", problems: composer });

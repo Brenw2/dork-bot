@@ -313,13 +313,8 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   const rows = useMemo(() => (WEB ? chatRows(state) : chatRows(state).reverse()), [state]);
   const listRef = useRef<FlatList<ChatRow>>(null);
   const pinned = useRef(true);
-  // The list's own height as onLayout last reported it. While the box under it grows or the window
-  // resizes, scroll events arrive for a height onLayout hasn't announced yet; they must not unpin the
-  // list (that left the newest message under the message box about one run in two).
-  const layoutH = useRef<number | null>(null);
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    if (layoutH.current !== null && Math.abs(layoutMeasurement.height - layoutH.current) > 1) return;
     pinned.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 80;
   };
   // scrollToEnd does nothing here until the list has measured itself, so scroll to the height we're given.
@@ -406,10 +401,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
               onScroll,
               scrollEventThrottle: 50,
               onContentSizeChange: (_w: number, h: number) => followBottom(h),
-              onLayout: (e: { nativeEvent: { layout: { height: number } } }) => {
-                layoutH.current = e.nativeEvent.layout.height;
-                followBottom();
-              },
+              onLayout: () => followBottom(),
               // Chats are short enough to draw whole; virtualizing from the top made the list jump
               // while it filled in on the way to the bottom.
               initialNumToRender: 10_000,

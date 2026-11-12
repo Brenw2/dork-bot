@@ -131,7 +131,7 @@ function NotifySwitch({ value, disabled, spacing, onChange }: { value: boolean; 
         <Text style={styles.notifyLabel}>Notify me</Text>
         <Text style={styles.notifyHint}>Puts the result in the chat and sends a notification.</Text>
       </View>
-      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel="Notify me" trackColor={{ true: '#4CC38A' }} thumbColor="#FFFFFF" />
+      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel="Notify me" trackColor={{ true: colors.ok }} thumbColor="#FFFFFF" />
     </View>
   );
 }
