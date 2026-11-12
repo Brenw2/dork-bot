@@ -113,6 +113,9 @@ export function chatSessionId(bot: string): string {
   return firstChatId(bot);
 }
 
+/** How many of a bot's newest sessions the Work list looks through. */
+const WORK_FETCH = 100;
+
 export class HermesClient {
   constructor(
     readonly conn: BotConnection,
@@ -177,6 +180,29 @@ export class HermesClient {
     const res = await this.request(`/api/sessions?limit=${limit}`);
     if (!res.ok) throw new HermesError(`Couldn't list the sessions: HTTP ${res.status}`, res.status);
     return parseSessionRows(((await res.json()) as { data?: unknown }).data);
+  }
+
+  /** The newest session rows of every kind, as Hermes sends them (lib/work.ts picks out the Work). */
+  async sessionRows(limit = WORK_FETCH): Promise<unknown> {
+    const res = await this.request(`/api/sessions?limit=${limit}`);
+    if (!res.ok) throw new HermesError(`Couldn't list the sessions: HTTP ${res.status}`, res.status);
+    return ((await res.json()) as { data?: unknown }).data;
+  }
+
+  /** One session's row, as Hermes sends it. Null when it doesn't exist (any more). */
+  async sessionRow(id: string): Promise<unknown> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new HermesError(`Couldn't read the session: HTTP ${res.status}`, res.status);
+    return ((await res.json()) as { session?: unknown }).session ?? null;
+  }
+
+  /** A session's saved messages, as Hermes sends them. */
+  async rawMessages(id: string): Promise<unknown> {
+    const res = await this.request(`/api/sessions/${encodeURIComponent(id)}/messages`);
+    if (res.status === 404) return [];
+    if (!res.ok) throw new HermesError(`Couldn't load the session: HTTP ${res.status}`, res.status);
+    return ((await res.json()) as { data?: unknown }).data ?? [];
   }
 
   /** Whether this chat's saved messages end mid-turn, i.e. a reply is still being worked on (lib/busy.ts). */

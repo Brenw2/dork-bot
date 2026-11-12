@@ -107,7 +107,9 @@ export async function setTokenOnBots(
 export type PushData =
   | { kind: 'reply' | 'approval'; bot: string; chat: string }
   /** `chat` + `at`: a "Notify me" routine's result was added to that chat, stamped `at`. Without them, it's in Routine results only. */
-  | { kind: 'routine'; bot: string; job?: string; chat?: string; at?: string };
+  | { kind: 'routine'; bot: string; job?: string; chat?: string; at?: string }
+  /** Outside work (lib/work.ts) that ended: `session` is the Hermes session id. */
+  | { kind: 'work'; bot: string; session: string };
 
 /** A push's data, checked. Null for anything that isn't one of ours. */
 export function parsePushData(raw: unknown): PushData | null {
@@ -124,6 +126,9 @@ export function parsePushData(raw: unknown): PushData | null {
       ...(chat ? { chat, ...(typeof r.at === 'string' && isNoteStamp(r.at) ? { at: r.at } : {}) } : {}),
     };
   }
+  if (r.kind === 'work') {
+    return typeof r.session === 'string' && r.session && r.session.length <= 200 && !isBotChat(bot, r.session) ? { kind: 'work', bot, session: r.session } : null;
+  }
   if ((r.kind === 'reply' || r.kind === 'approval') && typeof r.chat === 'string' && isBotChat(bot, r.chat)) {
     return { kind: r.kind, bot, chat: r.chat };
   }
@@ -133,16 +138,18 @@ export function parsePushData(raw: unknown): PushData | null {
 export type PushRoute =
   | { pathname: '/chat/[bot]'; params: { bot: string; chat: string; at?: string } }
   | { pathname: '/'; params: { bot: string; chat: string; at?: string } }
-  | { pathname: '/routine-results/[bot]'; params: { bot: string } };
+  | { pathname: '/routine-results/[bot]'; params: { bot: string } }
+  | { pathname: '/work-session/[bot]'; params: { bot: string; id: string } };
 
 /**
  * Where a tap goes. A routine's push opens the chat its result was added to, at that message; with
- * no chat (the bot had none) it opens that bot's Routine results. Two panes (open Duo in landscape,
- * wide desktop): the chat opens in the right pane.
+ * no chat (the bot had none) it opens that bot's Routine results. A finished work session opens that
+ * session. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane.
  */
 export function routeFor(data: PushData, twoPane: boolean): PushRoute {
+  if (data.kind === 'work') return { pathname: '/work-session/[bot]', params: { bot: data.bot, id: data.session } };
   if (data.kind === 'routine' && !data.chat) return { pathname: '/routine-results/[bot]', params: { bot: data.bot } };
-  const chat = data.kind === 'routine' ? (data.chat as string) : data.chat;
+  const chat = data.chat as string;
   const params = { bot: data.bot, chat, ...(data.kind === 'routine' && data.at ? { at: data.at } : {}) };
   return twoPane ? { pathname: '/', params } : { pathname: '/chat/[bot]', params };
 }

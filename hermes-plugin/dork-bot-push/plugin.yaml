@@ -5,3 +5,5 @@ author: "Brenw2"
 provides_hooks:
   - post_llm_call
   - pre_approval_request
+  - pre_llm_call
+  - on_session_finalize

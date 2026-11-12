@@ -551,7 +551,7 @@ class RegisterTests(unittest.TestCase):
                 hooks[name] = fn
 
         mod.register(Ctx())
-        self.assertEqual(sorted(hooks), ["post_llm_call", "pre_approval_request"])
+        self.assertEqual(sorted(hooks), ["on_session_finalize", "post_llm_call", "pre_approval_request", "pre_llm_call"])
 
 
 if __name__ == "__main__":
