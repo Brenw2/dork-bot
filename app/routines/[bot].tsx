@@ -124,14 +124,14 @@ interface NotifyMarks {
 }
 
 /** "Notify me": the routine's result goes in the bot's chat and to the phone. Off unless switched on. */
-function NotifySwitch({ value, disabled, color, onChange }: { value: boolean; disabled: boolean; color: string; onChange: (on: boolean) => void }) {
+function NotifySwitch({ value, disabled, spacing, onChange }: { value: boolean; disabled: boolean; spacing: number; onChange: (on: boolean) => void }) {
   return (
-    <View style={styles.notifyRow}>
+    <View style={[styles.notifyRow, { marginVertical: spacing }]}>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.notifyLabel}>Notify me</Text>
-        <Text style={styles.hint}>Puts the result in the chat and sends a notification.</Text>
+        <Text style={styles.notifyHint}>Puts the result in the chat and sends a notification.</Text>
       </View>
-      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel="Notify me" trackColor={{ true: color }} />
+      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel="Notify me" trackColor={{ true: '#4CC38A' }} thumbColor="#FFFFFF" />
     </View>
   );
 }
@@ -225,7 +225,7 @@ function NewRoutine({ bot, api, color, notify, onDone }: { bot: string; api: Rou
           <Text style={styles.hint}>A cron line (minute hour day month weekday), "every 2h", "30m" (once, in 30 minutes) or a date and time. Times are b-lab's (New York).</Text>
         </>
       ) : null}
-      <NotifySwitch value={notifyMe} disabled={!notify.ready || busy} color={color} onChange={setNotifyMe} />
+      <NotifySwitch value={notifyMe} disabled={!notify.ready || busy} spacing={16} onChange={setNotifyMe} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.row}>
         <Pressable onPress={() => onDone(false)} style={styles.secondary} accessibilityRole="button" accessibilityLabel="Cancel">
@@ -311,7 +311,7 @@ function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routi
         <View style={{ gap: 10, marginTop: 4 }}>
           <Text style={styles.prompt}>{r.prompt}</Text>
           {r.lastError ? <Text style={styles.error}>{r.lastError}</Text> : null}
-          <NotifySwitch value={notify.isOn(r.id)} disabled={!notify.ready || busy !== null} color={color} onChange={(on) => void flipNotify(on)} />
+          <NotifySwitch value={notify.isOn(r.id)} disabled={!notify.ready || busy !== null} spacing={10} onChange={(on) => void flipNotify(on)} />
           <View style={[styles.result, { borderColor: mix(color, 0.4) }]}>
             <Text style={styles.label}>{result ? `Last result · ${whenLabel(new Date(result.at * 1000).toISOString())}` : 'Last result'}</Text>
             {result === undefined ? <ActivityIndicator /> : result?.text ? <Markdown text={result.text} accent={color} /> : <Text style={styles.sub}>Nothing yet.</Text>}
@@ -351,8 +351,9 @@ const styles = StyleSheet.create({
   result: { borderWidth: 1, borderRadius: 10, padding: 10, gap: 6 },
   label: { color: colors.dim, fontSize: 13 },
   hint: { color: colors.dim, fontSize: 12, lineHeight: 17 },
-  notifyRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  notifyLabel: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  notifyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
+  notifyLabel: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  notifyHint: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   input: { color: colors.text, fontSize: 16, padding: 12, borderRadius: 12, backgroundColor: colors.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 12, height: 32, justifyContent: 'center' },

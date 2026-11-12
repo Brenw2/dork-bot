@@ -121,6 +121,15 @@ const RICH_MESSAGES = [
   { id: 4, role: 'assistant', content: 'Any time. Ping me if `npm test` goes red again.' },
 ];
 
+// A chat with a "Notify me" routine's result in it (a user-role row starting with the marker, lib/routineNotes.ts).
+const NOTE_MESSAGES = [
+  { id: 1, role: 'user', content: 'what is in the news today' },
+  { id: 2, role: 'assistant', content: 'Here you go.' },
+  { id: 3, role: 'user', content: `[Routine · daily_digest · ${new Date(Date.now() - 36e5).toISOString()}]\nThree stories today.\n\n- The Mets won 4-2.\n- Rain after 9.\n- Markets are flat.` },
+  { id: 4, role: 'user', content: 'thanks' },
+  { id: 5, role: 'assistant', content: 'Any time.' },
+];
+
 const PROFILES = [
   { name: 'default', is_default: true, model: 'claude', provider: 'anthropic', description: '' },
   {
@@ -244,6 +253,9 @@ const SCREENS = [
   { name: 'work-session', path: () => '/work-session/assistant?id=local-3f9a1c', waitFor: 'The test reads the clock' },
   { name: 'work-session-done', path: () => '/work-session/assistant?id=local-77be02', waitFor: 'Three themes' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
+  // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
+  { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
+  { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
 ];
 
 async function fakeHermes(route) {
@@ -259,7 +271,7 @@ async function fakeHermes(route) {
   if (/\/api\/jobs$/.test(p)) return json(200, { jobs: bot === 'assistant' ? JOBS : [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
   const sid = p.match(/\/api\/sessions\/([^/]+)/)?.[1];
-  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'coder' ? RICH_MESSAGES : MESSAGES) });
+  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'coder' ? RICH_MESSAGES : bot === 'newsie' ? NOTE_MESSAGES : MESSAGES) });
   if (WORK_MESSAGES[sid] && /\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: WORK_SESSIONS.find((w) => w.id === sid) });
   if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
   // chief: moved to Anthropic while its chat still says gemma4:31b (what broke it on 2026-11-03).
@@ -488,6 +500,7 @@ async function main() {
         await page.goto(base + path);
         await page.getByText(screen.waitFor, { exact: false }).first().waitFor({ timeout: 15_000 });
         if (screen.click) await page.getByLabel(screen.click).first().click();
+        if (screen.then) await page.getByText(screen.then, { exact: false }).first().waitFor({ timeout: 15_000 });
         await page.waitForTimeout(400); // let the list scroll to the end and statuses settle
         problems = await page.evaluate(audit, {
           insets: shape.insets,

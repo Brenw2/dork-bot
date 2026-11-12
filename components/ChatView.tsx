@@ -313,8 +313,13 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   const rows = useMemo(() => (WEB ? chatRows(state) : chatRows(state).reverse()), [state]);
   const listRef = useRef<FlatList<ChatRow>>(null);
   const pinned = useRef(true);
+  // The list's own height as onLayout last reported it. While the box under it grows or the window
+  // resizes, scroll events arrive for a height onLayout hasn't announced yet; they must not unpin the
+  // list (that left the newest message under the message box about one run in two).
+  const layoutH = useRef<number | null>(null);
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    if (layoutH.current !== null && Math.abs(layoutMeasurement.height - layoutH.current) > 1) return;
     pinned.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 80;
   };
   // scrollToEnd does nothing here until the list has measured itself, so scroll to the height we're given.
@@ -401,7 +406,10 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
               onScroll,
               scrollEventThrottle: 50,
               onContentSizeChange: (_w: number, h: number) => followBottom(h),
-              onLayout: () => followBottom(),
+              onLayout: (e: { nativeEvent: { layout: { height: number } } }) => {
+                layoutH.current = e.nativeEvent.layout.height;
+                followBottom();
+              },
               // Chats are short enough to draw whole; virtualizing from the top made the list jump
               // while it filled in on the way to the bottom.
               initialNumToRender: 10_000,
@@ -759,12 +767,11 @@ function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: stri
 /** A "Notify me" routine's result in the chat: from the bot, headed with the routine's name and when it ran. */
 function RoutineNoteView({ note, bot }: { note: RoutineNote; bot: string }) {
   const { color } = useBotLook(bot);
-  const name = useBotName(bot);
+  // 1:1 chats show no bot name above the card (the left bar and header say who/what); a group room (G3) would add it.
   return (
     <View style={[styles.reply, styles.routineNote, { borderLeftColor: color }]} accessibilityLabel={`Routine ${note.name}, ${whenLabel(note.at)}`}>
-      <Text style={[styles.who, { color, marginBottom: 2 }]}>{name}</Text>
       <Text style={styles.routineHead}>
-        {note.name} · {whenLabel(note.at)}
+        Routine · {note.name} · {whenLabel(note.at)}
       </Text>
       {note.text ? <Markdown text={note.text} accent={color} /> : null}
     </View>
@@ -928,8 +935,9 @@ const styles = StyleSheet.create({
   mine: { alignSelf: 'flex-end', gap: 6, alignItems: 'flex-end' },
   reply: { alignSelf: 'stretch', paddingVertical: 4, paddingRight: 4 },
   who: { fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 0.3 },
-  routineNote: { borderLeftWidth: 3, paddingLeft: 10, marginVertical: 4 },
-  routineHead: { color: colors.dim, fontSize: 12, marginBottom: 6 },
+  // Rows are 10 apart (listBody gap): 6 more above makes 16 from your bubble, 10 more below makes 20 to the next one.
+  routineNote: { borderLeftWidth: 3, paddingLeft: 10, paddingTop: 6, paddingBottom: 10 },
+  routineHead: { color: colors.dim, fontSize: 12, marginBottom: 10 },
   pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   picture: { borderRadius: 14, backgroundColor: colors.card },
   picturePlaceholder: { alignItems: 'center', justifyContent: 'center' },
