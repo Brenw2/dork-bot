@@ -5,8 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from '@/components/net';
 import { Menu } from '@/components/alert';
 import { chatName } from '@/lib/chats';
-import { noteIndex, type RoutineNote } from '@/lib/routineNotes';
+import { noteIndex } from '@/lib/routineNotes';
+import { focusPosition, focusStep, ROUTINE_FOCUS, ROUTINE_MOTION } from '@/lib/routineCard';
 import { whenLabel } from '@/lib/routines';
+import { RoutineCard } from '@/components/RoutineCard';
 import { BotSprite } from '@/components/BotSprite';
 import { Markdown, BODY_SIZE } from '@/components/Markdown';
 import { isDesktop } from '@/components/desktop';
@@ -357,17 +359,70 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approvalId]);
-  // A tapped "Notify me" notification: scroll to the routine's message once the chat has it (it can land a few seconds after the push).
+  // Routine cards: collapsed by default; open ones are remembered while this chat is open (in memory, per
+  // card), so scrolling away and back keeps them. Leaving the chat resets them (Fix 11).
+  const [openCards, setOpenCards] = useState<ReadonlySet<string>>(() => new Set());
+  const [flashes, setFlashes] = useState<Record<string, number>>({});
+  const cardHeights = useRef<Record<string, number>>({});
+  const listHeight = useRef(0);
+  const routineCtx = useMemo<RoutineCtx>(
+    () => ({
+      isOpen: (at) => openCards.has(at),
+      toggle: (at) =>
+        setOpenCards((cur) => {
+          const next = new Set(cur);
+          if (!next.delete(at)) next.add(at);
+          return next;
+        }),
+      flash: (at) => flashes[at] ?? 0,
+      measured: (at, h) => {
+        cardHeights.current[at] = h;
+      },
+    }),
+    [openCards, flashes],
+  );
+  // A tapped "Notify me" notification: find the routine's card (it can land a few seconds after the push, so
+  // reload the history a few times), open it, scroll to it and flash it once. Not found: Routine results.
   const scrolledTo = useRef<string | null>(null);
+  const reloads = useRef(0);
+  const [reloadTick, setReloadTick] = useState(0);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   useEffect(() => {
-    if (!focusAt || scrolledTo.current === focusAt) return;
+    reloads.current = 0;
+  }, [focusAt]);
+  useEffect(() => {
+    if (!focusAt || !client || scrolledTo.current === focusAt) return;
     const index = noteIndex(rows, focusAt);
-    if (index < 0) return;
+    const step = focusStep(index >= 0, reloads.current);
+    if (step === 'reload') {
+      const t = setTimeout(() => {
+        reloads.current += 1;
+        client
+          .messages(sessionId)
+          .then((messages) => dispatch({ type: 'loaded', messages }))
+          .catch(() => undefined)
+          .finally(() => setReloadTick((n) => n + 1));
+      }, ROUTINE_FOCUS.everyMs);
+      return () => clearTimeout(t);
+    }
     scrolledTo.current = focusAt;
+    if (step === 'fallback') {
+      router.push({ pathname: '/routine-results/[bot]', params: { bot } });
+      return;
+    }
     pinned.current = false;
-    const t = setTimeout(() => listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 60);
-    return () => clearTimeout(t);
-  }, [focusAt, rows]);
+    setOpenCards((cur) => new Set(cur).add(focusAt));
+    setFlashes((cur) => ({ ...cur, [focusAt]: (cur[focusAt] ?? 0) + 1 }));
+    // Scroll once it has opened (its height is then known): 16 below the header, or centred if it's taller than the list.
+    // (Not cleared when `rows` changes: this effect has already done its part.)
+    setTimeout(() => {
+      const at = noteIndex(rowsRef.current, focusAt);
+      if (at < 0) return;
+      const pos = focusPosition(cardHeights.current[focusAt] ?? 0, listHeight.current, !WEB);
+      listRef.current?.scrollToIndex({ index: at, animated: true, ...pos });
+    }, ROUTINE_MOTION.expand + 80);
+  }, [focusAt, rows, client, sessionId, reloadTick, bot]);
   // Desktop (web): the message box starts at one line and grows with its text up to 40% of the chat pane, then scrolls.
   // The field is 44 tall on the desktop, 36 on the phone (design fix 3); the textarea has no border or padding of its
   // own beyond the text's, so its height is the field's height.
@@ -439,7 +494,10 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
             }
           : null)}
         data={rows}
-        extraData={answering}
+        extraData={[answering, routineCtx]}
+        onLayout={(e) => {
+          listHeight.current = e.nativeEvent.layout.height;
+        }}
         keyExtractor={(r) => r.id}
         onScrollToIndexFailed={(info) => {
           // Rows not measured yet: go near, then try the exact one again.
@@ -467,6 +525,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
             bot={bot}
             since={startedAt.current}
             approval={{ busy: answering, onAnswer: answer, onAgain: tryAgain, onNewChat: () => void startNewChat(bot), name }}
+            routine={routineCtx}
           />
         )}
       />
@@ -596,20 +655,23 @@ function useConnectorWarmup(bot: string) {
 
 export { deleteChat, onChatsChanged, renameChat } from '@/components/chatActions';
 
+/** The chat's routine cards: which are open, which flash, and where they were measured. */
+type RoutineCtx = { isOpen: (at: string) => boolean; toggle: (at: string) => void; flash: (at: string) => number; measured: (at: string, h: number) => void };
+
 type RowCtx = { busy: boolean; onAnswer: (c: ApprovalChoice) => void; onAgain: () => void; onNewChat: () => void; name: string };
 
-function Row({ row, bot, since, gap, approval }: { row: ChatRow; bot: string; since: number; gap: number; approval: RowCtx }) {
+function Row({ row, bot, since, gap, approval, routine }: { row: ChatRow; bot: string; since: number; gap: number; approval: RowCtx; routine: RoutineCtx }) {
   return (
     <View style={{ marginTop: gap }}>
-      <RowBody row={row} bot={bot} since={since} approval={approval} />
+      <RowBody row={row} bot={bot} since={since} approval={approval} routine={routine} />
     </View>
   );
 }
 
-function RowBody({ row, bot, since, approval }: { row: ChatRow; bot: string; since: number; approval: RowCtx }) {
+function RowBody({ row, bot, since, approval, routine }: { row: ChatRow; bot: string; since: number; approval: RowCtx; routine: RoutineCtx }) {
   switch (row.kind) {
     case 'message':
-      if (row.message.routine) return <RoutineNoteView note={row.message.routine} bot={bot} />;
+      if (row.message.routine) return <RoutineNoteView note={row.message.routine} bot={bot} ctx={routine} />;
       return row.message.role === 'user' ? <Mine message={row.message} bot={bot} /> : <Reply text={row.message.content} bot={bot} />;
     case 'activity':
       return <Activity tools={row.tools} live={row.live} />;
@@ -630,17 +692,20 @@ function RowBody({ row, bot, since, approval }: { row: ChatRow; bot: string; sin
   }
 }
 
-/** A "Notify me" routine's result in the chat: from the bot, headed with the routine's name and when it ran. */
-function RoutineNoteView({ note, bot }: { note: RoutineNote; bot: string }) {
+/** A "Notify me" routine's result in the chat: a collapsible card (components/RoutineCard.tsx). */
+function RoutineNoteView({ note, bot, ctx }: { note: NonNullable<ChatMessage['routine']>; bot: string; ctx: RoutineCtx }) {
   const { color } = useBotLook(bot);
-  // 1:1 chats show no bot name above the card (the left bar and header say who/what); a group room (G3) would add it.
   return (
-    <View style={[styles.reply, styles.routineNote, { borderLeftColor: color }]} accessibilityLabel={`Routine ${note.name}, ${whenLabel(note.at)}`}>
-      <Text style={styles.routineHead}>
-        Routine · {note.name} · {whenLabel(note.at)}
-      </Text>
-      {note.text ? <Markdown text={note.text} accent={color} /> : null}
-    </View>
+    <RoutineCard
+      name={note.name}
+      when={whenLabel(note.at)}
+      text={note.text}
+      color={color}
+      expanded={ctx.isOpen(note.at)}
+      onToggle={() => ctx.toggle(note.at)}
+      highlight={ctx.flash(note.at)}
+      onLayoutHeight={(h) => ctx.measured(note.at, h)}
+    />
   );
 }
 
@@ -733,8 +798,6 @@ const styles = StyleSheet.create({
   bubble: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, alignSelf: 'flex-end' },
   mine: { alignSelf: 'flex-end', gap: 4, alignItems: 'flex-end' },
   reply: { alignSelf: 'stretch', paddingRight: 4 },
-  routineNote: { borderLeftWidth: 3, paddingLeft: 10 },
-  routineHead: { color: colors.dim, fontSize: 12, marginBottom: 10 },
   pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   picture: { borderRadius: 14, backgroundColor: colors.card },
   picturePlaceholder: { alignItems: 'center', justifyContent: 'center' },

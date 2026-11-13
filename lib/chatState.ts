@@ -191,6 +191,10 @@ export function chatRows(state: Pick<ChatState, 'messages' | 'pending'> & Partia
   return rows;
 }
 
+function isRoutineRow(row: ChatRow): boolean {
+  return row.kind === 'message' && !!row.message.routine;
+}
+
 /** Who a row belongs to, for spacing: you, or the bot (its chips, replies and routine cards). */
 function side(row: ChatRow): 'me' | 'bot' {
   if (row.kind === 'queued' || (row.kind === 'failure' && row.failure.notSent)) return 'me';
@@ -203,6 +207,8 @@ function side(row: ChatRow): 'me' | 'bot' {
  */
 export function rowGap(prev: ChatRow | undefined, row: ChatRow): number {
   if (!prev) return 0;
+  // A routine card (Fix 11) has 16 above and below, from bubbles and replies alike.
+  if (isRoutineRow(prev) || isRoutineRow(row)) return 16;
   const a = side(prev);
   const b = side(row);
   if (a === 'me' && b === 'bot') return 16;
