@@ -188,11 +188,11 @@ describe('tool activity rows', () => {
     const rows = chatRows({ messages: [], pending: { text: '', tools, thinking: true } });
     expect(rows.map((r) => r.kind)).toEqual(['activity', 'pending']);
     expect(rows[0].kind === 'activity' && rows[0].live).toBe(true);
-    expect(activityLine(tools, true)).toBe('… terminal · 3 steps');
-    expect(activityLine(tools, false)).toBe('✓ skill_view, terminal · 3 steps');
+    expect(activityLine(tools, true)).toBe('Running a command… · 3 steps');
+    expect(activityLine(tools, false)).toBe('Used Skills, Terminal · 3 steps');
     expect(activityLine([...tools, { name: 'read_file', preview: null, status: 'failed' }, { name: 'x', preview: null, status: 'done' }], false)).toBe(
-      '✕ skill_view, terminal +2 · 5 steps · 1 failed',
+      'Used Skills, Terminal +2 · 5 steps · 1 failed',
     );
-    expect(activityLine([tools[0]], false)).toBe('✓ skill_view');
+    expect(activityLine([tools[0]], false)).toBe('Used Skills');
   });
 });
