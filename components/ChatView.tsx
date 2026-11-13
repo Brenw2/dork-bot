@@ -9,14 +9,15 @@ import { chatName } from '@/lib/chats';
 import { noteIndex, type RoutineNote } from '@/lib/routineNotes';
 import { whenLabel } from '@/lib/routines';
 import { BotSprite } from '@/components/BotSprite';
-import { Markdown } from '@/components/Markdown';
+import { Markdown, BODY_SIZE } from '@/components/Markdown';
+import { isDesktop } from '@/components/desktop';
 import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
 import { useHermesImage } from '@/components/useHermesImage';
 import { attachmentProblem, MAX_IMAGES, messageBody, type Attachment } from '@/lib/attachments';
 import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
-import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, type ChatRow, type ToolCall } from '@/lib/chatState';
+import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, rowGap, type ChatRow, type ToolCall } from '@/lib/chatState';
 import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
 import { notificationsSupported, useOnScreen } from '@/components/notifications';
@@ -427,8 +428,11 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
             )}
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <Row
+            // Space above each row follows who spoke before it (rowGap). `rows` is oldest-first on the web
+            // and newest-first on the phone's inverted list, so "before" is the neighbour on the other side.
+            gap={rowGap(rows[WEB ? index - 1 : index + 1], item)}
             row={item}
             bot={bot}
             thinking={`${name} ${resumed ? 'is still working' : 'is thinking'}… ${elapsedLabel(elapsed * 1000)}`}
@@ -737,7 +741,15 @@ function ModelBar({ bot, style, color }: { bot: string; style: ViewStyle | null;
   );
 }
 
-function Row({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
+function Row({ row, bot, thinking, gap }: { row: ChatRow; bot: string; thinking: string; gap: number }) {
+  return (
+    <View style={{ marginTop: gap }}>
+      <RowBody row={row} bot={bot} thinking={thinking} />
+    </View>
+  );
+}
+
+function RowBody({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
   switch (row.kind) {
     case 'message':
       if (row.message.routine) return <RoutineNoteView note={row.message.routine} bot={bot} />;
@@ -770,13 +782,11 @@ function RoutineNoteView({ note, bot }: { note: RoutineNote; bot: string }) {
   );
 }
 
-/** A bot reply: formatted text across the chat's width, under the bot's name in its color. */
+/** A bot reply: formatted text across the chat's width. 1:1 chats show no name over it (a group room would). */
 export function Reply({ text, bot }: { text: string; bot: string }) {
   const { color } = useBotLook(bot);
-  const name = useBotName(bot);
   return (
     <View style={styles.reply}>
-      <Text style={[styles.who, { color }]}>{name}</Text>
       <Markdown text={text} accent={color} />
     </View>
   );
@@ -788,7 +798,7 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
   const local = message.localImages ?? [];
   const remote = local.length ? [] : (message.images ?? []);
   return (
-    <View style={[styles.mine, { maxWidth: '86%' }]}>
+    <View style={[styles.mine, { maxWidth: isDesktop ? '70%' : '78%' }]}>
       {local.length || remote.length ? (
         <View style={styles.pictures}>
           {local.map((uri, i) => (
@@ -918,17 +928,16 @@ const styles = StyleSheet.create({
   modelText: { flex: 1, color: colors.dim, fontSize: 13 },
   modelChange: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
-  listBody: { flexGrow: 1, padding: 14, gap: 10 },
+  // No list gap: each row carries its own space above it (rowGap).
+  listBody: { flexGrow: 1, padding: 14 },
   // An inverted list draws its empty state upside down unless it's flipped back.
   flip: { flex: 1, transform: [{ scaleY: -1 }], justifyContent: 'flex-end' },
   emptyWeb: { flex: 1, justifyContent: 'flex-end' },
   hint: { color: colors.dim, fontSize: 14, textAlign: 'center', marginTop: 8 },
-  bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, alignSelf: 'flex-end' },
-  mine: { alignSelf: 'flex-end', gap: 6, alignItems: 'flex-end' },
-  reply: { alignSelf: 'stretch', paddingVertical: 4, paddingRight: 4 },
-  who: { fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 0.3 },
-  // Rows are 10 apart (listBody gap): 6 more above makes 16 from your bubble, 10 more below makes 20 to the next one.
-  routineNote: { borderLeftWidth: 3, paddingLeft: 10, paddingTop: 6, paddingBottom: 10 },
+  bubble: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, alignSelf: 'flex-end' },
+  mine: { alignSelf: 'flex-end', gap: 4, alignItems: 'flex-end' },
+  reply: { alignSelf: 'stretch', paddingRight: 4 },
+  routineNote: { borderLeftWidth: 3, paddingLeft: 10 },
   routineHead: { color: colors.dim, fontSize: 12, marginBottom: 10 },
   pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   picture: { borderRadius: 14, backgroundColor: colors.card },
@@ -956,7 +965,7 @@ const styles = StyleSheet.create({
   thumbRemoveText: { color: colors.text, fontSize: 11, fontWeight: '700' },
   attach: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   attachText: { fontSize: 24, lineHeight: 26, fontWeight: '400' },
-  text: { color: colors.text, fontSize: 16, lineHeight: 22 },
+  text: { color: colors.text, fontSize: BODY_SIZE, lineHeight: 22 },
   activity: {
     alignSelf: 'flex-start',
     maxWidth: '86%',

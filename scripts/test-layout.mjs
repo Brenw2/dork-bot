@@ -376,6 +376,64 @@ function audit({ insets, keepOut, fixed, seen }) {
   return [...new Set(problems)];
 }
 
+// Design fix 7 (transcript rhythm), measured in the page: body sizes, the bubble's width and padding, no bot
+// name over replies, and the space between rows (4 / 16 / 20 / 10). Runs on the chat screens with `thanks`.
+function measureTranscript() {
+  const problems = [];
+  const px = (v) => parseFloat(v);
+  const leaf = (text) => [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === text);
+  const thanks = leaf('thanks');
+  const reply = leaf('Any time.');
+  if (!thanks || !reply) return ['transcript: "thanks" / "Any time." not found'];
+  const W = innerWidth;
+  const desktop = false; // the web build is never the desktop shell
+  const body = desktop ? 16 : 17;
+  const ts = getComputedStyle(thanks);
+  const rs = getComputedStyle(reply);
+  if (px(ts.fontSize) !== body || px(ts.lineHeight) !== 22) problems.push(`your bubble text should be ${body}/22, got ${ts.fontSize}/${ts.lineHeight}`);
+  if (px(rs.fontSize) !== body || px(rs.lineHeight) !== 24) problems.push(`reply text should be ${body}/24, got ${rs.fontSize}/${rs.lineHeight}`);
+  const bubble = thanks.parentElement;
+  const br = bubble.getBoundingClientRect();
+  const bs = getComputedStyle(bubble);
+  if (px(bs.paddingTop) !== 9 || px(bs.paddingLeft) !== 14 || px(bs.borderTopLeftRadius) !== 18) problems.push(`bubble should be padding 9x14, radius 18, got ${bs.paddingTop}/${bs.paddingLeft}/${bs.borderTopLeftRadius}`);
+  if (br.width > W * 0.78 + 1) problems.push(`bubble is ${br.width.toFixed(0)} wide, over 78% of ${W}`);
+  // Text blocks: climb from a leaf to the block that draws the whole line box (links and code are spans).
+  const block = (el) => {
+    let p = el;
+    while (p.tagName === 'SPAN' && p.parentElement) p = p.parentElement;
+    return p.getBoundingClientRect();
+  };
+  const before = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.includes('api.weather.gov'));
+  if (before) {
+    const gap = br.top - block(before).bottom;
+    if (Math.abs(gap - 20) > 2) problems.push(`bot reply → your bubble should be 20 apart, got ${gap.toFixed(1)}`);
+  }
+  const gapMe = block(reply).top - br.bottom;
+  if (Math.abs(gapMe - 16) > 2) problems.push(`your bubble → bot reply should be 16 apart, got ${gapMe.toFixed(1)}`);
+  // No bot name label over a 1:1 reply: "assistant" may be in the header and the bot list, not in the chat column.
+  const boxTop = document.querySelector('textarea')?.getBoundingClientRect().top ?? innerHeight;
+  const rl = reply.getBoundingClientRect().left;
+  const named = [...document.querySelectorAll('div,span')].filter((e) => {
+    if (e.children.length || !/^assistant$/i.test(e.textContent.trim())) return false;
+    const r = e.getBoundingClientRect();
+    return r.left >= rl - 1 && r.top > 110 && r.bottom < boxTop;
+  });
+  if (named.length) problems.push(`the bot's name repeats in the transcript (${named.length}×)`);
+  // A bare link shows without its scheme, cut at 40 characters.
+  const link = [...document.querySelectorAll('[role=link]')].find((e) => e.textContent.includes('mlb.com'));
+  if (!link) problems.push('the mlb.com link is missing');
+  else if (/^https?:/.test(link.textContent) || [...link.textContent].length > 40) problems.push(`bare link should drop the scheme and stay within 40 characters, got "${link.textContent}"`);
+  return problems;
+}
+
+// Card 20 nit: the Work row's chevron is #5D626A (was the too-faint #4B4F56).
+function measureChats() {
+  const chev = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === '›');
+  if (!chev) return ['the Work row chevron is missing'];
+  const c = getComputedStyle(chev).color;
+  return c === 'rgb(93, 98, 106)' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
+}
+
 const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat', "assistant's work"], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
@@ -521,6 +579,8 @@ async function main() {
           fixed: FIXED[screen.name] ?? [],
           seen: SEEN[screen.name] ?? [],
         });
+        if (screen.name === 'chat') problems.push(...(await page.evaluate(measureTranscript)));
+        if (screen.name === 'chats') problems.push(...(await page.evaluate(measureChats)));
       } catch (e) {
         problems = [`didn't render: ${e.message.split('\n')[0]}`];
       }

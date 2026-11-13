@@ -10,6 +10,10 @@ export const colors = {
   user: '#3B3470',
   ok: '#4CC38A',
   bad: '#F06A6A',
+  // Design tokens (docs/design/REVIEW.md): raised surfaces, placeholders/disabled text, disclosure chevrons.
+  raised: '#22252A',
+  faint: '#6B7078',
+  disclosure: '#5D626A',
 };
 
 export const mono = Platform.select({ ios: 'Menlo', default: 'monospace' });
