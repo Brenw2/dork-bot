@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
@@ -76,9 +77,12 @@ export default function RoutinesScreen() {
     },
   };
 
+  // The header's + opens the new-routine form (once the routines are reachable).
+  const action = useMemo(() => (api && !adding ? { label: 'New routine', icon: 'plus' as const, onPress: () => setAdding(true) } : undefined), [api, adding]);
+
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${botName}'s routines` }} />
+      <Sheet title="Routines" bot={bot} action={action} />
       <ScrollView
         contentContainerStyle={[styles.body, column]}
         keyboardShouldPersistTaps="handled"
@@ -96,17 +100,7 @@ export default function RoutinesScreen() {
               if (added) void load(api);
             }}
           />
-        ) : (
-          <Pressable
-            style={({ pressed }) => [styles.add, { backgroundColor: color }, pressed && { opacity: 0.7 }, !api && button.disabled]}
-            disabled={!api}
-            onPress={() => setAdding(true)}
-            accessibilityRole="button"
-            accessibilityLabel="New routine"
-          >
-            <Text style={[styles.addText, { color: onColor(color) }]}>+ New routine</Text>
-          </Pressable>
-        )}
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {list === null && !error ? <ActivityIndicator style={{ marginTop: 20 }} /> : null}
         {list?.length === 0 ? <Text style={styles.empty}>No routines yet.</Text> : null}

@@ -43,6 +43,10 @@ Chat header button no longer drawn as a grey liquid-glass capsule on iOS 26+ (cl
 
 Custom ⋯ menu and dialogs on desktop; chat buttons in the bot's color; formatted replies with highlighted code and Copy; photos and screenshots (camera/library on the phone, pick/paste/drop on desktop), shown on both devices.
 
+## In flight: UI polish 2/n, fixes 1, 2, 8, 10 (card 19, branch app/ui-polish-bot-list)
+
+Bot list like Messages (previews, times, Needs you, error copy, large title, desktop sidebar), one-row chat header with the model under the name and a banner only when the model is broken, the shared sheet and panel header (Done, subtitle, create action in the header), Chats as a search plus grouped list, the bot sheet (tap the chat title, long-press a row, or Bot settings), the 4-item chat ⋯ and the app ⋯. Built to docs/design/comps. Layout tests measure the sizes and spacing (`npm run test:layout`, the `ui` group). Not built here: swipe actions on Chats (press and hold instead), the iOS sheet grabber, the UIMenu look (device-only checks in REVIEW.md). Fixes 3-7 and 9 are later slices; PR #37 (fix 7) touches ChatView too.
+
 ## Design: UI review and locked comps (card 18, branch design/ui-review)
 
 docs/design/REVIEW.md ranks the top 10 clunky spots, each with before screenshots and a spec, plus the group chat screens (card 8). Locked comps are in docs/design/comps/ at iPhone 393x852 and desktop 1280x800. Mobile builds the fixes in card 19 and group chat in card 8. A UI PR merges only with Design's PASS against these comps. Six "Chief to confirm" calls are listed at the end of REVIEW.md.

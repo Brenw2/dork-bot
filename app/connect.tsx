@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { Sheet } from '@/components/Sheet';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fetch } from '@/components/net';
@@ -34,6 +35,7 @@ export default function Connect() {
 
   return (
     <View style={styles.page}>
+      <Sheet title="Hermes" close="cancel" />
       <Column style={styles.screen}>
         {state === 'checking' ? (
           <>

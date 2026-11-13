@@ -1,7 +1,8 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Sprite } from '@/components/BotSprite';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { LookPicker } from '@/components/LookPicker';
@@ -28,7 +29,7 @@ export default function ChangeLook() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]}>
-      <Stack.Screen options={{ title: botName }} />
+      <Sheet title="Look" bot={bot} close="cancel" />
       <View style={styles.preview}>
         {MOODS.filter((m) => m !== 'sleeping').map((m) => (
           <Sprite key={m} character={picked.character} variant={picked.variant} color={picked.color} mood={m} size={40} seed={m.length} />
