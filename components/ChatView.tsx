@@ -17,7 +17,7 @@ import { attachmentProblem, MAX_IMAGES, messageBody, type Attachment } from '@/l
 import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
-import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, rowGap, type ChatRow, type ToolCall } from '@/lib/chatState';
+import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, rowGap, type ChatRow } from '@/lib/chatState';
 import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
 import { notificationsSupported, useOnScreen } from '@/components/notifications';
@@ -30,12 +30,14 @@ import { useChatModel } from '@/components/useChatModel';
 import { liveRuns, liveRunsReady } from '@/components/liveRuns';
 import { keepWorking } from '@/components/busyWatch';
 import { leaveAction } from '@/lib/busy';
-import { elapsedLabel } from '@/lib/liveRuns';
 import { providerName } from '@/lib/models';
-import { button, colors, mix, mono, onColor } from '@/lib/theme';
+import { ArrowUpIcon, PlusIcon, StopIcon } from '@/components/ChatIcons';
+import { Activity, ApprovalCard, DecisionChip, TypingRow, useDesk } from '@/components/ChatStatus';
+import { colors, mix, mono, onColor } from '@/lib/theme';
+
+export { Activity };
 
 const WEB = Platform.OS === 'web';
-const INPUT_MIN_HEIGHT = 44;
 const INPUT_PANE_SHARE = 0.4; // desktop: the message box grows to this share of the chat pane's height
 
 interface ChatViewProps {
@@ -82,7 +84,6 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
       return next;
     });
   }, []);
-  const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const startedAt = useRef(0);
   const sessionId = chat;
@@ -225,25 +226,17 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     [bot],
   );
 
-  // Local models can take a while before the first word; show a timer.
+  // The typing row counts "Still working" from startedAt (after 10 s); no timer here.
   const running = state.pending !== null;
   const remote = !!state.pending?.remote;
-  useEffect(() => {
-    if (!running) return;
-    const t0 = startedAt.current || Date.now();
-    setElapsed(Math.round((Date.now() - t0) / 1000));
-    const id = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [running]);
 
-  const send = async () => {
-    const text = draft.trim();
-    const images = attached;
-    if ((!text && !images.length) || !client || (running && !remote)) return;
+  // Typed while a reply was running: goes out, in order, once that reply is done.
+  const [queued, setQueued] = useState<{ text: string; images: Attachment[] }[]>([]);
+
+  const submit = async (text: string, images: Attachment[]) => {
+    if (!client) return;
     const tooBig = attachmentProblem(images);
     if (tooBig) return setAttachError(tooBig);
-    setDraft('');
-    setAttached([]);
     setAttachError(null);
     pinned.current = true;
     startedAt.current = Date.now();
@@ -286,6 +279,27 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     }
   };
 
+  const send = () => {
+    const text = draft.trim();
+    const images = attached;
+    if ((!text && !images.length) || !client) return;
+    const tooBig = attachmentProblem(images);
+    if (tooBig) return setAttachError(tooBig);
+    setDraft('');
+    setAttached([]);
+    setAttachError(null);
+    if (running && !remote) return setQueued((q) => [...q, { text, images }]);
+    void submit(text, images);
+  };
+  // The reply is done: send what was queued behind it.
+  useEffect(() => {
+    if (running || !client || !queued.length) return;
+    const [next, ...rest] = queued;
+    setQueued(rest);
+    void submit(next.text, next.images);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, client, queued]);
+
   const [answering, setAnswering] = useState(false);
   const answer = async (choice: ApprovalChoice) => {
     const request = state.approval;
@@ -294,7 +308,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     setAnswering(true);
     try {
       await client.approve(runId, choice, request.requestId);
-      dispatch({ type: 'approval', request: null });
+      dispatch({ type: 'answered', choice });
     } catch (e) {
       dispatch({ type: 'approval', request: null });
       Alert.alert("Couldn't answer", (e as Error).message);
@@ -311,7 +325,8 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   // Web (the desktop app): react-native-web scrolls an inverted list in script, so the wheel jumps,
   // trackpad momentum is lost and the scrollbar runs backwards. There it's a normal list, pinned
   // to the bottom while you're at the bottom (new messages, the streaming reply).
-  const rows = useMemo(() => (WEB ? chatRows(state) : chatRows(state).reverse()), [state]);
+  const queuedText = useMemo(() => queued.map((q) => q.text), [queued]);
+  const rows = useMemo(() => (WEB ? chatRows(state, queuedText) : chatRows(state, queuedText).reverse()), [state, queuedText]);
   const listRef = useRef<FlatList<ChatRow>>(null);
   const pinned = useRef(true);
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
@@ -324,6 +339,16 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     contentHeight.current = h;
     if (pinned.current) listRef.current?.scrollToOffset({ offset: h, animated: false });
   };
+  // An approval card arrives at the end of the transcript: bring it into view (it can be taller than the space on a small screen).
+  const approvalId = state.approval?.requestId ?? state.approval?.command ?? null;
+  useEffect(() => {
+    if (!approvalId) return;
+    pinned.current = true;
+    followBottom();
+    const t = setTimeout(() => followBottom(), 150);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approvalId]);
   // A tapped "Notify me" notification: scroll to the routine's message once the chat has it (it can land a few seconds after the push).
   const scrolledTo = useRef<string | null>(null);
   useEffect(() => {
@@ -336,6 +361,10 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     return () => clearTimeout(t);
   }, [focusAt, rows]);
   // Desktop (web): the message box starts at one line and grows with its text up to 40% of the chat pane, then scrolls.
+  // The field is 44 tall on the desktop, 36 on the phone (design fix 3); the textarea has no border or padding of its
+  // own beyond the text's, so its height is the field's height.
+  const desk = useDesk();
+  const fieldMin = desk ? 44 : 36;
   const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const [paneHeight, setPaneHeight] = useState(0);
   const [inputHeight, setInputHeight] = useState<number | undefined>(undefined);
@@ -347,12 +376,20 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     const was = el.style.height; // React's own value; put it back so an unchanged height stays applied
     el.style.height = '0px'; // measure the content on its own, so the box can shrink too
     const border = el.offsetHeight - el.clientHeight; // scrollHeight leaves the border out
-    const h = el.scrollHeight < INPUT_MIN_HEIGHT + 10 ? INPUT_MIN_HEIGHT : el.scrollHeight + border;
+    const h = el.scrollHeight < fieldMin + 10 ? fieldMin : el.scrollHeight + border;
     el.style.height = was;
-    setInputHeight(Math.max(INPUT_MIN_HEIGHT, inputCap ? Math.min(h, inputCap) : h));
-  }, [draft, inputCap]);
+    const next = Math.max(fieldMin, inputCap ? Math.min(h, inputCap) : h);
+    // No scrollbar until the text reaches the cap (a box under it never needs one).
+    el.style.overflowY = inputCap && h >= inputCap ? 'auto' : 'hidden';
+    setInputHeight(next);
+  }, [draft, inputCap, fieldMin]);
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = (!!draft.trim() || attached.length > 0) && !!client;
+  // Send/Stop: a 30 circle 3 in from the field's corner (desktop 32, 6 in); the field's own line is a hairline.
+  const roundSize = desk
+    ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
+    : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth };
+  const disconnected = !client && !!state.error && !state.error.startsWith('No saved key');
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   const onBot = onColor(color);
@@ -410,6 +447,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
             }
           : null)}
         data={rows}
+        extraData={answering}
         keyExtractor={(r) => r.id}
         onScrollToIndexFailed={(info) => {
           // Rows not measured yet: go near, then try the exact one again.
@@ -435,12 +473,12 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
             gap={rowGap(rows[WEB ? index - 1 : index + 1], item)}
             row={item}
             bot={bot}
-            thinking={`${name} ${resumed ? 'is still working' : 'is thinking'}… ${elapsedLabel(elapsed * 1000)}`}
+            since={startedAt.current}
+            approval={{ busy: answering, onAnswer: answer }}
           />
         )}
       />
       {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
-      {state.approval ? <ApprovalCard request={state.approval} bot={bot} busy={answering} onAnswer={answer} style={column} /> : null}
       {warming.length ? (
         <Text style={[styles.warming, column]} accessibilityLiveRegion="polite">
           {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
@@ -471,63 +509,80 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
         </ScrollView>
       ) : null}
       {attachError ? <Text style={[styles.error, column]}>{attachError}</Text> : null}
-      <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }, column]}>
-        <Pressable
-          style={({ pressed }) => [styles.attach, { borderColor: mix(color, 0.55) }, pressed && { opacity: 0.6 }]}
-          onPress={(e) => openAttach({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
-          disabled={!client || attached.length >= MAX_IMAGES}
-          accessibilityRole="button"
-          accessibilityLabel="Add a picture"
-        >
-          <Text style={[styles.attachText, { color }]}>+</Text>
-        </Pressable>
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 }, { borderColor: focused ? mix(color, 0.7) : 'transparent' }, WEB && ({ outlineStyle: 'none' } as object)]}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          value={draft}
-          onChangeText={setDraft}
-          placeholder={`Message ${name}`}
-          placeholderTextColor={colors.dim}
-          accessibilityLabel={`Message ${name}`}
-          multiline
-          // Desktop: Enter sends, Shift+Enter is a new line.
-          {...(Platform.OS === 'web'
-            ? {
-                onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault: () => void }) => {
-                  if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                    e.preventDefault();
-                    void send();
+      <View style={[{ paddingTop: 8, paddingHorizontal: 12, paddingBottom: Math.max(insets.bottom, 8) }, column]}>
+        <View style={styles.composer}>
+          <Pressable
+            style={({ pressed }) => [styles.attach, { width: fieldMin, height: fieldMin, borderRadius: fieldMin / 2 }, pressed && { opacity: 0.6 }]}
+            onPress={(e) => openAttach({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+            disabled={!client || attached.length >= MAX_IMAGES}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel="Add a picture"
+          >
+            <PlusIcon size={18} color={colors.dim} />
+          </Pressable>
+          <View testID="composer-field" style={[styles.field, { minHeight: fieldMin, borderRadius: fieldMin / 2 }, disconnected && { opacity: 0.5 }]}>
+            <TextInput
+              ref={inputRef}
+              style={[
+                styles.input,
+                desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: 6 * 22 + 14 },
+                WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
+                WEB && ({ outlineStyle: 'none' } as object),
+              ]}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
+              placeholderTextColor={colors.faint}
+              accessibilityLabel={`Message ${name}`}
+              multiline
+              // Desktop: Enter sends, Shift+Enter is a new line.
+              {...(Platform.OS === 'web'
+                ? {
+                    onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault: () => void }) => {
+                      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                        e.preventDefault();
+                        void send();
+                      }
+                    },
                   }
-                },
-              }
-            : null)}
-          // The web build (layout tests, previews) draws a multiline box two rows tall; iOS starts at one.
-          {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
-          editable={!!client}
-        />
-        {running && !remote ? (
-          <Pressable
-            style={[styles.send, { backgroundColor: colors.bad }]}
-            onPress={stop}
-            disabled={!state.runId}
-            accessibilityRole="button"
-            accessibilityLabel="Stop"
-          >
-            <Text style={styles.sendText}>Stop</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            style={[styles.send, { backgroundColor: color }, !canSend && button.disabled]}
-            onPress={send}
-            accessibilityRole="button"
-            accessibilityLabel="Send"
-            accessibilityState={{ disabled: !canSend }}
-          >
-            <Text style={[styles.sendText, { color: onBot }, !canSend && button.disabledText]}>Send</Text>
-          </Pressable>
-        )}
+                : null)}
+              // The web build (layout tests, previews) draws a multiline box two rows tall; iOS starts at one.
+              {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
+              editable={!!client}
+            />
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, { borderRadius: fieldMin / 2 }]} />
+            {canSend ? (
+              <Pressable
+                testID="composer-send"
+                style={[styles.roundButton, roundSize, { backgroundColor: color }]}
+                onPress={send}
+                accessibilityRole="button"
+                accessibilityLabel="Send"
+              >
+                <ArrowUpIcon size={16} color={onBot} />
+              </Pressable>
+            ) : running && !remote ? (
+              <Pressable
+                testID="composer-stop"
+                style={[styles.roundButton, roundSize, { backgroundColor: colors.text }]}
+                onPress={stop}
+                disabled={!state.runId}
+                accessibilityRole="button"
+                accessibilityLabel="Stop"
+              >
+                <StopIcon color={colors.bg} />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+        {desk && focused ? (
+          <Text style={styles.hintLine} accessibilityElementsHidden importantForAccessibility="no">
+            Enter to send · Shift+Enter for a new line
+          </Text>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -659,64 +714,6 @@ function notifyChatsChanged() {
   chatsListeners.forEach((fn) => fn());
 }
 
-const CHOICE_LABEL: Record<ApprovalChoice, string> = {
-  once: 'Allow once',
-  session: 'Allow in this chat',
-  always: 'Always allow',
-  deny: 'Deny',
-};
-
-/** Hermes paused the reply to ask before running a risky command: show it with the answers it takes. */
-function ApprovalCard({
-  request,
-  bot,
-  busy,
-  onAnswer,
-  style,
-}: {
-  request: ApprovalRequest;
-  bot: string;
-  busy: boolean;
-  onAnswer: (choice: ApprovalChoice) => void;
-  style: ViewStyle | null;
-}) {
-  const { color } = useBotLook(bot);
-  const name = useBotName(bot);
-  const onBot = onColor(color);
-  return (
-    <View style={[styles.approval, { borderColor: mix(color, 0.6) }, style]} accessibilityLiveRegion="polite">
-      <Text style={styles.approvalTitle}>{name} wants to run a command that needs your OK</Text>
-      {request.description ? <Text style={styles.approvalWhy}>{request.description}</Text> : null}
-      {request.command ? (
-        <ScrollView horizontal style={styles.approvalCode} contentContainerStyle={{ padding: 10 }}>
-          <Text style={styles.approvalCommand} selectable>
-            {request.command}
-          </Text>
-        </ScrollView>
-      ) : null}
-      <View style={styles.approvalButtons}>
-        {request.choices.map((c) => (
-          <Pressable
-            key={c}
-            disabled={busy}
-            onPress={() => onAnswer(c)}
-            accessibilityRole="button"
-            accessibilityLabel={CHOICE_LABEL[c]}
-            style={({ pressed }) => [
-              styles.approvalButton,
-              c === 'deny' ? { borderColor: colors.bad } : c === 'once' ? { backgroundColor: color, borderColor: color } : { borderColor: mix(color, 0.6) },
-              (pressed || busy) && { opacity: 0.6 },
-            ]}
-          >
-            <Text style={[styles.approvalButtonText, c === 'deny' ? { color: colors.bad } : c === 'once' ? { color: onBot } : { color }]}>{CHOICE_LABEL[c]}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text style={styles.approvalNote}>No answer in 5 minutes counts as Deny.</Text>
-    </View>
-  );
-}
-
 /** The chat's model ("claude-opus-5-5 · Anthropic"); tap to switch. Turns red when the model can't work. */
 function ModelBar({ bot, style, color }: { bot: string; style: ViewStyle | null; color: string }) {
   const { choice, problem, catalog, error } = useChatModel(bot);
@@ -741,15 +738,15 @@ function ModelBar({ bot, style, color }: { bot: string; style: ViewStyle | null;
   );
 }
 
-function Row({ row, bot, thinking, gap }: { row: ChatRow; bot: string; thinking: string; gap: number }) {
+function Row({ row, bot, since, gap, approval }: { row: ChatRow; bot: string; since: number; gap: number; approval: { busy: boolean; onAnswer: (c: ApprovalChoice) => void } }) {
   return (
     <View style={{ marginTop: gap }}>
-      <RowBody row={row} bot={bot} thinking={thinking} />
+      <RowBody row={row} bot={bot} since={since} approval={approval} />
     </View>
   );
 }
 
-function RowBody({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: string }) {
+function RowBody({ row, bot, since, approval }: { row: ChatRow; bot: string; since: number; approval: { busy: boolean; onAnswer: (c: ApprovalChoice) => void } }) {
   switch (row.kind) {
     case 'message':
       if (row.message.routine) return <RoutineNoteView note={row.message.routine} bot={bot} />;
@@ -757,12 +754,15 @@ function RowBody({ row, bot, thinking }: { row: ChatRow; bot: string; thinking: 
     case 'activity':
       return <Activity tools={row.tools} live={row.live} />;
     case 'pending':
-      return row.text ? (
-        <Reply text={row.text} bot={bot} />
-      ) : (
-        <View style={styles.thinkingRow}>
-          <BotSprite bot={bot} size={28} />
-          <Text style={styles.thinkingText}>{thinking}</Text>
+      return row.text ? <Reply text={row.text} bot={bot} /> : <TypingRow bot={bot} since={since} />;
+    case 'approval':
+      return <ApprovalCard request={row.request} bot={bot} busy={approval.busy} onAnswer={approval.onAnswer} />;
+    case 'decision':
+      return <DecisionChip decision={row.decision} bot={bot} />;
+    case 'queued':
+      return (
+        <View style={{ opacity: 0.6 }}>
+          <Mine message={{ id: row.id, role: 'user', content: row.text } as ChatMessage} bot={bot} />
         </View>
       );
   }
@@ -859,50 +859,11 @@ function Picture({ uri, count }: { uri: string; count: number }) {
   );
 }
 
-// A run of tool calls is one line that updates in place ("… terminal · 3 steps"). Tap it for the steps,
-// tap a step for what it ran.
-export function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [openStep, setOpenStep] = useState<number | null>(null);
-  return (
-    <View style={styles.activity}>
-      <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={6}>
-        <Text style={styles.toolText} numberOfLines={1}>
-          {activityLine(tools, live)} {open ? '▾' : '▸'}
-        </Text>
-      </Pressable>
-      {open
-        ? tools.map((t, i) => (
-            <Pressable key={i} onPress={() => setOpenStep(openStep === i ? null : i)} disabled={!t.preview} accessibilityRole="button">
-              <Text style={styles.step} numberOfLines={1}>
-                {t.status === 'running' ? '…' : t.status === 'failed' ? '✕' : '✓'} {t.name}
-              </Text>
-              {openStep === i && t.preview ? (
-                <Text style={[styles.step, styles.preview]} numberOfLines={12}>
-                  {t.preview}
-                </Text>
-              ) : null}
-            </Pressable>
-          ))
-        : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   headerButton: { color: colors.accent, fontSize: 16 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingRight: 8 },
   moreButton: { fontSize: 20, fontWeight: '700', paddingHorizontal: 2 },
-  approval: { marginHorizontal: 12, marginBottom: 8, padding: 12, gap: 8, borderRadius: 14, borderWidth: 1.5, backgroundColor: colors.card },
-  approvalTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  approvalWhy: { color: colors.dim, fontSize: 13 },
-  approvalCode: { flexGrow: 0, borderRadius: 8, backgroundColor: '#000' },
-  approvalCommand: { color: colors.text, fontFamily: mono, fontSize: 13 },
-  approvalButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  approvalButton: { borderWidth: 1.5, borderRadius: 18, paddingHorizontal: 14, height: 36, alignItems: 'center', justifyContent: 'center' },
-  approvalButtonText: { fontSize: 14, fontWeight: '600' },
-  approvalNote: { color: colors.dim, fontSize: 12 },
   listToggle: { marginRight: 4 },
   paneHeader: {
     flexDirection: 'row',
@@ -913,8 +874,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
-  thinkingText: { color: colors.dim, fontSize: 14 },
   paneTitle: { fontSize: 17, fontWeight: '600' },
   modelBar: {
     flexDirection: 'row',
@@ -963,47 +922,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   thumbRemoveText: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  attach: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  attachText: { fontSize: 24, lineHeight: 26, fontWeight: '400' },
+  attach: { backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   text: { color: colors.text, fontSize: BODY_SIZE, lineHeight: 22 },
-  activity: {
-    alignSelf: 'flex-start',
-    maxWidth: '86%',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    gap: 4,
-  },
-  toolText: { color: colors.dim, fontSize: 13 },
-  step: { color: colors.dim, fontSize: 12, paddingLeft: 8 },
-  preview: { fontFamily: mono, paddingLeft: 20 },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingBottom: 6 },
   warming: { color: colors.dim, fontSize: 13, paddingHorizontal: 16, paddingBottom: 6 },
   composer: {
     flexDirection: 'row',
-    alignItems: 'flex-end', // Send stays level with the bottom line as the message box grows
+    alignItems: 'flex-end', // the plus stays level with the bottom line as the field grows
     gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
   },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 140,
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 20,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    backgroundColor: colors.card,
-  },
-  send: { ...button.primary, height: 44, borderRadius: 22, paddingHorizontal: 18 },
-  sendText: { ...button.text, fontSize: 15 },
+  // The field holds its Send/Stop circle (design fix 3), so they never change its width.
+  field: { flex: 1, backgroundColor: colors.card, justifyContent: 'center' },
+  fieldLine: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  input: { color: colors.text, paddingLeft: 14 },
+  roundButton: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  hintLine: { color: colors.faint, fontSize: 12, lineHeight: 16, marginTop: 6, marginLeft: 52 },
 });

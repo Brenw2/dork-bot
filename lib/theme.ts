@@ -14,6 +14,7 @@ export const colors = {
   raised: '#22252A',
   faint: '#6B7078',
   disclosure: '#5D626A',
+  code: '#0B0C0E',
 };
 
 export const mono = Platform.select({ ios: 'Menlo', default: 'monospace' });
