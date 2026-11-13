@@ -95,11 +95,22 @@ export function useRoomInfo(id: string): Room | null {
   return room;
 }
 
+function showMembers(room: Room, info: ReturnType<typeof useMemberInfo>) {
+  Alert.alert(`${room.members.length} members`, room.members.map((m) => info.name(m)).join('\n') + '\n\nMembers are set when the group is made. Hermes has no way to change them later.');
+}
+
+// Tapping the title opens Members (there is no dedicated button).
 export function RoomTitle({ room }: { room: Room | null }) {
   const info = useMemberInfo();
   if (!room) return <View style={{ height: 32 }} />;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <Pressable
+      onPress={() => showMembers(room, info)}
+      accessibilityRole="button"
+      accessibilityLabel="Members"
+      hitSlop={{ top: 6, bottom: 6 }}
+      style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 8 }, pressed && { opacity: 0.6 }, isDesktop && ({ cursor: 'pointer' } as object)]}
+    >
       <MemberStack profiles={room.members.map((m) => m.profile)} size={32} />
       <View style={{ flexShrink: 1 }}>
         <Text style={{ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }} numberOfLines={1}>
@@ -109,15 +120,14 @@ export function RoomTitle({ room }: { room: Room | null }) {
           {room.members.map((m) => info.name(m)).join(', ')}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 export function RoomActions({ room }: { room: Room | null }) {
   const info = useMemberInfo();
   if (!room) return null;
-  const members = () =>
-    Alert.alert(`${room.members.length} members`, room.members.map((m) => info.name(m)).join('\n') + '\n\nMembers are set when the group is made. Hermes has no way to change them later.');
+  const members = () => showMembers(room, info);
   const rename = () =>
     Alert.prompt(
       'Rename group',
@@ -164,7 +174,6 @@ export function RoomActions({ room }: { room: Room | null }) {
     ]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <HeaderButton label="Members" glyph="👥" onPress={members} />
       <HeaderButton label={isDesktop ? 'Group settings' : 'More'} glyph={isDesktop ? '⚙' : '⋯'} onPress={more} />
     </View>
   );
