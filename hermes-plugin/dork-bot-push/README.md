@@ -17,6 +17,10 @@ an empty or `[SILENT]` reply, Hermes's own smart approvals (`surface: smart`), c
 make (CLI, desktop Hermes, tests), or a muted bot (the mute also stops the chat message). An approval push never carries the command, and a
 chat sends at most one approval push per 30 s.
 
+## A bot needs you in a group room
+
+Hermes's gateway-hosted rooms run each member's turn in a hidden session titled `Group: <room_id>` (id `room_<hash>`). The gateway doesn't flag `@user`, so `room_push.py` watches the member's finished reply (`post_llm_call`): if it contains `@user` as a word (not in an email or a longer word), it sends one push, title `<bot name> in <room name>`, body the start of the reply, `data: {bot, name, kind: "room", room, roomName}`. A tap opens the room. A normal room reply or a pass (`[SILENT]`) sends nothing. The bot's mute switch and display name apply. The room's name is read from the install's `shared-state.db` (read-only); with no name the title says "in a room". Room sessions are kept out of the "finished" work push.
+
 ## The routine's output in the chat
 
 Hermes has no API route for "add a message to a session without a turn", so the plugin uses what Hermes's own cron delivery uses: `gateway.mirror.mirror_to_session(..., role="user", session_id=<chat>)`, which appends to the session transcript with no agent turn. It is user-role because the text isn't the agent speaking (an assistant-role mirror replays as a real turn and breaks strict-alternation providers). The text starts with a marker line the app recognises and draws as a routine card from the bot:

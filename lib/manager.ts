@@ -52,6 +52,11 @@ export class HermesManager {
     return this.auth.chatUrl;
   }
 
+  /** The `hermes serve` URL and a fresh bearer token, for the /api/ws rooms socket (lib/roomLink.ts). */
+  async wsAuth(): Promise<{ adminUrl: string; token: string }> {
+    return { adminUrl: this.auth.adminUrl, token: await this.token() };
+  }
+
   private async token(): Promise<string> {
     if (this.access && this.access.expiresAt - 60 > this.now()) return this.access.token;
     const res = await this.raw('/auth/native/refresh', {

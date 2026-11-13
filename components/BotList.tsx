@@ -32,19 +32,23 @@ function useApprovalTick(): number {
   useEffect(() => liveRuns.onApprovals(() => setN((v) => v + 1)), []);
   return n;
 }
+import { RoomListRow } from '@/components/RoomRow';
+import { useRoomRows } from '@/components/roomsClient';
 
 
 /**
  * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
  * compact: the sidebar next to a chat (desktop and the open Duo in landscape).
  */
-export function BotList({ onSelect, selected, compact = false }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean }) {
+export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, ConnectState>>({});
   const [previews, setPreviews] = useState<Record<string, BotPreview>>(() => Object.fromEntries(previewCache));
   useBusyWatch();
   const approvals = useApprovalTick();
   const insets = useSafeAreaInsets();
+  // Group rooms on Hermes (card 8): a row each, above the bots. None when Hermes has no rooms or isn't reachable.
+  const { rows: rooms, supported: roomsSupported } = useRoomRows();
 
   const load = useCallback(() => {
     let live = true;
@@ -110,7 +114,13 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
       anchor,
     );
 
-  const header = <ListHeader compact={compact} top={insets.top} onMenu={appMenu} />;
+  // Compose: New bot, or a menu with New group chat when this Hermes runs rooms and there are 2+ bots.
+  const compose = (anchor?: { x: number; y: number }) =>
+    roomsSupported && (bots?.length ?? 0) >= 2
+      ? Menu.show('New', [{ text: 'New bot', onPress: () => router.push('/new') }, { text: 'New group chat', onPress: () => router.push('/room-new') }, { text: 'Cancel', style: 'cancel' }], anchor)
+      : router.push('/new');
+
+  const header = <ListHeader compact={compact} top={insets.top} onMenu={appMenu} onCompose={compose} />;
   if (bots === null) return <View style={styles.screen}>{header}</View>;
 
   const open = (b: SavedBot) => {
@@ -126,6 +136,22 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
       <FlatList
         data={rows}
         keyExtractor={(r) => r.bot}
+        ListHeaderComponent={
+          rooms.length ? (
+            <View>
+              {rooms.map((r) => (
+                <RoomListRow
+                  key={r.id}
+                  row={r}
+                  label={(id) => nameOf(id, bots?.find((b) => b.bot === id)?.displayName)}
+                  selected={r.id === selectedRoom}
+                  compact={compact}
+                  onPress={() => (onSelectRoom ? onSelectRoom(r.id) : router.push({ pathname: '/room/[id]', params: { id: r.id } }))}
+                />
+              ))}
+            </View>
+          ) : undefined
+        }
         contentContainerStyle={rows.length ? (compact ? styles.listCompact : styles.list) : styles.empty}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
@@ -144,7 +170,7 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
   );
 }
 
-function ListHeader({ compact, top, onMenu }: { compact: boolean; top: number; onMenu: (anchor?: { x: number; y: number }) => void }) {
+function ListHeader({ compact, top, onMenu, onCompose }: { compact: boolean; top: number; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
@@ -158,7 +184,7 @@ function ListHeader({ compact, top, onMenu }: { compact: boolean; top: number; o
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
         <Icon name="ellipsis" size={icon} color={colors.accent} />
       </Pressable>
-      <Pressable onPress={() => router.push('/new')} accessibilityRole="button" accessibilityLabel="New bot" style={buttonStyle}>
+      <Pressable onPress={(e) => onCompose({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="New bot" style={buttonStyle}>
         <Icon name="compose" size={icon} color={colors.accent} />
       </Pressable>
     </View>

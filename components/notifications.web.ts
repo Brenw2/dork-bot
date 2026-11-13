@@ -17,6 +17,8 @@ export async function turnOffNotifications(): Promise<Record<string, string>> {
 
 export function useOnScreen(_bot: string): void {}
 
+export function useOnScreenRoom(_room: string): void {}
+
 export function NotificationRoutes(): null {
   return null;
 }

@@ -68,6 +68,8 @@ def work_title(task: str) -> str:
 def is_outside_work(bot: str, session_id: str, platform: str = "", on_cron: bool = False) -> bool:
     if not session_id or is_bot_chat(bot, session_id):
         return False
+    if session_id.startswith("room_"):  # a member's hidden group-room session (room_push.py owns those)
+        return False
     return not (on_cron or platform == "cron" or session_id.startswith("cron_"))
 
 

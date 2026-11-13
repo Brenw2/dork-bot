@@ -77,7 +77,22 @@ export function useOnScreen(bot: string): void {
 }
 
 function onScreen(): OnScreen | null {
+  if (onScreenRoom) return { bot: '', chat: null, room: onScreenRoom };
   return onScreenBot ? { bot: onScreenBot, chat: currentChat(onScreenBot) } : null;
+}
+
+// The group room on screen (components/RoomChat.tsx), so its own @user push shows no banner.
+let onScreenRoom: string | null = null;
+
+export function useOnScreenRoom(room: string): void {
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (!focused) return;
+    onScreenRoom = room;
+    return () => {
+      if (onScreenRoom === room) onScreenRoom = null;
+    };
+  }, [room, focused]);
 }
 
 Notifications.setNotificationHandler({

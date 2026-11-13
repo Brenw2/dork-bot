@@ -18,6 +18,7 @@ import uuid
 from typing import Any, Optional
 
 from .push import Notifier, in_background, mirror_if_no_turn, pick_chat, pinned
+from .room_push import RoomNotifier
 from .work_push import WorkNotifier
 
 
@@ -46,6 +47,32 @@ def _session_rows() -> Any:
         return db.list_sessions_rich(source="api_server", limit=200, min_message_count=1)
     finally:
         release_or_close(db)
+
+
+def _session_title(session_id: str) -> Optional[str]:
+    # The member's hidden session is titled `Group: <room_id>` (gateway/platforms/api_server_room_dispatch.py).
+    from hermes_state_registry import acquire, release_or_close
+
+    db = acquire()
+    try:
+        return db.get_session_title(session_id)
+    finally:
+        release_or_close(db)
+
+
+def _room_name(room_id: str) -> Optional[str]:
+    # Read-only: the room's name in the install's shared-state.db (hosted_rooms), which is what groups.list reads.
+    import sqlite3
+
+    from hermes_constants import get_default_hermes_root
+
+    path = get_default_hermes_root() / "shared-state.db"
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2)
+    try:
+        row = conn.execute("SELECT name FROM hosted_rooms WHERE room_id=?", (room_id,)).fetchone()
+    finally:
+        conn.close()
+    return row[0] if row else None
 
 
 def _mirror_into_chat(chat: str, text: str) -> bool:
@@ -88,9 +115,19 @@ def register(ctx: Any) -> None:
     # latest reply, and pushes once when Hermes finalizes the session.
     work = WorkNotifier(profile_name=lambda: ctx.profile_name, load_config=_load_config, cron_job=cron_job)
 
+    # A group-room member's reply that asks for the user (`@user`): one push (room_push.py).
+    rooms = RoomNotifier(
+        profile_name=lambda: ctx.profile_name,
+        load_config=_load_config,
+        session_title=_session_title,
+        room_name=_room_name,
+        run=_run_in_this_profile,
+    )
+
     def on_reply(**kwargs: Any) -> None:
         notifier.on_reply(**kwargs)
         work.on_reply(**kwargs)
+        rooms.on_reply(**kwargs)
 
     ctx.register_hook("post_llm_call", on_reply)
     ctx.register_hook("pre_llm_call", work.on_task)
