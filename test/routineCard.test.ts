@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { focusPosition, focusStep, ROUTINE_FOCUS, routineHasBody, routineHint, routineLabel, routinePreview, routineTints } from '@/lib/routineCard';
-import { parsePushData, routeFor } from '@/lib/push';
+import { focusKey, parsePushData, routeFor, shouldFocus } from '@/lib/push';
 import { noteIndex } from '@/lib/routineNotes';
 
 describe('routine card colours (Fix 11, bot colour #4CC38A)', () => {
@@ -69,5 +69,25 @@ describe('landing on a routine card from a notification', () => {
     expect(focusPosition(300, 700, true)).toEqual({ viewPosition: 1, viewOffset: -16 }); // inverted list: its end is the top of the screen
     expect(focusPosition(900, 700, true)).toEqual({ viewPosition: 0.5, viewOffset: 0 });
     expect(focusPosition(900, 700, false)).toEqual({ viewPosition: 0.5, viewOffset: 0 });
+  });
+
+  it('tapping the same routine notification again in an open chat is a new route and a new focus', () => {
+    const data = parsePushData({ kind: 'routine', bot: 'assistant', chat, at: AT })!;
+    const first = routeFor(data, false, '1000');
+    const again = routeFor(data, false, '2000');
+    // Without the nonce the two taps are identical params: expo-router sees no change and the chat never re-renders.
+    expect(routeFor(data, false)).toEqual(routeFor(data, false));
+    expect(first).not.toEqual(again);
+    expect(first).toEqual({ pathname: '/chat/[bot]', params: { bot: 'assistant', chat, at: AT, n: '1000' } });
+    expect(routeFor(data, true, '2000')).toEqual({ pathname: '/', params: { bot: 'assistant', chat, at: AT, n: '2000' } });
+    // The chat acts once per tap: the first tap, not twice for the same tap, then again for the second tap.
+    const k1 = focusKey(AT, '1000');
+    const k2 = focusKey(AT, '2000');
+    let done: string | null = null;
+    expect(shouldFocus(done, k1)).toBe(true);
+    done = k1;
+    expect(shouldFocus(done, k1)).toBe(false); // a re-render with the same params does nothing
+    expect(shouldFocus(done, k2)).toBe(true); // the same routine, tapped again
+    expect(shouldFocus(done, focusKey(undefined, '3'))).toBe(false); // no target
   });
 });

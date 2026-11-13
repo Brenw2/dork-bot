@@ -12,7 +12,24 @@ export const ROUTINE_SCREENS = [
   // Opened from a notification: the chat opens, the card is expanded and flashing. Run with Reduce Motion on: the colours
   // hold for a full second with no fade (Fix 11), so they can be read exactly; the fade itself is a timing, not a layout.
   { name: 'routine-notified', paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}&at=${encodeURIComponent(NOTE_AT)}` : `/chat/${NOTE_BOT}?at=${encodeURIComponent(NOTE_AT)}`), waitFor: 'Three stories today.', reducedMotion: true, settle: 100, check: (page, posture) => checkRoutine(page, posture, 'notified') },
+  // The same notification tapped again while the chat is open (card collapsed by hand in between): a new `n`, so the
+  // route changes, and the card must expand and flash again.
+  { name: 'routine-retap', paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}&at=${encodeURIComponent(NOTE_AT)}&n=1` : `/chat/${NOTE_BOT}?at=${encodeURIComponent(NOTE_AT)}&n=1`), waitFor: 'Three stories today.', reducedMotion: true, settle: 100, act: retap, check: (page, posture) => checkRoutine(page, posture, 'notified') },
 ];
+
+async function retap(page) {
+  const head = page.getByLabel('Routine daily_digest', { exact: false }).first();
+  await page.waitForTimeout(1300); // the first flash has finished
+  await head.click(); // collapse by hand
+  await page.waitForSelector('[aria-expanded=false][aria-label^="Routine daily_digest"]', { timeout: 5000 });
+  await page.evaluate(() => {
+    const u = new URL(location.href);
+    u.searchParams.set('n', '2');
+    history.pushState(history.state, '', u.toString());
+    dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  });
+  await page.waitForSelector('[aria-expanded=true][aria-label^="Routine daily_digest"]', { timeout: 8000 }); // the same card, expanded again
+}
 
 export function checkRoutine(page, posture, state) {
   return page.evaluate(measureRoutine, { state, posture });

@@ -46,6 +46,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
   // open: 0 = collapsed, 1 = expanded (chevron, body fade); `height` animates the body's box.
   const open = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   const height = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(expanded ? 1 : 0)).current; // the body's opacity
   const bodyH = useRef(0);
   const [mounted, setMounted] = useState(expanded); // the body is in the tree
   const [settled, setSettled] = useState(expanded); // fully open: height is natural, not animated
@@ -63,6 +64,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
     };
     if (dur === 0) {
       open.setValue(opening ? 1 : 0);
+      fade.setValue(opening ? 1 : 0);
       finish();
       return;
     }
@@ -75,7 +77,9 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
         Animated.parallel([
           Animated.timing(height, { toValue: bodyH.current, duration: dur, easing: ease, useNativeDriver: false }),
           Animated.timing(open, { toValue: 1, duration: dur, easing: ease, useNativeDriver: false }),
+          Animated.timing(fade, { toValue: 1, duration: ROUTINE_MOTION.fade, easing: ease, useNativeDriver: false }),
         ]).start(({ finished }) => finished && finish());
+      fade.setValue(0);
       pendingStart.current = start;
       if (bodyH.current > 0) {
         pendingStart.current = null;
@@ -88,6 +92,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
       Animated.parallel([
         Animated.timing(height, { toValue: 0, duration: dur, easing: ease, useNativeDriver: false }),
         Animated.timing(open, { toValue: 0, duration: dur, easing: ease, useNativeDriver: false }),
+        Animated.timing(fade, { toValue: 0, duration: dur, easing: ease, useNativeDriver: false }),
       ]).start(({ finished }) => finished && finish());
     }
   };
@@ -152,7 +157,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
               {when}
             </Text>
           </View>
-          {!expanded && body ? (
+          {!mounted && body ? (
             <Text style={styles.preview} numberOfLines={1}>
               {routinePreview(text)}
             </Text>
@@ -169,7 +174,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
         ) : null}
       </Pressable>
       {body && mounted ? (
-        <Animated.View style={[styles.bodyClip, !settled && { height }, { opacity: settled ? 1 : open.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) }]}>
+        <Animated.View style={[styles.bodyClip, !settled && { height }, { opacity: settled ? 1 : fade }]}>
           <View
             onLayout={(e) => {
               bodyH.current = e.nativeEvent.layout.height;

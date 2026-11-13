@@ -8,7 +8,7 @@ import { CHAT_MAX_WIDTH, foldNavFor } from '@/lib/layoutClass';
 
 // The header (back, bot, model, Chats, ⋯) is the chat's own one-row header: components/ChatHeader.tsx.
 export default function ChatScreen() {
-  const { bot, chat, at } = useLocalSearchParams<{ bot: string; chat?: string; at?: string }>();
+  const { bot, chat, at, n } = useLocalSearchParams<{ bot: string; chat?: string; at?: string; n?: string }>();
   // A link to one chat (a notification): open that one.
   useEffect(() => {
     if (chat) openChat(bot, chat);
@@ -24,5 +24,5 @@ export default function ChatScreen() {
     if (action?.type === 'show-in-pane') router.dismissTo({ pathname: '/', params: { bot: action.bot } });
   }, [cls, bot]);
 
-  return <ChatView bot={bot} focusAt={at} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />;
+  return <ChatView bot={bot} focusAt={at} focusNonce={n} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />;
 }

@@ -7,6 +7,7 @@ import { Menu } from '@/components/alert';
 import { chatName } from '@/lib/chats';
 import { noteIndex } from '@/lib/routineNotes';
 import { focusPosition, focusStep, ROUTINE_FOCUS, ROUTINE_MOTION } from '@/lib/routineCard';
+import { focusKey, shouldFocus } from '@/lib/push';
 import { whenLabel } from '@/lib/routines';
 import { RoutineCard } from '@/components/RoutineCard';
 import { BotSprite } from '@/components/BotSprite';
@@ -50,6 +51,8 @@ interface ChatViewProps {
   list?: { hidden: boolean; toggle: () => void };
   /** A routine note to scroll to once the chat has it (a tapped "Notify me" notification): its time stamp. */
   focusAt?: string;
+  /** Changes on every notification tap, so tapping the same routine again lands on it again. */
+  focusNonce?: string;
 }
 
 /**
@@ -69,7 +72,7 @@ export function ChatView(props: ChatViewProps) {
   return <ChatThread key={chat} {...props} chat={chat} />;
 }
 
-function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: ChatViewProps & { chat: string }) {
+function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusNonce }: ChatViewProps & { chat: string }) {
   const insets = useSafeAreaInsets();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
@@ -388,11 +391,12 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   const [reloadTick, setReloadTick] = useState(0);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const key = focusKey(focusAt, focusNonce);
   useEffect(() => {
     reloads.current = 0;
-  }, [focusAt]);
+  }, [key]);
   useEffect(() => {
-    if (!focusAt || !client || scrolledTo.current === focusAt) return;
+    if (!focusAt || !client || !shouldFocus(scrolledTo.current, key)) return;
     const index = noteIndex(rows, focusAt);
     const step = focusStep(index >= 0, reloads.current);
     if (step === 'reload') {
@@ -406,7 +410,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
       }, ROUTINE_FOCUS.everyMs);
       return () => clearTimeout(t);
     }
-    scrolledTo.current = focusAt;
+    scrolledTo.current = key;
     if (step === 'fallback') {
       router.push({ pathname: '/routine-results/[bot]', params: { bot } });
       return;
@@ -422,7 +426,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
       const pos = focusPosition(cardHeights.current[focusAt] ?? 0, listHeight.current, !WEB);
       listRef.current?.scrollToIndex({ index: at, animated: true, ...pos });
     }, ROUTINE_MOTION.expand + 80);
-  }, [focusAt, rows, client, sessionId, reloadTick, bot]);
+  }, [focusAt, key, rows, client, sessionId, reloadTick, bot]);
   // Desktop (web): the message box starts at one line and grows with its text up to 40% of the chat pane, then scrolls.
   // The field is 44 tall on the desktop, 36 on the phone (design fix 3); the textarea has no border or padding of its
   // own beyond the text's, so its height is the field's height.
