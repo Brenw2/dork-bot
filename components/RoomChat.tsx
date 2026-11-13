@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, Menu } from '@/components/alert';
 import { ArrowUpIcon, StopIcon } from '@/components/ChatIcons';
@@ -350,7 +350,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
   }
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
       {inPane ? (
         <View style={styles.paneHeader}>
           <RoomTitle room={room} />
@@ -468,7 +468,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
           </View>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
