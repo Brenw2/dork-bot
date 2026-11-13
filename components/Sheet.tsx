@@ -9,6 +9,7 @@ import { Icon, type IconName } from '@/components/AppIcons';
 import { isDesktop } from '@/components/desktop';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
+import { headerSides } from '@/lib/headerItems';
 import { colors } from '@/lib/theme';
 
 export interface SheetAction {
@@ -80,16 +81,18 @@ export function Sheet({
         headerTitleAlign: 'center',
         headerBackVisible: false,
         headerTitle: () => (title ? <SheetTitle title={title} subtitle={bot ? name : undefined} /> : null),
-        headerLeft: create
-          ? () => <HeaderIcon icon={create.icon} label={create.label} color={color} onPress={create.onPress} />
-          : close === 'cancel'
-            ? () => <TextButton label="Cancel" color={color} bold={false} />
-            : () => null,
-        headerRight: hasCommit
-          ? () => <TextButton label={commitLabel ?? ''} color={commitOff ? colors.faint : color} bold onPress={() => !commitOff && commitRef.current?.onPress()} />
-          : close === 'done'
-            ? () => <TextButton label="Done" color={color} bold />
-            : () => null,
+        ...headerSides({
+          left: create ? (
+            <HeaderIcon icon={create.icon} label={create.label} color={color} onPress={create.onPress} />
+          ) : close === 'cancel' ? (
+            <TextButton label="Cancel" color={color} bold={false} />
+          ) : null,
+          right: hasCommit ? (
+            <TextButton label={commitLabel ?? ''} color={commitOff ? colors.faint : color} bold onPress={() => !commitOff && commitRef.current?.onPress()} />
+          ) : close === 'done' ? (
+            <TextButton label="Done" color={color} bold />
+          ) : null,
+        }),
       }}
     />
   );

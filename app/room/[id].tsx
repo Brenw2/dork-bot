@@ -3,6 +3,7 @@ import { Platform, Pressable, Text } from 'react-native';
 import { RoomActions, RoomChat, RoomTitle, useRoomInfo } from '@/components/RoomChat';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH } from '@/lib/layoutClass';
+import { headerSides } from '@/lib/headerItems';
 import { colors } from '@/lib/theme';
 
 export default function RoomScreen() {
@@ -16,13 +17,8 @@ export default function RoomScreen() {
           title: room?.name ?? 'Group',
           headerTitle: () => <RoomTitle room={room} />,
           // Same as the bot chat: the back button is drawn by the app (no iOS 26 glass capsule), in the app accent.
-          ...(Platform.OS === 'ios'
-            ? {
-                headerBackVisible: false,
-                unstable_headerLeftItems: () => [{ type: 'custom' as const, element: <BackToBots />, hidesSharedBackground: true }],
-                unstable_headerRightItems: () => [{ type: 'custom' as const, element: <RoomActions room={room} />, hidesSharedBackground: true }],
-              }
-            : { headerRight: () => <RoomActions room={room} /> }),
+          ...(Platform.OS === 'ios' ? { headerBackVisible: false } : {}),
+          ...headerSides({ left: Platform.OS === 'ios' ? <BackToBots /> : null, right: <RoomActions room={room} /> }),
         }}
       />
       <RoomChat id={id} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />
