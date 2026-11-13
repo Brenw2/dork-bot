@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { BotAvatar } from '@/components/BotSprite';
-import { Icon } from '@/components/Icons';
+import { Icon } from '@/components/AppIcons';
 import { useSheetAction } from '@/components/Sheet';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';

@@ -8,7 +8,7 @@ import { currentChat, openChat, startNewChat, useCurrentChat } from '@/component
 import { deleteChat, onChatsChanged, renameChat } from '@/components/ChatView';
 import { isDesktop } from '@/components/desktop';
 import { Group } from '@/components/Grouped';
-import { Icon } from '@/components/Icons';
+import { Icon } from '@/components/AppIcons';
 import { fetch } from '@/components/net';
 import { Sheet } from '@/components/Sheet';
 import { useBotLook } from '@/components/useBotLook';
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   work: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, minHeight: 56 },
   workName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
   workNote: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  workChevron: { color: colors.chevron, fontSize: 20 },
+  workChevron: { color: colors.disclosure, fontSize: 20 },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 62, paddingLeft: 16, paddingVertical: 8 },
   text: { flex: 1, gap: 1 },
   line1: { flexDirection: 'row', alignItems: 'center', gap: 8 },

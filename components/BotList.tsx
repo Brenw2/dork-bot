@@ -11,7 +11,7 @@ import { BotAvatar } from '@/components/BotSprite';
 import { openBotSheet } from '@/components/ChatHeader';
 import { useBusyWatch } from '@/components/busyWatch';
 import { isDesktop } from '@/components/desktop';
-import { Icon } from '@/components/Icons';
+import { Icon } from '@/components/AppIcons';
 import { liveRuns } from '@/components/liveRuns';
 import { fetch } from '@/components/net';
 import { syncNow } from '@/components/sync';

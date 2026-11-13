@@ -5,7 +5,7 @@
 import { router, Stack } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Icon, type IconName } from '@/components/Icons';
+import { Icon, type IconName } from '@/components/AppIcons';
 import { isDesktop } from '@/components/desktop';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';

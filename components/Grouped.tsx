@@ -65,5 +65,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52, paddingHorizontal: 16 },
   label: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22 },
   value: { flexShrink: 1, color: colors.dim, fontSize: 17, lineHeight: 22 },
-  chevron: { color: '#5D626A', fontSize: 17 },
+  chevron: { color: colors.disclosure, fontSize: 17 },
 });

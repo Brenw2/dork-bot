@@ -3,7 +3,7 @@
 // app/_layout.tsx) draws them. The phone uses React Native's Alert instead (components/alert.ts).
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { Icon, type IconName } from '@/components/Icons';
+import { Icon, type IconName } from '@/components/AppIcons';
 import { colors } from '@/lib/theme';
 
 export interface DialogButton {

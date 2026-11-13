@@ -11,7 +11,7 @@ import { BotAvatar } from '@/components/BotSprite';
 import { isDesktop } from '@/components/desktop';
 import { startNewChat } from '@/components/currentChat';
 import { renameOpenChat, deleteOpenChat } from '@/components/chatActions';
-import { Icon } from '@/components/Icons';
+import { Icon } from '@/components/AppIcons';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import type { ChatModelState } from '@/components/useChatModel';

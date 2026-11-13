@@ -7,7 +7,7 @@ import { modelLabel } from '@/components/ChatHeader';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { Group, GroupRow } from '@/components/Grouped';
-import { Icon, type IconName } from '@/components/Icons';
+import { Icon, type IconName } from '@/components/AppIcons';
 import { loadManager } from '@/components/manager';
 import { Sheet } from '@/components/Sheet';
 import { useBotLook } from '@/components/useBotLook';
