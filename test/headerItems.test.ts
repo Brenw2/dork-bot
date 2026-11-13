@@ -39,6 +39,18 @@ describe('headerSides', () => {
       expect(headerSides({})).toEqual({});
     }
   });
+
+  it('non-iOS: an explicit null side emits () => null (suppresses the default back); undefined omits', () => {
+    for (const os of ['android', 'web']) {
+      rn.Platform.OS = os;
+      const o = headerSides({ left: null, right: null }) as any;
+      expect(typeof o.headerLeft).toBe('function');
+      expect(o.headerLeft()).toBeNull();
+      expect(typeof o.headerRight).toBe('function');
+      expect(o.headerRight()).toBeNull();
+      expect(Object.keys(headerSides({ left: undefined, right: R }))).toEqual(['headerRight']);
+    }
+  });
 });
 
 // Regression guard: plain headerLeft/headerRight get the iOS 26 glass capsule. Screens must use headerSides.

@@ -19,8 +19,9 @@ export function headerSides({ left, right }: HeaderSides) {
       ...(right ? { unstable_headerRightItems: () => [custom(right)] } : {}),
     };
   }
+  // null suppresses the default (back) button with an empty item; undefined leaves the default alone.
   return {
-    ...(left ? { headerLeft: () => left } : {}),
-    ...(right ? { headerRight: () => right } : {}),
+    ...(left ? { headerLeft: () => left } : left === null ? { headerLeft: () => null } : {}),
+    ...(right ? { headerRight: () => right } : right === null ? { headerRight: () => null } : {}),
   };
 }

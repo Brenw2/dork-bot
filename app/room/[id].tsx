@@ -18,7 +18,7 @@ export default function RoomScreen() {
           headerTitle: () => <RoomTitle room={room} />,
           // Same as the bot chat: the back button is drawn by the app (no iOS 26 glass capsule), in the app accent.
           ...(Platform.OS === 'ios' ? { headerBackVisible: false } : {}),
-          ...headerSides({ left: Platform.OS === 'ios' ? <BackToBots /> : null, right: <RoomActions room={room} /> }),
+          ...headerSides({ left: Platform.OS === 'ios' ? <BackToBots /> : undefined, right: <RoomActions room={room} /> }),
         }}
       />
       <RoomChat id={id} maxWidth={cls === 'compact' ? undefined : CHAT_MAX_WIDTH} />
