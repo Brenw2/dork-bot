@@ -15,6 +15,10 @@ Last updated: 2026-11-12
 - Hermes chat accepts images inline (`message: [{type: text}, {type: image_url, image_url: {url: data:…}}]`, 10 MB request limit; probe: chief read "BLUE 42" from a PNG in 2 s). History keeps them as `[Image attached at: <profile>/cache/documents/native-inputs/…]`. gemma4:31b reports vision.
 - Ollama's model runner crashed once on 2026-11-04 11:23 (a desktop test turn hung until stopped). Watch for it.
 
+## In flight: group chat (card 8, branch app/group-chat, PR #40)
+
+Hermes's own gateway-hosted rooms (`groups.*` over `/api/ws`; no Dork Bot room format or server). Code: `lib/rooms.ts` (client, parsing, mentions, transcript, poller, resend-safe send), `lib/roomLink.ts` + `lib/gatewayWs.ts` (socket), `components/Room*.tsx`, `app/room/[id].tsx`, `app/room-new.tsx`. Push: `hermes-plugin/dork-bot-push/room_push.py` (a member's reply with `@user` → "<bot> in <room>", tap opens the room). Fixtures: `scripts/layout-rooms.mjs`. Live test: `DORK_LIVE=1 npx vitest run test/live-rooms.test.ts --silent=false` (3 throwaway bots). Not possible on Hermes today: editing a room's members after it is made, a room picture, a persistent hold after Stop. Needs Design PASS before merge; the plugin needs installing on b-lab by Brennan (not done here).
+
 ## Done 2026-11-04 evening (app/chats, for 0.8.0)
 
 Several chats per bot (Chats screen, New chat, rename, delete; Hermes titles new chats), approvals (Allow once / in this chat / always / Deny card; verified live with test/live-approval.test.ts), Routines screen (add, pause, run now, delete, last result), "‹ Bots" back button without the glass capsule on the chat screen, "can't reach b-lab" message with auto-retry. Needs a Duo check: the back button and ⋯ look, approvals on a real bot.

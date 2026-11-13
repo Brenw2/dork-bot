@@ -79,6 +79,8 @@ export interface RoomEvent {
   memberId: string;
   status: string;
   reason: string;
+  /** `turn.failed`: what went wrong, as the gateway words it. */
+  error: string;
 }
 
 export function parseEvent(raw: unknown): RoomEvent | null {
@@ -101,6 +103,7 @@ export function parseEvent(raw: unknown): RoomEvent | null {
     memberId: str(p.member_id) || str(actor.id) || str(actor.profile),
     status: str(p.status),
     reason: str(p.reason_code),
+    error: str(p.error),
   };
 }
 
@@ -409,6 +412,11 @@ export function buildTranscript(events: RoomEvent[], members: RoomMember[], labe
       const grouped = lastBot !== null && lastBot.id === e.actorId && e.at !== undefined && lastBot.at !== undefined && e.at - lastBot.at <= GROUP_WINDOW_S;
       items.push({ type: 'member', seq: e.seq, member: memberOf(members, e.actorId), actorId: e.actorId, text: e.text, at: e.at, grouped, needsYou: mentionsUser(e.text) });
       lastBot = { id: e.actorId, at: e.at };
+    } else if (e.kind === 'turn.failed') {
+      const who = label(memberOf(members, e.memberId), e.memberId);
+      const first = (e.error.split('\n')[0] ?? '').trim().slice(0, 160);
+      items.push({ type: 'system', seq: e.seq, text: first ? `${who} hit an error: ${first}` : `${who} hit an error.` });
+      lastBot = null;
     } else if (e.kind === 'room.stop_requested') {
       const held: string[] = [];
       for (let j = i + 1; j < sorted.length && sorted[j].kind !== 'message.user'; j++) {

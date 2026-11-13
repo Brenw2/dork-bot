@@ -228,6 +228,11 @@ describe('the transcript', () => {
     expect(t[0]).toMatchObject({ needsYou: true });
   });
 
+  it('a failed turn is one dim system line with the first line of the error (G3)', () => {
+    const t = buildTranscript([ev(1, 'turn.failed', { payload: { member_id: 'design', error: 'Rate limited.\nretry in 30s', reason_code: 'rate_limit' } })], members);
+    expect(t).toEqual([{ type: 'system', seq: 1, text: 'design hit an error: Rate limited.' }]);
+  });
+
   it('a stop becomes one system line naming who is held, and clears when you speak', () => {
     const log = [user(1, 'go'), ev(2, 'room.stop_requested'), ev(3, 'turn.cancelled', { payload: { member_id: 'design' } }), ev(4, 'turn.cancelled', { payload: { member_id: 'mobile' } })];
     const t = buildTranscript(log, members);

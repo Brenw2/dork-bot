@@ -118,7 +118,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
         keyExtractor={(b) => b.bot}
         ListHeaderComponent={
           rooms.length ? (
-            <View style={styles.rooms}>
+            <View style={[styles.rooms, compact && { marginHorizontal: -10 }]}>
               {rooms.map((r) => (
                 <RoomListRow
                   key={r.id}
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   add: { ...button.primary, alignSelf: 'center', minWidth: 180, margin: 16 },
   addCompact: { height: 40, minWidth: 0, alignSelf: 'stretch', marginHorizontal: 10, marginTop: 8 },
   addText: button.text,
-  rooms: { marginBottom: 6 },
+  rooms: { marginBottom: 6, marginHorizontal: -16 }, // the list pads 16; room rows run edge to edge (g1)
   newGroup: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginBottom: 8 },
   newGroupText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
 });

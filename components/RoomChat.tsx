@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, Menu } from '@/components/alert';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
@@ -194,6 +195,7 @@ function stamp(at: number): { day: string; time: string } {
 
 export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidth?: number; inPane?: boolean }) {
   useOnScreenRoom(id);
+  const { bottom } = useSafeAreaInsets();
   const room = useRoomInfo(id);
   const info = useMemberInfo();
   const [events, setEvents] = useState<RoomEvent[]>([]);
@@ -413,7 +415,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
         </Text>
       ) : null}
 
-      <View style={[styles.composerWrap, column]}>
+      <View style={[styles.composerWrap, { paddingBottom: Math.max(bottom, 10) }, column]}>
         {sugg.length ? (
           <View style={[styles.popover, isDesktop && { width: 360, right: undefined }]} accessibilityRole="menu">
             {sugg.map((s, i) => (
@@ -439,7 +441,11 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
           <View style={styles.fieldWrap}>
             <TextInput
               value={text}
-              onChangeText={setText}
+              onChangeText={(t) => {
+                // Typing at the end moves the caret with it (the selection event can lag a frame behind).
+                if (caret >= text.length) setCaret(t.length);
+                setText(t);
+              }}
               onSelectionChange={(e) => setCaret(e.nativeEvent.selection.end)}
               onKeyPress={onKey}
               onSubmitEditing={Platform.OS === 'web' && !sugg.length ? () => void send() : undefined}

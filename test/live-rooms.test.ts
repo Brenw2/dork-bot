@@ -1,16 +1,20 @@
-// Live SPIKE (card 8): a Hermes gateway-hosted group room driven over `hermes serve`'s /api/ws, with only
-// what Hermes already exposes (groups.* JSON-RPC). Skipped unless DORK_LIVE=1.
+// Live test (card 8): group rooms driven through the APP's own code (lib/rooms.ts over lib/roomLink.ts and
+// lib/gatewayWs.ts) against a real Hermes gateway, with 3 throwaway bots. Skipped unless DORK_LIVE=1.
 //   DORK_LIVE=1 npx vitest run test/live-rooms.test.ts --silent=false
-// Covers docs/GROUP-ROOMS-SPIKE.md steps 1-3: create a room with 2 throwaway bots, post with no mention
-// (both take turns on the gateway), drop the client right after the send ACK, reconnect, and check the
-// round finished without it. Disbands the room and deletes the bots afterwards. Nothing real is touched.
+// Covers card 8's done-when 1-3: create a 3-bot room (shows in groups.list), @bot reaches only that bot, no
+// mention gives every bot a turn within 3 rounds, Stop works, and closing the client mid-round doesn't stop it
+// (reopening shows the replies). Also: a resend with the same event_id never double-posts. Disbands the room and
+// deletes the bots afterwards. Smallest prompts: model turns are slow.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import type { WsCtor } from '@/lib/gatewayWs';
 import type { FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';
+import { RoomLink } from '@/lib/roomLink';
+import { buildTranscript, MAX_ROUNDS, memorySendStore, sendMessage, type RoomClient, type RoomEvent } from '@/lib/rooms';
 
 const live = process.env.DORK_LIVE === '1';
 const adminUrl = process.env.DORK_ADMIN_URL ?? 'http://127.0.0.1:9119';
@@ -35,123 +39,115 @@ async function signIn(): Promise<string> {
   return raw.startsWith('"') ? JSON.parse(raw) : raw;
 }
 
-/** The app's refresh flow: refresh token -> short-lived bearer access token (what `?token=` takes). */
-async function accessToken(refreshToken: string): Promise<string> {
-  const res = await fetch(`${adminUrl}/auth/native/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken, provider: 'basic' }),
-  });
-  expect(res.status).toBe(200);
-  return ((await res.json()) as { access_token: string }).access_token;
-}
-
-/** A bare JSON-RPC client for /api/ws (same wire as lib/gatewayWs.ts on app/private-secrets). */
-async function openRpc(access: string) {
-  const ws = new WebSocket(`${adminUrl.replace(/^http/i, 'ws')}/api/ws?token=${encodeURIComponent(access)}`);
-  let id = 1;
-  const pending = new Map<number, (m: { result?: any; error?: { code: number; message: string } }) => void>();
-  ws.onmessage = (e) => {
-    const m = JSON.parse(String(e.data));
-    if (typeof m.id === 'number' && pending.has(m.id)) {
-      pending.get(m.id)!(m);
-      pending.delete(m.id);
-    }
-  };
-  await new Promise<void>((resolve, reject) => {
-    ws.onopen = () => resolve();
-    ws.onerror = () => reject(new Error("can't open /api/ws"));
-  });
-  await sleep(800); // gateway.ready event
-  const call = (method: string, params: Record<string, unknown> = {}) =>
-    new Promise<any>((resolve, reject) => {
-      const i = id++;
-      pending.set(i, (m) => (m.error ? reject(new Error(`${method}: ${m.error.code} ${m.error.message}`)) : resolve(m.result)));
-      ws.send(JSON.stringify({ jsonrpc: '2.0', id: i, method, params }));
-    });
-  return { call, close: () => ws.close() };
-}
-
-type RoomEvent = { seq: number; kind: string; actor: { kind: string; id: string }; payload: Record<string, any> };
-
-async function readLog(call: (m: string, p?: Record<string, unknown>) => Promise<any>, room_id: string): Promise<RoomEvent[]> {
-  const out: RoomEvent[] = [];
-  let since = 0;
-  for (;;) {
-    const page = await call('groups.log', { room_id, since_seq: since, limit: 100 });
-    out.push(...page.events);
-    if (!page.has_more) return out;
-    since = page.cursor;
-  }
-}
-
-async function untilIdle(call: (m: string, p?: Record<string, unknown>) => Promise<any>, room_id: string, ms = 120_000) {
+async function untilIdle(client: RoomClient, roomId: string, ms = 150_000) {
   const t0 = Date.now();
   let idle = 0;
   while (Date.now() - t0 < ms) {
-    const st = await call('groups.state', { room_id });
-    idle = st.driver_status?.working ? 0 : idle + 1;
+    const st = await client.state(roomId);
+    idle = st.working || Object.keys(st.activity).length ? 0 : idle + 1;
     if (idle >= 2) return;
     await sleep(1500);
   }
   throw new Error('room never went idle');
 }
 
-describe.skipIf(!live)(`live rooms: throwaway bots on ${adminUrl}`, () => {
-  it('creates a hosted room, runs a no-mention round on the gateway, and finishes it with the client gone', async () => {
+const short = (e: RoomEvent) => `${e.seq}:${e.kind.replace('message.', '').replace('room.', '')}${e.actorKind === 'member' ? `(${e.actorId.replace(/-[a-z0-9]+$/, '')})` : ''}`;
+const spoke = (log: RoomEvent[]) => [...new Set(log.filter((e) => e.kind === 'message.member' && e.text.trim() && e.text.trim() !== '[SILENT]').map((e) => e.actorId))];
+const turnsOf = (log: RoomEvent[]) => log.filter((e) => e.kind === 'turn.settled' && e.actorKind === 'gateway');
+
+describe.skipIf(!live)(`live rooms through the app code: 3 throwaway bots on ${adminUrl}`, () => {
+  it('create, @mention, no mention, stop, close mid-round and resume', async () => {
     const m = new HermesManager({ adminUrl, chatUrl, refreshToken: await signIn() }, f, () => undefined);
     const suffix = Date.now().toString(36);
-    const names = [`dbt-room-a-${suffix}`, `dbt-room-b-${suffix}`];
-    let room_id = '';
-    let rpc = await openRpc(await accessToken(await signIn()));
+    const names = ['a', 'b', 'c'].map((x) => `dbt-room-${x}-${suffix}`);
+    const [A, B] = names;
+    let roomId = '';
+    // The app's connection: a fresh bearer token on every open, Node's WebSocket for the browser's.
+    const link = new RoomLink(async () => ({ adminUrl, token: (await m.wsAuth()).token }), WebSocket as unknown as WsCtor);
+    const client = link.client;
+    const store = memorySendStore();
+    const send = (text: string) => sendMessage(client, store, roomId, text, randomUUID);
+    const allLog = async () => (await client.logAll(roomId, 0)).events;
+    const lastSeq = async () => (await allLog()).reduce((n, e) => Math.max(n, e.seq), 0);
+    const logAfter = async (from: number) => (await allLog()).filter((e) => e.seq > from);
     try {
       for (const n of names) {
-        await m.createBot({ name: n, job: 'A throwaway test bot. In a group room reply in one short sentence and say your name.' }, () => randomBytes(32).toString('hex'));
+        await m.createBot({ name: n, job: 'A throwaway test bot. In a group room reply in one short sentence, say your name, and never mention anyone with @.' }, () => randomBytes(32).toString('hex'));
         await m.setBotModel(n, { provider: 'anthropic', model: 'claude-haiku-5-5' }).catch(() => m.setBotModel(n, { provider: 'anthropic', model: 'claude-haiku-4-5' }));
       }
 
-      // 1. the gateway runs rooms, and creates one for the two bots (same shape Hermes Desktop sends).
-      const caps = await rpc.call('groups.capabilities');
-      expect(caps.driver).toBe(true);
-      expect(caps.methods).toEqual(expect.arrayContaining(['groups.create', 'groups.send', 'groups.log', 'groups.state', 'groups.stop', 'groups.disband']));
-      room_id = randomUUID();
-      const members = names.map((p) => ({ member_id: p, profile: p, handle: p, target: { kind: 'local', profile: p } }));
-      const made = await rpc.call('groups.create', { room_id, name: `dbt-spike-${suffix}`, members });
-      expect(made.room.room_id).toBe(room_id);
-      expect(made.room.members).toHaveLength(2);
-      expect((await rpc.call('groups.list', { limit: 100, offset: 0 })).rooms.map((r: { room_id: string }) => r.room_id)).toContain(room_id);
+      // 1. create a 3-bot room from the app's client; it is in groups.list.
+      expect(await client.supported()).toBe(true);
+      roomId = randomUUID();
+      const room = await client.create({ roomId, name: `dbt-group-${suffix}`, profiles: names });
+      expect(room.members.map((x) => x.profile).sort()).toEqual([...names].sort());
+      expect((await client.list()).map((r) => r.id)).toContain(roomId);
+      console.log(`created a room of ${room.members.length} bots; groups.list has it`);
 
-      // 2/3. send with no mention, then drop the socket right after the ACK (the phone going to sleep).
-      const event_id = randomUUID();
+      // 2. @b reaches only b.
+      let from = await lastSeq();
+      await send(`@${B} say hi in three words`);
+      await untilIdle(client, roomId);
+      let log = await logAfter(from);
+      console.log(`@${B}: ${log.map(short).join(' ')}`);
+      expect(spoke(log)).toEqual([B]);
+      expect(turnsOf(log).every((e) => e.memberId === B)).toBe(true);
+
+      // 3. no mention: every bot gets a turn (and may pass); the round ends within MAX_ROUNDS.
+      from = await lastSeq();
+      await send('Check-in: say your name.');
+      await untilIdle(client, roomId);
+      log = await logAfter(from);
+      console.log(`no mention: ${log.map(short).join(' ')}`);
+      for (const n of names) {
+        const mine = turnsOf(log).filter((e) => e.memberId === n).length;
+        expect(mine).toBeGreaterThanOrEqual(1);
+        expect(mine).toBeLessThanOrEqual(MAX_ROUNDS);
+      }
+      expect(log.some((e) => e.kind === 'room.activity' && e.status === 'settled')).toBe(true);
+
+      // 4. Stop mid-round: a stop event is logged and nothing runs on afterwards.
+      from = await lastSeq();
+      await send('Count from 1 to 5, one number per line.');
+      const cancelled = await client.stop(roomId, randomUUID());
+      await untilIdle(client, roomId);
+      log = await logAfter(from);
+      console.log(`stop (cancelled ${cancelled}): ${log.map(short).join(' ')}`);
+      expect(log.some((e) => e.kind === 'room.stop_requested')).toBe(true);
+      expect(buildTranscript(log, room.members).some((i) => i.type === 'system' && i.text.startsWith('You stopped the room'))).toBe(true);
+      const after = await lastSeq();
+      await sleep(8_000);
+      expect(await lastSeq()).toBe(after);
+
+      // 5. closing the app mid-round doesn't stop it; reopening shows the replies.
+      from = await lastSeq();
       const t0 = Date.now();
-      const ack = await rpc.call('groups.send', { room_id, event_id, payload: { text: 'Check-in: each of you say your name and one word about your day.', thread_id: event_id } });
-      expect(ack.accepted).toBe(true);
-      expect(ack.event.kind).toBe('message.user');
-      rpc.close();
+      await send('Check-in again: say your name.');
+      link.close(); // the phone sleeps right after the ACK
       const closedAt = Date.now() - t0;
-      await sleep(25_000);
-      rpc = await openRpc(await accessToken(await signIn()));
-      await untilIdle(rpc.call, room_id);
-      const log = await readLog(rpc.call, room_id);
+      await sleep(20_000);
+      await untilIdle(client, roomId); // a new socket, opened by the first call
+      log = await logAfter(from);
+      console.log(`closed ${closedAt} ms after the send, reopened after ~20 s: ${log.map(short).join(' ')}`);
+      expect(spoke(log).length).toBeGreaterThanOrEqual(1);
+      expect([...new Set(turnsOf(log).map((e) => e.memberId))].sort()).toEqual([...names].sort());
 
-      // A member may speak again in a later round (answering the other), so compare the sets.
-      const said = [...new Set(log.filter((e) => e.kind === 'message.member').map((e) => e.actor.id))];
-      const settled = [...new Set(log.filter((e) => e.kind === 'turn.settled' && e.actor.kind === 'gateway' && e.payload.passed === false).map((e) => e.payload.member_id as string))];
-      console.log(
-        `client closed ${closedAt} ms after the send ACK, reconnected after ~25 s; log has ${log.length} events: ` +
-          `${log.map((e) => `${e.seq}:${e.kind}${e.actor.kind === 'member' ? '(' + e.actor.id.replace(/-[a-z0-9]+$/, '') + ')' : ''}`).join(' ')}`,
-      );
-      expect(said.sort()).toEqual([...names].sort());
-      expect(settled.sort()).toEqual([...names].sort());
-      expect(log.some((e) => e.kind === 'room.activity' && e.payload.status === 'settled')).toBe(true);
-      expect(log[0].kind).toBe('message.user');
+      // 6. a resend of the same event_id after an unknown outcome never double-posts.
+      from = await lastSeq();
+      const eventId = randomUUID();
+      await client.send(roomId, eventId, `@${A} reply with one word`);
+      await client.send(roomId, eventId, `@${A} reply with one word`);
+      await untilIdle(client, roomId);
+      log = await logAfter(from);
+      expect(log.filter((e) => e.kind === 'message.user')).toHaveLength(1);
+      console.log('resend with the same event_id: one user message in the log');
     } finally {
-      if (room_id) await rpc.call('groups.disband', { room_id }).catch((e) => console.log(`disband: ${e.message}`));
-      rpc.close();
-      for (const n of names) await m.deleteBot(n);
+      if (roomId) await client.disband(roomId).catch((e) => console.log(`disband: ${e.message}`));
+      link.close();
+      for (const n of names) await m.deleteBot(n).catch((e) => console.log(`delete ${n}: ${e.message}`));
     }
     const left = (await m.listProfiles()).map((p) => p.name);
     for (const n of names) expect(left).not.toContain(n);
     console.log(`throwaway bots ${names.join(', ')} deleted, room disbanded`);
-  }, 360_000);
+  }, 900_000);
 });

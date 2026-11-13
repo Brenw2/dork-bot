@@ -1,9 +1,10 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
 import { Column } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
+import { loadManager } from '@/components/manager';
 import { MemberDisc, MemberStack } from '@/components/RoomAvatar';
 import { newId, roomLink } from '@/components/roomsClient';
 import { listBots, type SavedBot } from '@/lib/bots';
@@ -21,11 +22,13 @@ export function RoomNew() {
   const [taken, setTaken] = useState<string[]>([]);
   const [name, setName] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
+  const [jobs, setJobs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     listBots().then(setBots);
+    loadManager().then((m) => m?.listProfiles()).then((ps) => ps && setJobs(Object.fromEntries(ps.map((p) => [p.name, p.description])))).catch(() => undefined);
     roomLink.client.list().then((rooms) => setTaken(rooms.map((r) => r.name))).catch(() => undefined);
   }, []);
 
@@ -54,19 +57,25 @@ export function RoomNew() {
 
   return (
     <View style={styles.screen}>
+      {/* The phone sheet's header: Cancel | New group chat | Create. The desktop panel has its own footer buttons. */}
+      {!isDesktop ? (
+        <Stack.Screen
+          options={{
+            title: 'New group chat',
+            headerLeft: () => (
+              <Pressable onPress={confirm} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.barSide}>
+                <Text style={styles.barLink}>Cancel</Text>
+              </Pressable>
+            ),
+            headerRight: () => (
+              <Pressable onPress={create} disabled={!ready} hitSlop={12} accessibilityRole="button" accessibilityLabel="Create" accessibilityState={{ disabled: !ready }} style={[styles.barSide, { alignItems: 'flex-end' }]}>
+                {busy ? <ActivityIndicator color={colors.accent} /> : <Text style={[styles.barLink, { fontWeight: '600' }, !ready && { color: colors.faint }]}>Create</Text>}
+              </Pressable>
+            ),
+          }}
+        />
+      ) : null}
       <Column>
-        {/* The phone sheet's own title row (the desktop panel draws its own header). */}
-        {!isDesktop ? (
-          <View style={styles.sheetBar}>
-            <Pressable onPress={confirm} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.barSide}>
-              <Text style={styles.barLink}>Cancel</Text>
-            </Pressable>
-            <Text style={styles.barTitle}>New group chat</Text>
-            <Pressable onPress={create} disabled={!ready} hitSlop={12} accessibilityRole="button" accessibilityLabel="Create" accessibilityState={{ disabled: !ready }} style={[styles.barSide, { alignItems: 'flex-end' }]}>
-              {busy ? <ActivityIndicator color={colors.accent} /> : <Text style={[styles.barLink, { fontWeight: '600' }, !ready && { color: colors.faint }]}>Create</Text>}
-            </Pressable>
-          </View>
-        ) : null}
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={isDesktop ? styles.headRow : styles.headCol}>
             <View style={isDesktop ? styles.pictureDesk : styles.picture}>
@@ -114,6 +123,11 @@ export function RoomNew() {
                       <Text style={styles.memberName} numberOfLines={1}>
                         {nameOf(b.bot, b.displayName)}
                       </Text>
+                      {jobs[b.bot] ? (
+                        <Text style={styles.memberJob} numberOfLines={1}>
+                          {jobs[b.bot]}
+                        </Text>
+                      ) : null}
                     </View>
                     <View style={[styles.check, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}>{on ? <Text style={styles.tick}>✓</Text> : null}</View>
                   </Pressable>
@@ -142,9 +156,7 @@ export function RoomNew() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  sheetBar: { flexDirection: 'row', alignItems: 'center', height: 56, paddingHorizontal: 16 },
-  barSide: { width: 80, minHeight: 44, justifyContent: 'center' },
-  barTitle: { flex: 1, textAlign: 'center', color: colors.text, fontSize: 17, fontWeight: '600' },
+  barSide: { minWidth: 60, minHeight: 44, justifyContent: 'center', ...(Platform.OS === 'web' ? { marginHorizontal: 16 } : null) },
   barLink: { color: colors.accent, fontSize: 17 },
   content: { padding: 16, paddingBottom: 32 },
   headCol: { alignItems: 'center', gap: 12 },
@@ -158,6 +170,7 @@ const styles = StyleSheet.create({
   member: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 58, paddingHorizontal: 16, paddingVertical: 8 },
   memberLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   memberName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  memberJob: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#4B4F56', alignItems: 'center', justifyContent: 'center' },
   tick: { color: '#fff', fontSize: 14, fontWeight: '700', lineHeight: 16 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginTop: 12, marginHorizontal: 16 },

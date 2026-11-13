@@ -1,13 +1,6 @@
-import { Stack } from 'expo-router';
-import { isDesktop } from '@/components/desktop';
 import { RoomNew } from '@/components/RoomNew';
 
-// A sheet on the phone (its own Cancel | title | Create bar), a panel on desktop.
+// A sheet on the phone (header: Cancel | New group chat | Create, set by RoomNew), a panel on desktop.
 export default function NewRoomScreen() {
-  return (
-    <>
-      {!isDesktop ? <Stack.Screen options={{ headerShown: false }} /> : null}
-      <RoomNew />
-    </>
-  );
+  return <RoomNew />;
 }

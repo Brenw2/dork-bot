@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist-web');
@@ -45,6 +46,8 @@ export const POSTURES = {
     // crosses the fold, the same way every screen crosses it in open portrait.
     keepOut: [{ name: 'status rail', x: 867, y: 0, width: 84, height: 669 }],
   },
+  // A wide desktop window (two panes). Only the group chat screens run here (card 8, comps g1..g6 --desktop).
+  desktop: { width: 1280, height: 800, insets: { top: 0, right: 0, bottom: 0, left: 0 }, keepOut: [], roomsOnly: true },
 };
 
 const HERMES = 'https://hermes.test';
@@ -256,6 +259,8 @@ const SCREENS = [
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
   { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
+  // Card 8: group chat (fixtures and the fake rooms socket are in scripts/layout-rooms.mjs).
+  ...ROOM_SCREENS,
 ];
 
 async function fakeHermes(route) {
@@ -437,6 +442,9 @@ function measureChats() {
 const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat', "assistant's work"], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
+Object.assign(FIXED, ROOM_FIXED);
+Object.assign(SEEN, ROOM_SEEN);
+
 function serve(dir) {
   const types = {
     '.html': 'text/html',
@@ -552,6 +560,7 @@ async function main() {
     if (only && posture !== only) continue;
     for (const screen of SCREENS) {
       if (screen.postures && !screen.postures.includes(posture)) continue;
+      if (shape.roomsOnly && !screen.name.startsWith('room-')) continue;
       const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2 });
       const page = await context.newPage();
       const errors = [];
@@ -563,6 +572,7 @@ async function main() {
         },
         { insets: shape.insets, store: seedFor(screen) },
       );
+      if (screen.rooms) await page.addInitScript(roomsMock, { data: ROOM_DATA[screen.rooms] });
       await page.route(`${HERMES}/**`, fakeHermes);
       await page.route(`${ADMIN}/**`, fakeHermes);
       const path = screen.path(posture);
@@ -571,6 +581,8 @@ async function main() {
         await page.goto(base + path);
         await page.getByText(screen.waitFor, { exact: false }).first().waitFor({ timeout: 15_000 });
         if (screen.click) await page.getByLabel(screen.click).first().click();
+        for (const l of screen.clickAll ?? []) await page.getByLabel(l, { exact: true }).first().click();
+        if (screen.fill) await page.getByLabel(screen.fill[0]).fill(screen.fill[1]);
         if (screen.then) await page.getByText(screen.then, { exact: false }).first().waitFor({ timeout: 15_000 });
         await page.waitForTimeout(400); // let the list scroll to the end and statuses settle
         problems = await page.evaluate(audit, {
