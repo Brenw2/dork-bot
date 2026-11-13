@@ -145,3 +145,37 @@ describe('elapsedLabel', () => {
     expect(elapsedLabel(-5)).toBe('0s');
   });
 });
+
+describe('LiveRuns needsYou (the bot list\'s "Needs you")', () => {
+  it('shows within one poll of an approval arriving and clears once it is answered', async () => {
+    const { runs } = setup({ chief: ['waiting_for_approval', 'waiting_for_approval', 'running'] });
+    let heard = 0;
+    runs.onApprovals(() => void heard++);
+    runs.start('chief', 'c1', 'run_1');
+    runs.detach('c1');
+    expect(runs.needsYou('chief')).toBeNull();
+    await runs.poll();
+    expect(runs.needsYou('chief')?.command).toBe('rm -rf /tmp/x');
+    expect(runs.needsYou('scout')).toBeNull();
+    expect(heard).toBe(1);
+    await runs.poll(); // same request: no new noise
+    expect(heard).toBe(1);
+    await runs.poll(); // answered, the run goes on
+    expect(runs.needsYou('chief')).toBeNull();
+    expect(heard).toBe(2);
+  });
+
+  it('hears an approval the open chat saw on its own stream, and clears when the run ends', () => {
+    const { runs } = setup({ chief: ['running'] });
+    let heard = 0;
+    runs.onApprovals(() => void heard++);
+    runs.start('chief', 'c1', 'run_1');
+    runs.setApproval('c1', { command: 'ls', description: '', choices: ['once', 'deny'] });
+    runs.setApproval('c1', { command: 'ls', description: '', choices: ['once', 'deny'] });
+    expect(runs.needsYou('chief')?.command).toBe('ls');
+    expect(heard).toBe(1);
+    runs.finish('c1');
+    expect(runs.needsYou('chief')).toBeNull();
+    expect(heard).toBe(2);
+  });
+});

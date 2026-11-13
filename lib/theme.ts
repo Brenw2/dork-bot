@@ -10,6 +10,17 @@ export const colors = {
   user: '#3B3470',
   ok: '#4CC38A',
   bad: '#F06A6A',
+  // Card 19 tokens (docs/design/REVIEW.md)
+  raised: '#22252A', // selected or pressed row, menus, popovers
+  hover: '#1C1E22', // hovered row (desktop)
+  faint: '#6B7078', // placeholder, disabled text, hints
+  sidebar: '#0D0E10', // desktop and Duo sidebar
+  chevron: '#4B4F56',
+  menuBorder: '#343840',
+  menuHover: '#2E3238',
+  errorBg: '#24171A',
+  errorLine: '#4A2A2E',
+  errorText: '#F0C7C9',
 };
 
 export const mono = Platform.select({ ios: 'Menlo', default: 'monospace' });

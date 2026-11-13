@@ -1,6 +1,7 @@
 // Alerts and menus on the web build (the desktop app): drawn in the app (components/Dialogs.tsx)
 // instead of the system's dialogs. Same call shape as React Native's Alert, so screens don't change.
 import type { AlertButton } from 'react-native';
+import type { MenuItem } from './alert';
 import { showDialog, type DialogButton } from './Dialogs';
 
 const asButtons = (buttons: AlertButton[] | undefined): DialogButton[] =>
@@ -26,6 +27,8 @@ export const Alert = {
 
 export const Menu = {
   /** A menu next to what was clicked (the ⋯ button). */
-  show: (title: string, items: AlertButton[], anchor?: { x: number; y: number }) =>
-    showDialog({ kind: 'menu', title, anchor, items: asButtons(items) }),
+  show: (title: string, items: MenuItem[], anchor?: { x: number; y: number }) =>
+    showDialog({ kind: 'menu', title, anchor, items: asMenu(items) }),
 };
+
+const asMenu = (items: MenuItem[]): DialogButton[] => items.map((it, i) => ({ ...asButtons([it])[0], icon: it.icon, shortcut: it.shortcut, sepBefore: it.sepBefore }));

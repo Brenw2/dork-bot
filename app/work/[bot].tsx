@@ -1,9 +1,10 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { useBotLook } from '@/components/useBotLook';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useWork } from '@/components/workWatch';
 import { whenLabel } from '@/lib/routines';
@@ -22,7 +23,7 @@ export default function WorkScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${botName}'s work` }} />
+      <Sheet title="Work" bot={bot} />
       <View style={[styles.fill, column]}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {items === null && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}

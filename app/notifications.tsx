@@ -1,8 +1,8 @@
-import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useColumnStyle } from '@/components/Column';
 import { loadManager } from '@/components/manager';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { getPushToken, notificationsSupported, turnOffNotifications, turnOnNotifications } from '@/components/notifications';
 import { listBots } from '@/lib/bots';
@@ -77,7 +77,7 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Notifications' }} />
+      <Sheet title="Notifications" />
       <ScrollView contentContainerStyle={[styles.body, column]}>
         <Text style={styles.intro}>
           Get a notification when a bot finishes a reply, needs your OK, or finishes a routine you turned Notify me on (its result is also added to the chat). Each one opens the chat; every routine run is kept in Routine results.

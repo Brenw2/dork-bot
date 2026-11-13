@@ -1,10 +1,11 @@
-import { Stack, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, FlatList, StyleSheet, Text, View } from 'react-native';
 import { Activity, Mine, Reply } from '@/components/ChatView';
 import { useColumnStyle } from '@/components/Column';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { getConnection } from '@/lib/bots';
 import { chatRows, type ChatRow } from '@/lib/chatState';
@@ -71,7 +72,7 @@ export default function WorkSessionScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${botName}'s work` }} />
+      <Sheet title="Work" bot={bot} />
       {item ? (
         <View style={[styles.head, column]}>
           <Text style={styles.title} numberOfLines={3}>

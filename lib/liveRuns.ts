@@ -42,6 +42,7 @@ export class LiveRuns {
   /** Chats whose screen is streaming the run itself, so there's nothing to poll. */
   private streaming = new Set<string>();
   private listeners = new Set<Listener>();
+  private approvalListeners = new Set<() => void>();
   private polling = false;
 
   constructor(private readonly deps: LiveRunDeps) {}
@@ -94,11 +95,39 @@ export class LiveRuns {
     if (!this.runs.delete(chat)) return;
     void this.deps.save(this.snapshot());
     this.listeners.forEach((fn) => fn(chat, null));
+    this.approvalListeners.forEach((fn) => fn());
   }
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => void this.listeners.delete(fn);
+  }
+
+  /** The command a bot is waiting on Brennan's OK for (any of its chats), or null. The bot list's "Needs you". */
+  needsYou(bot: string): ApprovalRequest | null {
+    for (const r of this.runs.values()) if (r.bot === bot && r.approval) return r.approval;
+    return null;
+  }
+
+  /** Called when any bot starts or stops waiting for an approval. */
+  onApprovals(fn: () => void): () => void {
+    this.approvalListeners.add(fn);
+    return () => void this.approvalListeners.delete(fn);
+  }
+
+  /**
+   * The open chat saw an approval request (or its answer) on its own stream, which the polling
+   * doesn't see. Quiet for the chat's own listener; only the bot list hears about it.
+   */
+  setApproval(chat: string, approval: ApprovalRequest | null): void {
+    const run = this.runs.get(chat);
+    if (!run) return;
+    const same = (run.approval?.requestId ?? run.approval?.command) === (approval?.requestId ?? approval?.command);
+    if (same) return;
+    const next: LiveRun = { ...run, approval: approval ?? undefined };
+    if (!approval) delete next.approval;
+    this.runs.set(chat, next);
+    this.approvalListeners.forEach((fn) => fn());
   }
 
   /** Checks every run nobody is streaming. Safe to call often; overlapping calls are skipped. */
@@ -127,6 +156,7 @@ export class LiveRuns {
           if (!approval) delete next.approval;
           this.runs.set(chat, next);
           this.listeners.forEach((fn) => fn(chat, next));
+          this.approvalListeners.forEach((fn) => fn());
         }
       }
     } finally {

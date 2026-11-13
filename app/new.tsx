@@ -12,6 +12,7 @@ import { listBots, saveBot } from '@/lib/bots';
 import { TEMPLATE_PROFILE, type HermesManager, type Profile } from '@/lib/manager';
 import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
 import { button, colors, mono } from '@/lib/theme';
+import { Sheet } from '@/components/Sheet';
 
 // Create a bot (a new Hermes profile, on any model), or connect one that's already on Hermes.
 export default function NewBot() {
@@ -97,6 +98,7 @@ export default function NewBot() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
+      <Sheet title="New bot" close="cancel" />
       <Field label="Name" value={name} onChangeText={(t) => setName(t.toLowerCase())} placeholder="scout" maxLength={64} />
       <Field
         label="What does it do?"
