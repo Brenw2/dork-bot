@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, Menu } from '@/components/alert';
+import { ArrowUpIcon, StopIcon } from '@/components/ChatIcons';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
 import { useOnScreenRoom } from '@/components/notifications';
@@ -438,7 +439,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
           </View>
         ) : null}
         <View style={styles.composer}>
-          <View style={styles.fieldWrap}>
+          <View style={[styles.fieldWrap, { minHeight: FIELD_MIN, borderRadius: FIELD_MIN / 2 }]}>
             <TextInput
               value={text}
               onChangeText={(t) => {
@@ -456,12 +457,12 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
               accessibilityLabel={`Message ${room?.name ?? 'the group'}`}
             />
             {canSend ? (
-              <Pressable onPress={() => void send()} style={[styles.round, { backgroundColor: colors.accent }]} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
-                <Text style={styles.sendArrow}>↑</Text>
+              <Pressable onPress={() => void send()} style={[styles.round, ROUND, { backgroundColor: colors.accent }]} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
+                <ArrowUpIcon size={16} color="#fff" />
               </Pressable>
             ) : busy ? (
-              <Pressable onPress={() => void stop()} style={[styles.round, { backgroundColor: '#fff' }]} accessibilityRole="button" accessibilityLabel="Stop the room" hitSlop={6}>
-                <View style={styles.stopSquare} />
+              <Pressable onPress={() => void stop()} style={[styles.round, ROUND, { backgroundColor: colors.text }]} accessibilityRole="button" accessibilityLabel="Stop the room" hitSlop={6}>
+                <StopIcon color={colors.bg} />
               </Pressable>
             ) : null}
           </View>
@@ -589,6 +590,11 @@ function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; m
 }
 
 const BODY = isDesktop ? 16 : 17;
+// The message box pill from card 19 fix 3 (same numbers as ChatView): Send/Stop sit inside the field.
+const FIELD_MIN = isDesktop ? 44 : 36;
+const ROUND = isDesktop
+  ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
+  : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
@@ -636,11 +642,9 @@ const styles = StyleSheet.create({
   error: { color: colors.bad, fontSize: 13, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 6 },
   composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  fieldWrap: { flex: 1, minHeight: 44, borderRadius: 22, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, flexDirection: 'row', alignItems: 'flex-end' },
-  input: { flex: 1, color: colors.text, fontSize: BODY, minHeight: 44, maxHeight: 140, paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 12 : 10, paddingBottom: Platform.OS === 'ios' ? 12 : 10 },
-  round: { width: 32, height: 32, borderRadius: 16, margin: 6, alignItems: 'center', justifyContent: 'center' },
-  sendArrow: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 20 },
-  stopSquare: { width: 12, height: 12, borderRadius: 2, backgroundColor: '#0F1012' },
+  fieldWrap: { flex: 1, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, justifyContent: 'center' },
+  input: { color: colors.text, fontSize: BODY, lineHeight: isDesktop ? 24 : 22, maxHeight: 140, paddingLeft: 14, paddingRight: isDesktop ? 44 : 36, paddingVertical: isDesktop ? 10 : 7 },
+  round: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   popover: { position: 'absolute', left: 12, right: 12, bottom: '100%', marginBottom: 4, backgroundColor: colors.raised, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#343840', overflow: 'hidden' },
   popRow: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
   popLine: { height: StyleSheet.hairlineWidth, backgroundColor: '#343840', marginHorizontal: 12 },

@@ -1,3 +1,4 @@
+import '@/components/webStyles';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import type { ReactNode } from 'react';

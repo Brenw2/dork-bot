@@ -1,6 +1,7 @@
 // Chat screen state as a pure reducer, so the streaming logic is unit-tested
 // without React Native.
-import type { ApprovalRequest, ChatEvent, ChatMessage } from './hermes';
+import type { ApprovalChoice, ApprovalRequest, ChatEvent, ChatMessage } from './hermes';
+import { doneToolName, liveToolName } from './toolNames';
 
 export interface ToolCall {
   name: string;
@@ -16,9 +17,16 @@ export interface ChatState {
   error: string | null;
   /** The reply is paused until Brennan allows or denies a command. */
   approval: ApprovalRequest | null;
+  /** Approvals answered during the running reply; each shows as a one-line chip until the reply is done. */
+  decisions: Decision[];
 }
 
-export const initialChat: ChatState = { messages: [], pending: null, runId: null, error: null, approval: null };
+export interface Decision {
+  choice: ApprovalChoice;
+  command: string;
+}
+
+export const initialChat: ChatState = { messages: [], pending: null, runId: null, error: null, approval: null, decisions: [] };
 
 export type ChatAction =
   | { type: 'loaded'; messages: ChatMessage[] }
@@ -32,6 +40,8 @@ export type ChatAction =
   | { type: 'failed'; message: string }
   /** What the run is waiting on, from a status check (null: nothing any more). */
   | { type: 'approval'; request: ApprovalRequest | null }
+  /** The approval card was answered: it collapses to a chip. */
+  | { type: 'answered'; choice: ApprovalChoice }
   | { type: 'ended' };
 
 let localId = 0;
@@ -52,6 +62,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         runId: null,
         error: null,
         approval: null,
+        decisions: [],
       };
     case 'event':
       return applyEvent(state, action.event);
@@ -68,9 +79,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       if (state.pending && !state.pending.remote) return state;
       return { ...state, runId: null, pending: { text: '', tools: [], thinking: true, resumed: true, remote: true }, error: null };
     case 'settled':
-      return { ...state, pending: null, runId: null, approval: null };
+      return { ...state, pending: null, runId: null, approval: null, decisions: [] };
     case 'approval':
       return { ...state, approval: action.request };
+    case 'answered':
+      if (!state.approval) return state;
+      return { ...state, approval: null, decisions: [...state.decisions, { choice: action.choice, command: state.approval.command }] };
     case 'failed':
       return finish({ ...state, error: action.message });
     case 'ended':
@@ -113,12 +127,12 @@ function applyEvent(state: ChatState, e: ChatEvent): ChatState {
 
 function finish(state: ChatState): ChatState {
   const p = state.pending;
-  if (!p) return { ...state, runId: null, approval: null };
+  if (!p) return { ...state, runId: null, approval: null, decisions: [] };
   const messages = [...state.messages];
   for (const t of p.tools) messages.push({ id: nextId(), role: 'tool', content: t.preview ?? '', toolName: t.name });
   const text = p.text.trim();
   if (text) messages.push({ id: nextId(), role: 'assistant', content: text });
-  return { ...state, messages, pending: null, runId: null, approval: null };
+  return { ...state, messages, pending: null, runId: null, approval: null, decisions: [] };
 }
 
 function findLastIndex<T>(arr: T[], pred: (t: T) => boolean): number {
@@ -131,10 +145,19 @@ function findLastIndex<T>(arr: T[], pred: (t: T) => boolean): number {
 export type ChatRow =
   | { kind: 'message'; id: string; message: ChatMessage }
   | { kind: 'activity'; id: string; tools: ToolCall[]; live: boolean }
-  | { kind: 'pending'; id: 'pending'; text: string };
+  | { kind: 'pending'; id: 'pending'; text: string }
+  /** The card for an approval Hermes is waiting on: the last thing in the transcript (design fix 5). */
+  | { kind: 'approval'; id: 'approval'; request: ApprovalRequest }
+  /** An answered approval, collapsed to a chip. */
+  | { kind: 'decision'; id: string; decision: Decision }
+  /** A message typed while a reply was running; it goes out when that reply is done. */
+  | { kind: 'queued'; id: string; text: string };
 
-/** Rows oldest first. The in-flight reply ends with its live activity and its text (or thinking line). */
-export function chatRows(state: Pick<ChatState, 'messages' | 'pending'>): ChatRow[] {
+/**
+ * Rows oldest first. The in-flight reply ends with its live activity and its text (or the typing
+ * bubble); an approval Hermes is waiting on comes last, and the typing bubble steps aside for it.
+ */
+export function chatRows(state: Pick<ChatState, 'messages' | 'pending'> & Partial<Pick<ChatState, 'approval' | 'decisions'>>, queued: string[] = []): ChatRow[] {
   const rows: ChatRow[] = [];
   let run: ToolCall[] | null = null;
   for (const m of state.messages) {
@@ -152,13 +175,17 @@ export function chatRows(state: Pick<ChatState, 'messages' | 'pending'>): ChatRo
   const p = state.pending;
   if (p) {
     if (p.tools.length) rows.push({ kind: 'activity', id: 'pending-tools', tools: p.tools, live: !p.text });
-    rows.push({ kind: 'pending', id: 'pending', text: p.text });
+    state.decisions?.forEach((decision, i) => rows.push({ kind: 'decision', id: `decision-${i}`, decision }));
+    if (p.text || !state.approval) rows.push({ kind: 'pending', id: 'pending', text: p.text });
   }
+  if (state.approval) rows.push({ kind: 'approval', id: 'approval', request: state.approval });
+  queued.forEach((text, i) => rows.push({ kind: 'queued', id: `queued-${i}`, text }));
   return rows;
 }
 
 /** Who a row belongs to, for spacing: you, or the bot (its chips, replies and routine cards). */
 function side(row: ChatRow): 'me' | 'bot' {
+  if (row.kind === 'queued') return 'me';
   return row.kind === 'message' && row.message.role === 'user' && !row.message.routine ? 'me' : 'bot';
 }
 
@@ -176,16 +203,35 @@ export function rowGap(prev: ChatRow | undefined, row: ChatRow): number {
   return 4;
 }
 
-/** One line for a run of tool calls: the latest one while it works, a count when it's done. */
+/**
+ * The step chip's text (design fix 4), without its icon. While it runs: the friendly name of the
+ * latest step ("Searching the web…") plus a step count. Done: "Used Trello, Web search · 4 steps".
+ */
 export function activityLine(tools: ToolCall[], live: boolean): string {
   const last = tools[tools.length - 1];
   if (!last) return '';
   const failed = tools.filter((t) => t.status === 'failed').length;
   const steps = tools.length === 1 ? '' : ` · ${tools.length} steps`;
-  if (live) return `${last.status === 'running' ? '…' : last.status === 'failed' ? '✕' : '✓'} ${last.name}${steps}`;
-  const names = [...new Set(tools.map((t) => t.name))];
+  if (live) return `${liveToolName(last.name)}${steps}`;
+  const names = [...new Set(tools.map((t) => doneToolName(t.name)))];
   const shown = names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
-  return `${failed ? '✕' : '✓'} ${shown}${steps}${failed ? ` · ${failed} failed` : ''}`;
+  return `Used ${shown}${steps}${failed ? ` · ${failed} failed` : ''}`;
+}
+
+/** "Still working · 48 s" (nothing before 10 s); a run seen from another device or after leaving: "· 2 min". */
+export function stillWorking(ms: number): string | null {
+  const s = Math.floor(ms / 1000);
+  if (s < 10) return null;
+  return `Still working · ${s < 60 ? `${s} s` : `${Math.floor(s / 60)} min`}`;
+}
+
+/** Hermes denies an unanswered approval after this many seconds (approvals.timeout). */
+export const APPROVAL_TIMEOUT_S = 300;
+
+/** The approval card's countdown: "4:32". */
+export function countdown(secondsLeft: number): string {
+  const s = Math.max(0, Math.ceil(secondsLeft));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 /** How long a message from another device with no reply yet counts as "the bot is still on it". */

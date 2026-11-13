@@ -17,6 +17,7 @@ export const colors = {
   sidebar: '#0D0E10', // desktop and Duo sidebar
   chevron: '#4B4F56', // bot list row chevron
   disclosure: '#5D626A', // grouped-list disclosure ›
+  code: '#0B0C0E', // code blocks and commands
   menuBorder: '#343840',
   menuHover: '#2E3238',
   errorBg: '#24171A',

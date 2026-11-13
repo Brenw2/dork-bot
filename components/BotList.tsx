@@ -138,7 +138,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
         keyExtractor={(r) => r.bot}
         ListHeaderComponent={
           rooms.length ? (
-            <View style={compact ? { marginHorizontal: -8 } : undefined}>
+            <View>
               {rooms.map((r) => (
                 <RoomListRow
                   key={r.id}

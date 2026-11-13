@@ -17,6 +17,7 @@ import { extname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
+import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist-web');
@@ -207,6 +208,9 @@ const JOBS = [
   },
 ];
 
+const answered = new Set(); // runs whose approval was answered (what the fake run status says next)
+const APPROVAL = { command: 'rm -rf ~/notes/old-drafts', description: 'recursive delete', choices: ['once', 'session', 'always', 'deny'], request_id: 'req-1' };
+
 const SERVERS = [
   { name: 'trello', transport: 'http', url: 'https://mcp.trello.com/v1', auth: 'oauth', enabled: true, source: 'config' },
   { name: 'linear', transport: 'http', url: 'https://mcp.linear.app/mcp', auth: 'oauth', enabled: true, source: 'config' },
@@ -263,7 +267,25 @@ const SCREENS = [
   { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
   // Card 8: group chat (fixtures and the fake rooms socket are in scripts/layout-rooms.mjs).
   ...ROOM_SCREENS,
+  // Fix 3: the message box with text in it (Send inside the field). Fixes 4 and 5: a reply on its way (see fakeHermes).
+  { name: 'chat-typing', path: chatPath('assistant'), waitFor: 'Any time.', act: (page) => typeIn(page, 'assistant', 'what time is sunset'), check: checkComposer },
+  { name: 'chat-thinking', extraBots: ['thinker'], path: chatPath('thinker'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'thinker', 'what time is sunset'), page.getByLabel('Typing').first().waitFor()), check: checkThinking },
+  { name: 'chat-working', extraBots: ['worker'], path: chatPath('worker'), waitFor: 'Any time.', act: (page) => sendIn(page, 'worker', 'summarize each card', 'Trello: read card'), check: checkWorking },
+  { name: 'chat-working-long', clock: true, extraBots: ['worker'], path: chatPath('worker'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'worker', 'summarize each card', 'Trello: read card'), page.clock.fastForward(48_000), page.getByText('Still working', { exact: false }).first().waitFor()), check: checkWorkingLong },
+  { name: 'chat-approval', extraBots: ['approver'], path: chatPath('approver'), waitFor: 'Any time.', act: (page) => sendIn(page, 'approver', 'clean up my old drafts folder', 'Run this command?'), check: checkApproval },
+  { name: 'chat-approval-answered', extraBots: ['approver'], path: chatPath('approver'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'approver', 'clean up my old drafts folder', 'Run this command?'), page.getByLabel('Allow once').first().click(), page.getByText('Allowed once', { exact: false }).first().waitFor()), check: checkAnswered },
 ];
+
+function chatPath(bot) {
+  return (p) => (p === 'duo-open-landscape' ? `/?bot=${bot}` : `/chat/${bot}`);
+}
+const typeIn = async (page, bot, text) => page.getByLabel(`Message ${bot}`).fill(text);
+// Send a message (Enter sends on the web) and wait for what the reply should show.
+async function sendIn(page, bot, text, wait) {
+  await typeIn(page, bot, text);
+  await page.getByLabel(`Message ${bot}`).press('Enter');
+  if (wait) await page.getByText(wait, { exact: false }).first().waitFor({ timeout: 15_000 });
+}
 
 async function fakeHermes(route) {
   const req = route.request();
@@ -272,6 +294,34 @@ async function fakeHermes(route) {
   const p = url.pathname;
   // Gateway API server, one bot per /p/<bot>/.
   const bot = p.match(/^\/p\/([^/]+)\//)?.[1];
+  // A reply on its way (design fixes 4 and 5). thinker: the stream never answers (the typing bubble). worker: a few
+  // steps, then the stream drops and Hermes still has the run (the chip and the typing row). approver: the same, and
+  // Hermes then waits for an OK. failer: Hermes answers HTTP 500.
+  if (/\/chat\/stream$/.test(p)) {
+    if (bot === 'thinker') return new Promise(() => {});
+    if (bot === 'failer') return json(500, { error: 'model runner crashed' });
+    answered.delete(`run-${bot}`);
+    const events = [
+      ['run.started', { run_id: `run-${bot}` }],
+      ['tool.started', { tool_name: 'terminal', preview: 'ls ~/notes' }],
+      ['tool.completed', { tool_name: 'terminal' }],
+      ['tool.started', { tool_name: 'web_search', preview: 'trail map' }],
+      ['tool.completed', { tool_name: 'web_search' }],
+      ['tool.started', { tool_name: 'mcp__trello__trelloReadCard', preview: 'card 7' }],
+      ...(bot === 'approver' ? [['approval.request', APPROVAL]] : []),
+    ];
+    const body = events.map(([e, d]) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`).join('');
+    return route.fulfill({ status: 200, contentType: 'text/event-stream', body });
+  }
+  const run = p.match(/\/v1\/runs\/([^/]+)(\/approval)?$/);
+  if (run && req.method() === 'POST') {
+    answered.add(run[1]);
+    return json(200, { ok: true });
+  }
+  if (run) {
+    const waiting = bot === 'approver' && !answered.has(run[1]);
+    return json(200, waiting ? { status: 'waiting_for_approval', approval: APPROVAL } : { status: 'running' });
+  }
   if (bot === 'scout' && p.endsWith('/api/sessions')) return json(401, { error: 'unauthorized' }); // shows a red status
   if (/\/api\/sessions$/.test(p) && req.method() === 'GET')
     return json(200, { data: bot !== 'assistant' ? [] : url.searchParams.get('source') === 'api_server' ? CHATS : url.searchParams.get('source') ? [] : WORK_SESSIONS });
@@ -435,14 +485,16 @@ function measureTranscript() {
 
 // Card 20 nit: the Work row's chevron is #5D626A (was the too-faint #4B4F56).
 function measureChats() {
-  const chev = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === '›');
+  // The Work row's own chevron (a finished step chip in the chat pane has its own).
+  const row = [...document.querySelectorAll('[role=button], [role=link]')].find((e) => (e.getAttribute('aria-label') || '').includes("assistant's work"));
+  const chev = row && [...row.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === '›');
   if (!chev) return ['the Work row chevron is missing'];
   const c = getComputedStyle(chev).color;
   return c === 'rgb(93, 98, 106)' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
-const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
+const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
+const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'chat-approval': ['Run this command?', 'Hermes flagged it'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 Object.assign(FIXED, ROOM_FIXED);
 Object.assign(SEEN, ROOM_SEEN);
@@ -493,11 +545,21 @@ async function composerTest(browser, base) {
   const measure = () =>
     page.evaluate(() => {
       const ta = document.querySelector('textarea');
-      const r = ta.getBoundingClientRect();
+      const field = document.querySelector('[data-testid=composer-field]');
+      const r = field.getBoundingClientRect();
       const send = [...document.querySelectorAll('[role=button]')].find((e) => e.getAttribute('aria-label') === 'Send')?.getBoundingClientRect();
       const last = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === 'Any time.');
       const lr = last?.getBoundingClientRect();
-      return { h: r.height, top: r.top, bottom: r.bottom, sendBottom: send?.bottom, scrolls: ta.scrollHeight > ta.clientHeight + 1, lastBottom: lr?.bottom, H: innerHeight };
+      const fs = getComputedStyle(field);
+      const ts = getComputedStyle(ta);
+      return {
+        h: r.height, top: r.top, bottom: r.bottom, width: r.width,
+        sendBottom: send?.bottom, sendRight: send?.right, sendSize: send ? `${send.width}x${send.height}` : null, fieldRight: r.right,
+        scrolls: ta.scrollHeight > ta.clientHeight + 1, overflowY: ts.overflowY, taH: ta.getBoundingClientRect().height,
+        radius: fs.borderTopLeftRadius, font: `${ts.fontSize}/${ts.lineHeight}`, bar: getComputedStyle(ta, '::-webkit-scrollbar').width,
+        hint: document.body.innerText.includes('Enter to send · Shift+Enter for a new line'),
+        lastBottom: lr?.bottom, H: innerHeight,
+      };
     });
   const lines = (n) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join('\n');
   // Layout settles a few frames after the text changes (the box grows, then the list below it resizes and
@@ -526,7 +588,14 @@ async function composerTest(browser, base) {
   check(Math.abs(m1.h - 44) < 1 && Math.abs(one.h - 44) < 1, `1 line should be 44 px tall, got ${one.h} / ${m1.h}`);
   check(m5.h > m1.h + 60 && m5.h < cap && !m5.scrolls, `5 lines should grow past 1 line without scrolling, got ${m5.h} (1 line ${m1.h}, cap ${cap})`);
   check(m30.h <= cap + 1 && m30.h > 0.3 * DESKTOP.height && m30.h > m5.h && m30.scrolls, `30 lines should stop at the cap (under 40% of the pane, so under ${cap}) and scroll, got ${m30.h}, scrolls ${m30.scrolls}`);
-  check(Math.abs(m30.sendBottom - m30.bottom) < 1, `Send should stay level with the bottom of the box (${m30.sendBottom} vs ${m30.bottom})`);
+  check(Math.abs(m30.sendBottom - (m30.bottom - 6)) < 1.2 && Math.abs(m30.fieldRight - m30.sendRight - 6) < 1.2, `Send should sit 6 in from the box's bottom-right corner (bottom ${m30.bottom - m30.sendBottom}, right ${m30.fieldRight - m30.sendRight})`);
+  check(m1.sendSize === '32x32' && m30.sendSize === '32x32', `desktop Send should be a 32 circle, got ${m1.sendSize} / ${m30.sendSize}`);
+  check(m1.radius === '22px' && m1.font === '16px/24px', `desktop field should be radius 22 with 16/24 text, got ${m1.radius} ${m1.font}`);
+  check(Math.abs(m1.width - m5.width) < 1 && Math.abs(m1.width - m30.width) < 1 && Math.abs(one.width - m1.width) < 1, `the box's width should not change with Send or its text (${one.width} / ${m1.width} / ${m5.width} / ${m30.width})`);
+  check(m1.overflowY === 'hidden' && m5.overflowY === 'hidden' && !m1.scrolls && !m5.scrolls, `a box under the cap should show no scrollbar (overflow ${m1.overflowY} / ${m5.overflowY})`);
+  check(m30.overflowY === 'auto', `a box at the cap should scroll (overflow ${m30.overflowY})`);
+  check(m30.bar === '8px', `scrollbars should be 8 px, got ${m30.bar}`);
+  check(!one.hint && m1.hint, `the key hint shows only while the box has focus (before ${one.hint}, focused ${m1.hint})`);
   check(m30.lastBottom !== undefined && m30.lastBottom <= m30.top + 0.5, `newest message overlaps the box or is out of view (bottom ${m30.lastBottom}, box top ${m30.top})`);
   // The cap follows the window.
   await page.setViewportSize({ width: 1280, height: 640 });
@@ -862,6 +931,7 @@ async function main() {
       if (screen.rooms) await page.addInitScript(roomsMock, { data: ROOM_DATA[screen.rooms] });
       await page.route(`${HERMES}/**`, fakeHermes);
       await page.route(`${ADMIN}/**`, fakeHermes);
+      if (screen.clock) await page.clock.install(); // a run that has gone on for a while (fast-forwarded below)
       const path = screen.path(posture);
       let problems;
       try {
@@ -871,6 +941,7 @@ async function main() {
         for (const l of screen.clickAll ?? []) await page.getByLabel(l, { exact: true }).first().click();
         if (screen.fill) await page.getByLabel(screen.fill[0]).fill(screen.fill[1]);
         if (screen.then) await page.getByText(screen.then, { exact: false }).first().waitFor({ timeout: 15_000 });
+        if (screen.act) await screen.act(page);
         await page.waitForTimeout(400); // let the list scroll to the end and statuses settle
         problems = await page.evaluate(audit, {
           insets: shape.insets,
@@ -880,6 +951,7 @@ async function main() {
         });
         if (screen.name === 'chat') problems.push(...(await page.evaluate(measureTranscript)));
         if (screen.name === 'chats') problems.push(...(await page.evaluate(measureChats)));
+        if (screen.check) problems.push(...(await screen.check(page, posture)));
       } catch (e) {
         problems = [`didn't render: ${e.message.split('\n')[0]}`];
       }
