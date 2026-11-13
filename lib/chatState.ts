@@ -1,6 +1,7 @@
 // Chat screen state as a pure reducer, so the streaming logic is unit-tested
 // without React Native.
 import type { ApprovalChoice, ApprovalRequest, ChatEvent, ChatMessage } from './hermes';
+import { isBanner, type Failure } from './errors';
 import { doneToolName, liveToolName } from './toolNames';
 
 export interface ToolCall {
@@ -15,6 +16,8 @@ export interface ChatState {
   pending: { text: string; tools: ToolCall[]; thinking: boolean; resumed?: boolean; remote?: boolean } | null;
   runId: string | null;
   error: string | null;
+  /** The last turn's failure, shown in plain words (lib/errors.ts): a banner, a card in the transcript, or a line under your bubble. */
+  failure: Failure | null;
   /** The reply is paused until Brennan allows or denies a command. */
   approval: ApprovalRequest | null;
   /** Approvals answered during the running reply; each shows as a one-line chip until the reply is done. */
@@ -26,18 +29,18 @@ export interface Decision {
   command: string;
 }
 
-export const initialChat: ChatState = { messages: [], pending: null, runId: null, error: null, approval: null, decisions: [] };
+export const initialChat: ChatState = { messages: [], pending: null, runId: null, error: null, failure: null, approval: null, decisions: [] };
 
 export type ChatAction =
   | { type: 'loaded'; messages: ChatMessage[] }
-  | { type: 'send'; text: string; images?: string[] }
+  | { type: 'send'; text: string; images?: string[]; /** Try again: the failed message is replaced, not repeated. */ retry?: boolean }
   | { type: 'event'; event: ChatEvent }
   | { type: 'resumed'; runId: string }
   /** The last message was sent from another device and its reply isn't in yet. */
   | { type: 'remote' }
   /** A resumed reply finished: the reloaded history already has it, so drop the partial copy. */
   | { type: 'settled' }
-  | { type: 'failed'; message: string }
+  | { type: 'failed'; message: string; status?: number; notSent?: boolean }
   /** What the run is waiting on, from a status check (null: nothing any more). */
   | { type: 'approval'; request: ApprovalRequest | null }
   /** The approval card was answered: it collapses to a chip. */
@@ -50,17 +53,18 @@ const nextId = () => `local-${++localId}`;
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case 'loaded':
-      return { ...state, messages: action.messages, error: null };
+      return { ...state, messages: action.messages, error: null, failure: state.failure && isBanner(state.failure) ? null : state.failure };
     case 'send':
       return {
         ...state,
         messages: [
-          ...state.messages,
+          ...(action.retry ? state.messages.slice(0, Math.max(0, state.messages.map((m) => m.role).lastIndexOf('user'))) : state.messages),
           { id: nextId(), role: 'user', content: action.text, ...(action.images?.length ? { localImages: action.images } : {}) },
         ],
         pending: { text: '', tools: [], thinking: true },
         runId: null,
         error: null,
+        failure: null,
         approval: null,
         decisions: [],
       };
@@ -74,19 +78,20 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         runId: action.runId,
         pending: { ...(state.pending ?? { text: '', tools: [], thinking: true }), resumed: true },
         error: null,
+        failure: null,
       };
     case 'remote':
       if (state.pending && !state.pending.remote) return state;
-      return { ...state, runId: null, pending: { text: '', tools: [], thinking: true, resumed: true, remote: true }, error: null };
+      return { ...state, runId: null, pending: { text: '', tools: [], thinking: true, resumed: true, remote: true }, error: null, failure: null };
     case 'settled':
-      return { ...state, pending: null, runId: null, approval: null, decisions: [] };
+      return { ...state, pending: null, runId: null, approval: null, decisions: [], failure: null };
     case 'approval':
       return { ...state, approval: action.request };
     case 'answered':
       if (!state.approval) return state;
       return { ...state, approval: null, decisions: [...state.decisions, { choice: action.choice, command: state.approval.command }] };
     case 'failed':
-      return finish({ ...state, error: action.message });
+      return finish({ ...state, error: action.message, failure: { raw: action.message, status: action.status, notSent: action.notSent } });
     case 'ended':
       return state.pending ? finish(state) : state;
   }
@@ -119,9 +124,9 @@ function applyEvent(state: ChatState, e: ChatEvent): ChatState {
     case 'completed':
       return { ...state, pending: { ...p, text: e.content || p.text, thinking: false } };
     case 'finished':
-      return finish(e.status === 'failed' ? { ...state, error: 'The bot hit an error on that one.' } : state);
+      return finish(e.status === 'failed' ? { ...state, error: 'The bot hit an error on that one.', failure: { raw: 'The bot hit an error on that one.', stopped: true } } : state);
     case 'error':
-      return { ...state, error: e.message };
+      return { ...state, error: e.message, failure: { raw: e.message, fromHermes: true } };
   }
 }
 
@@ -150,6 +155,8 @@ export type ChatRow =
   | { kind: 'approval'; id: 'approval'; request: ApprovalRequest }
   /** An answered approval, collapsed to a chip. */
   | { kind: 'decision'; id: string; decision: Decision }
+  /** A failed turn: a card (or the "Not sent" line under your bubble). Connection and key problems are banners, not rows. */
+  | { kind: 'failure'; id: 'failure'; failure: Failure }
   /** A message typed while a reply was running; it goes out when that reply is done. */
   | { kind: 'queued'; id: string; text: string };
 
@@ -157,7 +164,7 @@ export type ChatRow =
  * Rows oldest first. The in-flight reply ends with its live activity and its text (or the typing
  * bubble); an approval Hermes is waiting on comes last, and the typing bubble steps aside for it.
  */
-export function chatRows(state: Pick<ChatState, 'messages' | 'pending'> & Partial<Pick<ChatState, 'approval' | 'decisions'>>, queued: string[] = []): ChatRow[] {
+export function chatRows(state: Pick<ChatState, 'messages' | 'pending'> & Partial<Pick<ChatState, 'approval' | 'decisions' | 'failure'>>, queued: string[] = []): ChatRow[] {
   const rows: ChatRow[] = [];
   let run: ToolCall[] | null = null;
   for (const m of state.messages) {
@@ -179,13 +186,14 @@ export function chatRows(state: Pick<ChatState, 'messages' | 'pending'> & Partia
     if (p.text || !state.approval) rows.push({ kind: 'pending', id: 'pending', text: p.text });
   }
   if (state.approval) rows.push({ kind: 'approval', id: 'approval', request: state.approval });
+  if (state.failure && !isBanner(state.failure)) rows.push({ kind: 'failure', id: 'failure', failure: state.failure });
   queued.forEach((text, i) => rows.push({ kind: 'queued', id: `queued-${i}`, text }));
   return rows;
 }
 
 /** Who a row belongs to, for spacing: you, or the bot (its chips, replies and routine cards). */
 function side(row: ChatRow): 'me' | 'bot' {
-  if (row.kind === 'queued') return 'me';
+  if (row.kind === 'queued' || (row.kind === 'failure' && row.failure.notSent)) return 'me';
   return row.kind === 'message' && row.message.role === 'user' && !row.message.routine ? 'me' : 'bot';
 }
 

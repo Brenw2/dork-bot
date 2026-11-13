@@ -1,5 +1,6 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Sprite } from '@/components/BotSprite';
+import { Group, GroupHeader, GroupRow, LEADING_INSET } from '@/components/Grouped';
 import { BOT_COLORS, CHARACTER_IDS, CHARACTERS, lookName, looksOf, type Look } from '@/lib/sprites';
 import { colors } from '@/lib/theme';
 
@@ -50,27 +51,24 @@ export function LookPicker({ value, onChange }: { value: Look; onChange: (look: 
       </View>
 
       {looks.length > 1 ? (
-        <View style={{ gap: 6 }}>
-          <Text style={styles.heading}>Style</Text>
-          <ScrollView horizontal contentContainerStyle={styles.looks} accessibilityRole="radiogroup" accessibilityLabel="Style">
+        <View>
+          <GroupHeader>Style</GroupHeader>
+          <Group inset={LEADING_INSET}>
             {looks.map((_, v) => {
               const on = v === value.variant;
               const name = lookName(value.character, v);
               return (
-                <Pressable
+                <GroupRow
                   key={v}
+                  label={name}
+                  leading={<Sprite character={value.character} variant={v} color={value.color} mood="idle" size={32} seed={v} />}
+                  right={on ? <Text style={[styles.check, { color: value.color }]}>✓</Text> : undefined}
                   onPress={() => onChange({ ...value, variant: v })}
-                  style={[styles.cell, on && { borderColor: value.color, backgroundColor: colors.card }]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: on }}
                   accessibilityLabel={name}
-                >
-                  <Sprite character={value.character} variant={v} color={value.color} mood="idle" size={52} seed={v} />
-                  <Text style={[styles.label, on && { color: colors.text }]}>{name}</Text>
-                </Pressable>
+                />
               );
             })}
-          </ScrollView>
+          </Group>
         </View>
       ) : null}
     </View>
@@ -94,4 +92,5 @@ const styles = StyleSheet.create({
   },
   heading: { color: colors.dim, fontSize: 13 },
   label: { color: colors.dim, fontSize: 12 },
+  check: { fontSize: 22, fontWeight: '700' },
 });

@@ -3,7 +3,7 @@
 // sheet's create action (New chat, New routine) as an icon on the left. A screen puts <Sheet .../>
 // in its tree; on the phone that sets the native header, on desktop the panel (Overlay) reads it.
 import { router, Stack } from 'expo-router';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/AppIcons';
 import { isDesktop } from '@/components/desktop';
@@ -42,14 +42,36 @@ const dismiss = () => (router.canGoBack() ? router.back() : router.replace('/'))
  * app accent. `close`: "done" for a list, "cancel" for a form that commits with its own button.
  * Pass a stable `action` (useMemo) so the header isn't rebuilt on every render.
  */
-export function Sheet({ title, bot, action: create, close = 'done' }: { title: string; bot?: string; action?: SheetAction; close?: 'done' | 'cancel' }) {
+export function Sheet({
+  title,
+  bot,
+  action: create,
+  close = 'done',
+  commit,
+}: {
+  title: string;
+  bot?: string;
+  action?: SheetAction;
+  close?: 'done' | 'cancel';
+  /** A form's commit ("Save", "Create"): semibold on the right of the header (a small primary button in a desktop panel). */
+  commit?: { label: string; onPress: () => void; disabled?: boolean };
+}) {
   const { color: botColor } = useBotLook(bot ?? '');
   const color = bot ? botColor : colors.accent;
   const name = useBotName(bot ?? '');
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  const hasCommit = !!commit;
+  const commitLabel = commit?.label;
+  const commitOff = !!commit?.disabled;
+  const panelAction = useMemo<SheetAction | null>(
+    () => create ?? (hasCommit ? { label: commitLabel ?? '', icon: 'check', onPress: () => !commitOff && commitRef.current?.onPress() } : null),
+    [create, hasCommit, commitLabel, commitOff],
+  );
   useEffect(() => {
-    setAction(create ?? null);
+    setAction(panelAction);
     return () => setAction(null);
-  }, [create]);
+  }, [panelAction]);
   if (isDesktop) return null;
   return (
     <Stack.Screen
@@ -63,7 +85,11 @@ export function Sheet({ title, bot, action: create, close = 'done' }: { title: s
           : close === 'cancel'
             ? () => <TextButton label="Cancel" color={color} bold={false} />
             : () => null,
-        headerRight: close === 'done' ? () => <TextButton label="Done" color={color} bold /> : () => null,
+        headerRight: hasCommit
+          ? () => <TextButton label={commitLabel ?? ''} color={commitOff ? colors.faint : color} bold onPress={() => !commitOff && commitRef.current?.onPress()} />
+          : close === 'done'
+            ? () => <TextButton label="Done" color={color} bold />
+            : () => null,
       }}
     />
   );
@@ -78,9 +104,9 @@ function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-function TextButton({ label, color, bold }: { label: string; color: string; bold: boolean }) {
+function TextButton({ label, color, bold, onPress = dismiss }: { label: string; color: string; bold: boolean; onPress?: () => void }) {
   return (
-    <Pressable onPress={dismiss} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
       <Text style={[styles.textButtonText, { color }, bold && { fontWeight: '600' }]} maxFontSizeMultiplier={1.4}>{label}</Text>
     </Pressable>
   );

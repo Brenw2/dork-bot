@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,10 +17,12 @@ import { activity } from '@/lib/activity';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { getConnection } from '@/lib/bots';
 import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, rowGap, type ChatRow } from '@/lib/chatState';
-import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
+import { HermesClient, HermesError, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
 import { useOnScreen } from '@/components/notifications';
 import { ChatHeader, ModelBanner } from '@/components/ChatHeader';
+import { FailureBanner, FailureCard, useRetryCountdown } from '@/components/ChatErrors';
+import { describeFailure } from '@/lib/errors';
 import { Alert } from '@/components/alert';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
@@ -115,7 +118,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
         }
       } catch (e) {
         if (!live) return;
-        dispatch({ type: 'failed', message: (e as Error).message });
+        dispatch({ type: 'failed', message: (e as Error).message, status: (e as HermesError).status });
         retry = setTimeout(() => setAttempt((n) => n + 1), 5000);
         sub = AppState.addEventListener('change', (s) => s === 'active' && setAttempt((n) => n + 1));
       }
@@ -229,14 +232,14 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   // Typed while a reply was running: goes out, in order, once that reply is done.
   const [queued, setQueued] = useState<{ text: string; images: Attachment[] }[]>([]);
 
-  const submit = async (text: string, images: Attachment[]) => {
+  const submit = async (text: string, images: Attachment[], retry = false) => {
     if (!client) return;
     const tooBig = attachmentProblem(images);
     if (tooBig) return setAttachError(tooBig);
     setAttachError(null);
     pinned.current = true;
     startedAt.current = Date.now();
-    dispatch({ type: 'send', text, images: images.map((im) => im.dataUrl) });
+    dispatch({ type: 'send', text, retry, images: images.map((im) => im.dataUrl) });
     const abort = new AbortController();
     abortRef.current = abort;
     let runId: string | null = null;
@@ -269,7 +272,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
         // Network dropped or the app was backgrounded mid-reply; the reply carries on on Hermes.
         liveRuns.detach(sessionId);
         dispatch({ type: 'resumed', runId });
-      } else dispatch({ type: 'failed', message: (e as Error).message });
+      } else dispatch({ type: 'failed', message: (e as Error).message, status: (e as HermesError).status, notSent: !runId && (e as HermesError).status === undefined });
     } finally {
       startedAt.current = liveRuns.get(sessionId)?.startedAt ?? 0;
     }
@@ -297,6 +300,13 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   }, [running, client, queued]);
   // The bot list's "Needs you" follows the approval this chat is showing.
   useEffect(() => liveRuns.setApproval(sessionId, state.approval), [sessionId, state.approval]);
+
+  // Try again: resend your last message to the same chat (it replaces the failed one in the transcript).
+  const tryAgain = () => {
+    const last = [...state.messages].reverse().find((m) => m.role === 'user' && !m.routine);
+    if (!last || !client || (running && !remote)) return;
+    void submit(last.content, (last.localImages ?? []).map((dataUrl) => ({ dataUrl })), true);
+  };
 
   const [answering, setAnswering] = useState(false);
   const answer = async (choice: ApprovalChoice) => {
@@ -387,7 +397,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   const roundSize = desk
     ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
     : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth };
-  const disconnected = !client && !!state.error && !state.error.startsWith('No saved key');
+  const disconnected = !client && !!state.failure && state.failure.status === undefined && !state.failure.raw.startsWith('No saved key');
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   const model = useChatModel(bot);
@@ -399,6 +409,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
       ? attach(PICK_SOURCES[0].source)
       : Menu.show('Add a picture', [...PICK_SOURCES.map((p) => ({ text: p.label, onPress: () => attach(p.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
   const warming = useConnectorWarmup(bot);
+  const retryIn = useRetryCountdown(!client && !!state.failure, attempt);
 
   return (
     <KeyboardAvoidingView
@@ -409,6 +420,9 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     >
       <ChatHeader bot={bot} pane={inPane} list={list} model={model} />
       {model.problem ? <ModelBanner bot={bot} problem={model.problem} /> : null}
+      {state.failure && describeFailure(state.failure, name).place === 'banner' ? (
+        <FailureBanner failure={state.failure} name={name} secondsToRetry={retryIn} onRetry={() => setAttempt((n) => n + 1)} onPair={() => router.push('/add')} />
+      ) : null}
       <FlatList
         ref={listRef}
         inverted={!WEB}
@@ -452,11 +466,11 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
             row={item}
             bot={bot}
             since={startedAt.current}
-            approval={{ busy: answering, onAnswer: answer }}
+            approval={{ busy: answering, onAnswer: answer, onAgain: tryAgain, onNewChat: () => void startNewChat(bot), name }}
           />
         )}
       />
-      {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
+      {/* connection and key problems are a banner under the nav (above); a failed turn is a card in the transcript */}
       {warming.length ? (
         <Text style={[styles.warming, column]} accessibilityLiveRegion="polite">
           {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
@@ -582,7 +596,9 @@ function useConnectorWarmup(bot: string) {
 
 export { deleteChat, onChatsChanged, renameChat } from '@/components/chatActions';
 
-function Row({ row, bot, since, gap, approval }: { row: ChatRow; bot: string; since: number; gap: number; approval: { busy: boolean; onAnswer: (c: ApprovalChoice) => void } }) {
+type RowCtx = { busy: boolean; onAnswer: (c: ApprovalChoice) => void; onAgain: () => void; onNewChat: () => void; name: string };
+
+function Row({ row, bot, since, gap, approval }: { row: ChatRow; bot: string; since: number; gap: number; approval: RowCtx }) {
   return (
     <View style={{ marginTop: gap }}>
       <RowBody row={row} bot={bot} since={since} approval={approval} />
@@ -590,7 +606,7 @@ function Row({ row, bot, since, gap, approval }: { row: ChatRow; bot: string; si
   );
 }
 
-function RowBody({ row, bot, since, approval }: { row: ChatRow; bot: string; since: number; approval: { busy: boolean; onAnswer: (c: ApprovalChoice) => void } }) {
+function RowBody({ row, bot, since, approval }: { row: ChatRow; bot: string; since: number; approval: RowCtx }) {
   switch (row.kind) {
     case 'message':
       if (row.message.routine) return <RoutineNoteView note={row.message.routine} bot={bot} />;
@@ -601,6 +617,8 @@ function RowBody({ row, bot, since, approval }: { row: ChatRow; bot: string; sin
       return row.text ? <Reply text={row.text} bot={bot} /> : <TypingRow bot={bot} since={since} />;
     case 'approval':
       return <ApprovalCard request={row.request} bot={bot} busy={approval.busy} onAnswer={approval.onAnswer} />;
+    case 'failure':
+      return <FailureCard failure={row.failure} bot={bot} name={approval.name} onAgain={approval.onAgain} onNewChat={approval.onNewChat} onRetryUnsent={approval.onAgain} />;
     case 'decision':
       return <DecisionChip decision={row.decision} bot={bot} />;
     case 'queued':

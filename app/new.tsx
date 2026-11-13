@@ -11,7 +11,9 @@ import { pushMeta } from '@/components/sync';
 import { listBots, saveBot } from '@/lib/bots';
 import { TEMPLATE_PROFILE, type HermesManager, type Profile } from '@/lib/manager';
 import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
-import { button, colors, mono } from '@/lib/theme';
+import { colors, mono } from '@/lib/theme';
+import { Button, SmallButton } from '@/components/Buttons';
+import { Group, GroupHeader, GroupRow } from '@/components/Grouped';
 import { Sheet } from '@/components/Sheet';
 
 // Create a bot (a new Hermes profile, on any model), or connect one that's already on Hermes.
@@ -129,46 +131,23 @@ export default function NewBot() {
         It starts on the same model and tools as {'"'}assistant{'"'}{template?.model ? ` (${template.model})` : ''}, with its own memory and chats. Switch it to any model, local or frontier, from the model line in its chat.
       </Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable
-        style={[styles.button, (!!busy || !name || !job.trim()) && button.disabled]}
-        onPress={create}
-        disabled={!!busy || !name || !job.trim()}
-        accessibilityRole="button"
-        accessibilityLabel="Create bot"
-      >
-        {busy ? (
-          <View style={styles.busyRow}>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.buttonText}>{busy}</Text>
-          </View>
-        ) : (
-          <Text style={[styles.buttonText, (!name || !job.trim()) && button.disabledText]}>Create bot</Text>
-        )}
-      </Pressable>
+      <Button label={busy ? busy : 'Create bot'} accessibilityLabel="Create bot" busy={!!busy} disabled={!name || !job.trim()} onPress={create} />
 
       {others.length ? (
-        <View style={{ gap: 10, marginTop: 12 }}>
-          <Text style={styles.label}>Already on Hermes</Text>
-          {others.map((p) => (
-            <Pressable
-              key={p.name}
-              style={styles.row}
-              onPress={() => connect(p.name)}
-              disabled={!!busy}
-              accessibilityRole="button"
-              accessibilityLabel={`Add ${p.name}`}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{p.name}</Text>
-                {p.description ? (
-                  <Text style={styles.sub} numberOfLines={2}>
-                    {p.description}
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.addText}>Add</Text>
-            </Pressable>
-          ))}
+        <View>
+          <GroupHeader>Already on Hermes</GroupHeader>
+          <Group>
+            {others.map((p) => (
+              <GroupRow
+                key={p.name}
+                label={p.name}
+                detail={p.description || undefined}
+                onPress={() => connect(p.name)}
+                accessibilityLabel={`Add ${p.name}`}
+                right={<SmallButton label="Add" tone="tint" disabled={!!busy} onPress={() => connect(p.name)} accessibilityLabel={`Add ${p.name}`} />}
+              />
+            ))}
+          </Group>
         </View>
       ) : null}
 
@@ -208,9 +187,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   error: { color: colors.bad, fontSize: 14 },
-  button: { ...button.primary, height: 50, borderRadius: 25 },
-  busyRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  buttonText: button.text,
   row: {
     flexDirection: 'row',
     alignItems: 'center',
