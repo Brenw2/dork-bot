@@ -255,6 +255,8 @@ const SCREENS = [
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
+  // Card 19 fix 10: the bot sheet (tap the chat title, long-press a row).
+  { name: 'bot-sheet', paired: true, path: () => '/bot/assistant', waitFor: 'Routine results' },
   { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
 ];
 
@@ -434,7 +436,7 @@ function measureChats() {
   return c === 'rgb(93, 98, 106)' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
 }
 
-const FIXED = { chat: ['Message assistant', 'Send', 'Change model', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Change model'], bots: ['New bot'], chats: ['New chat', "assistant's work"], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'] };
+const FIXED = { chat: ['Message assistant', 'Send', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', 'Send', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Send', 'Add a picture'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 function serve(dir) {
@@ -537,6 +539,291 @@ async function composerTest(browser, base) {
   return problems;
 }
 
+// Card 19 (docs/design/REVIEW.md fixes 1, 2, 8, 10): sizes and spacing the comps lock, measured in the
+// browser on the iPhone and on a desktop window with a stub of the desktop app's bridge (so the
+// desktop-only chrome, hover states and in-app menus are the real ones).
+const PHONE = POSTURES.iphone;
+const RED = 'rgb(240, 106, 106)';
+
+async function uiPage(browser, base, { desktop, shape = PHONE, viewport, extraBots, paired = true } = {}) {
+  const context = await browser.newContext({ viewport: viewport ?? { width: shape.width, height: shape.height }, deviceScaleFactor: 2 });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(`page error: ${e.message}`));
+  await page.addInitScript(
+    ({ insets, store, desktop }) => {
+      if (!desktop) globalThis.__DORK_TEST_INSETS__ = insets;
+      for (const [k, v] of Object.entries(store)) localStorage.setItem(`dorkbot.${k}`, v);
+      if (desktop) {
+        // The desktop app's bridge: requests go through the page's own fetch (Playwright answers them), values live in localStorage.
+        let listener = () => {};
+        globalThis.dorkDesktop = {
+          platform: 'linux',
+          onFetchEvent: (fn) => (listener = fn),
+          fetchAbort: () => {},
+          fetchStart: async (id, url, init) => {
+            const res = await fetch(url, init);
+            const buf = new Uint8Array(await res.arrayBuffer());
+            setTimeout(() => {
+              listener(id, 'chunk', buf);
+              listener(id, 'end');
+            }, 0);
+            return { status: res.status, ok: res.ok };
+          },
+          storeGet: async (k) => localStorage.getItem(`dorkbot.${k}`),
+          storeSet: async (k, v) => localStorage.setItem(`dorkbot.${k}`, v),
+          storeDelete: async (k) => localStorage.removeItem(`dorkbot.${k}`),
+          storeBackend: async () => 'test',
+          openAuth: async () => {},
+          closeAuth: () => {},
+          message: async () => ({ response: 0, checked: false }),
+        };
+      }
+    },
+    { insets: shape.insets, store: seedFor({ paired, extraBots }), desktop: !!desktop },
+  );
+  await page.route(`${HERMES}/**`, fakeHermes);
+  await page.route(`${ADMIN}/**`, fakeHermes);
+  return { context, page, errors };
+}
+
+// Boxes of what's on screen, by accessible label (exact start) or visible text.
+const rectOf = async (page, label) => {
+  const box = await page.getByLabel(label, { exact: false }).first().boundingBox({ timeout: 5000 }).catch(() => null);
+  return box;
+};
+const textRect = async (page, text) => page.getByText(text, { exact: true }).first().boundingBox({ timeout: 5000 }).catch(() => null);
+const css = (page, label, prop) => page.getByLabel(label, { exact: false }).first().evaluate((el, p) => getComputedStyle(el)[p], prop);
+
+async function uiPolishTests(browser, base) {
+  const report = [];
+  const run = async (name, ctx, fn) => {
+    const problems = [];
+    const check = (ok, msg) => ok || problems.push(msg);
+    const near = (a, b, tol = 1) => typeof a === 'number' && Math.abs(a - b) <= tol;
+    try {
+      await fn({ check, near, ...ctx });
+    } catch (e) {
+      problems.push(`didn't run: ${e.message.split('\n')[0]}`);
+      await ctx.page.screenshot({ path: join(OUT, `ui--${name.replace(/\W+/g, '-')}-failed.png`) }).catch(() => undefined);
+    }
+    problems.push(...ctx.errors);
+    await ctx.context.close();
+    console.log(`${problems.length ? 'FAIL' : 'ok  '} ui ${name}`);
+    for (const p of problems) console.log(`       - ${p}`);
+    report.push({ posture: 'ui', screen: name, problems });
+    return problems.length;
+  };
+  let failed = 0;
+  const shot = (page, name) => page.screenshot({ path: join(OUT, `ui--${name}.png`) });
+
+  // ---- iPhone: the bot list like Messages (fix 1) ----
+  failed += await run('iphone bot list', await uiPage(browser, base, { paired: false }), async ({ page, check, near }) => {
+    await page.goto(`${base}/`);
+    await page.getByText('Key rejected. Tap to pair again.').waitFor({ timeout: 15_000 });
+    await page.getByText('No messages yet').waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(300);
+    const body = await page.evaluate(() => document.body.innerText);
+    check(!/Connected/.test(body), 'no row may say "Connected"');
+    check(!/Checking…/.test(body), 'no row may flash "Checking…"');
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('[role=button]')]
+        .filter((e) => /^(assistant|scout|a-bot-with)/.test(e.getAttribute('aria-label') ?? '') && e.getBoundingClientRect().height > 60)
+        .map((e) => ({ label: e.getAttribute('aria-label'), r: e.getBoundingClientRect().toJSON() })),
+    );
+    check(rows.length === 3, `3 rows expected, got ${rows.length}`);
+    for (const { label, r } of rows) {
+      check(r.height >= 76 - 0.5, `row "${label}" is ${r.height} tall; at least 76`);
+      check(near(r.left, 0) && near(r.width, PHONE.width), `row "${label}" must be full-bleed (x ${r.left}, width ${r.width})`);
+    }
+    const name = await textRect(page, 'assistant');
+    check(near(name?.x, 80), `row text must start at x 80, got ${name?.x}`);
+    const avatar = await page.evaluate(() => {
+      const d = [...document.querySelectorAll('div')].find((e) => { const r = e.getBoundingClientRect(); return Math.abs(r.width - 52) < 0.5 && Math.abs(r.height - 52) < 0.5 && getComputedStyle(e).borderRadius.startsWith('26'); });
+      return d ? d.getBoundingClientRect().toJSON() : null;
+    });
+    check(avatar && near(avatar.left, 16), `avatar disc must be 52 wide at x 16, got ${JSON.stringify(avatar)}`);
+    const title = await page.getByText('Dork Bot', { exact: true }).first().evaluate((el) => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight, x: el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft) }));
+    check(title.size === '34px' && title.weight === '700' && near(title.x, 16), `large title must be 34/700 at x 16, got ${JSON.stringify(title)}`);
+    for (const label of ['More', 'New bot']) {
+      const r = await rectOf(page, label);
+      check(near(r?.width, 44) && near(r?.height, 44), `"${label}" must be a 44 x 44 button, got ${r?.width} x ${r?.height}`);
+    }
+    check((await css(page, 'scout,', 'display')) !== undefined, 'scout row exists');
+    const red = await page.getByText('Key rejected. Tap to pair again.').evaluate((el) => getComputedStyle(el).color);
+    check(red === RED, `the 401 line must be #F06A6A, got ${red}`);
+    const first = await page.evaluate(() => document.querySelector('[role=button][aria-label^="assistant,"]')?.getBoundingClientRect().top);
+    const second = await page.evaluate(() => [...document.querySelectorAll('[role=button]')].find((e) => /^(a-bot|scout)/.test(e.getAttribute('aria-label') ?? ''))?.getBoundingClientRect().top);
+    check(first < second, 'the bot with the newest message sorts first');
+    await shot(page, 'iphone-bots');
+  });
+
+  // ---- iPhone: one-row chat header (fix 2) and the model-problem banner ----
+  failed += await run('iphone chat header', await uiPage(browser, base), async ({ page, check, near }) => {
+    await page.goto(`${base}/chat/assistant`);
+    await page.getByText('Any time.', { exact: false }).first().waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(300);
+    const top = PHONE.insets.top;
+    for (const label of ["assistant's chats", 'More for this chat', 'Back to the bots']) {
+      const r = await rectOf(page, label);
+      check(r && r.height >= 44 - 0.5 && r.y >= top - 0.5 && r.y + r.height <= top + 52 + 0.5, `"${label}" must be at least 44 tall inside the 52 pt bar (y ${r?.y}, h ${r?.height})`);
+    }
+    for (const label of ["assistant's chats", 'More for this chat']) {
+      const r = await rectOf(page, label);
+      check(near(r?.width, 44), `"${label}" must be 44 wide, got ${r?.width}`);
+      check(r && near(r.y + r.height / 2, top + 26, 0.6), `"${label}" must be centered in the 52 pt bar (center ${r && r.y + r.height / 2}, want ${top + 26})`);
+    }
+    const title = await rectOf(page, 'Bot settings for assistant');
+    check(title && title.y >= top && title.y + title.height <= top + 52, `the title block must sit in the 52 pt bar (y ${title?.y}, h ${title?.height})`);
+    const bodyText = await page.evaluate(() => document.body.innerText);
+    check(!/Change\b/.test(bodyText) && !/Pick model/.test(bodyText), 'no model bar and no banner while the model works');
+    // Nothing between the bar and the transcript: the bar is the only chrome above the first message.
+    const firstMsg = await textRect(page, 'what time is the mets game tonight and will it rain');
+    check(firstMsg && firstMsg.y <= top + 52 + 14 + 30, `the first message starts ${firstMsg ? firstMsg.y - top : '?'} pt under the status bar; at most about 96 (52 bar + 14 padding + bubble)`);
+    await shot(page, 'iphone-chat');
+  });
+  failed += await run('iphone model problem banner', await uiPage(browser, base, { extraBots: ['chief'] }), async ({ page, check, near }) => {
+    await page.goto(`${base}/chat/chief`);
+    await page.getByText('which doesn', { exact: false }).first().waitFor({ timeout: 15_000 });
+    const btn = await rectOf(page, 'Pick model');
+    check(near(btn?.height, 30 + 14, 0.6) || near(btn?.height, 30, 0.6), `"Pick model" must be 30 tall, got ${btn?.height}`);
+    const bg = await page.evaluate(() => {
+      const t = [...document.querySelectorAll('div')].find((e) => /which doesn/.test(e.textContent ?? '') && e.children.length === 3);
+      return t ? getComputedStyle(t).backgroundColor : null;
+    });
+    check(bg === 'rgb(36, 23, 26)', `the banner must be #24171A, got ${bg}`);
+    const header = await rectOf(page, 'Bot settings for chief');
+    const banner = await page.getByText('which doesn', { exact: false }).first().boundingBox();
+    check(header && banner && banner.y > header.y + header.height, 'the banner sits under the header row');
+    await shot(page, 'iphone-chat-model-problem');
+  });
+
+  // ---- iPhone: sheet header, Chats and the bot sheet (fixes 8 and 10) ----
+  failed += await run('iphone chats sheet', await uiPage(browser, base), async ({ page, check, near }) => {
+    await page.goto(`${base}/chats/assistant`);
+    await page.getByText('Mets tickets', { exact: false }).first().waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(300);
+    const body = await page.evaluate(() => document.body.innerText);
+    check(!/\+ New chat/.test(body), 'no full-width "+ New chat" slab');
+    check(/Press and hold a chat to rename or delete it\./.test(body), 'the footnote is there');
+    for (const label of ['New chat', 'Done']) {
+      const r = await rectOf(page, label);
+      check(r && r.height >= 44 - 0.5 && r.width >= 44 - 0.5, `"${label}" must have a 44 pt hit area, got ${r?.width} x ${r?.height}`);
+    }
+    const search = await page.getByLabel('Search chats').first().evaluate((el) => el.parentElement.getBoundingClientRect().toJSON());
+    check(near(search?.height, 36) || near(search?.height, 36, 0.6), `the search field must be 36 tall, got ${search?.height}`);
+    const sheetTitle = await page.getByText('Chats', { exact: true }).first().evaluate((el) => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight }));
+    check(sheetTitle.size === '17px' && sheetTitle.weight === '600', `sheet title must be 17/600, got ${JSON.stringify(sheetTitle)}`);
+    const sub = await textRect(page, 'assistant');
+    check(sub, 'the bot name is the 12 pt subtitle');
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('[role=button]')].filter((e) => /^(Mets tickets|Dork Bot: assistant|What model|why does this test)/i.test(e.getAttribute('aria-label') ?? '')).map((e) => e.getBoundingClientRect().toJSON()),
+    );
+    check(rows.length >= 3, `3 chat rows expected, got ${rows.length}`);
+    for (const r of rows) {
+      check(r.height >= 52, `a chat row must be at least 52 tall, got ${r.height}`);
+      check(near(r.left, 16) && near(r.right, PHONE.width - 16), `rows sit in one container with 16 margins (x ${r.left}-${r.right})`);
+    }
+    const checks = await page.evaluate(() => [...document.querySelectorAll('[role=button] svg')].filter((s) => s.getBoundingClientRect().width === 22).length);
+    check(checks === 1, `exactly one ✓ (the open chat), got ${checks}`);
+    await shot(page, 'iphone-chats');
+  });
+  failed += await run('iphone bot sheet', await uiPage(browser, base), async ({ page, check, near }) => {
+    await page.goto(`${base}/bot/assistant`);
+    await page.getByText('Routine results', { exact: true }).waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(300);
+    const tiles = [];
+    for (const t of ['Chats', 'Routines', 'Connectors', 'Look']) tiles.push(await rectOf(page, `${t} for assistant`));
+    for (const r of tiles) check(near(r?.height, 68), `a tile must be 68 tall, got ${r?.height}`);
+    check(new Set(tiles.map((r) => Math.round(r?.y))).size === 1, 'the 4 tiles are in one row');
+    const nameFont = await page.getByText('assistant', { exact: true }).first().evaluate((el) => getComputedStyle(el).fontSize);
+    check(nameFont === '22px', `the bot's name must be 22, got ${nameFont}`);
+    const rows = await page.evaluate(() => ['Model', 'Routine results', 'Rename', 'Hide bot', 'Delete bot…'].map((t) => { const e = [...document.querySelectorAll('[role=button]')].find((b) => (b.getAttribute('aria-label') ?? '').startsWith(t)); return [t, e?.getBoundingClientRect().height]; }));
+    for (const [t, h] of rows) check(h >= 52, `"${t}" row must be at least 52 tall, got ${h}`);
+    const del = await page.getByText('Delete bot…', { exact: true }).evaluate((el) => getComputedStyle(el).color);
+    check(del === RED, `Delete bot… must be #F06A6A, got ${del}`);
+    const text = await page.evaluate(() => document.body.innerText);
+    check(['Model', 'Routine results', 'Notifications', 'Rename', 'Hide bot'].every((t) => text.includes(t)), 'the bot sheet has Model, Routine results, Notifications, Rename and Hide bot');
+    const done = await rectOf(page, 'Done');
+    check(done && done.height >= 44 - 0.5, 'Done has a 44 pt hit area');
+    await shot(page, 'iphone-bot-sheet');
+  });
+
+  // ---- Desktop 1280x800 with the desktop bridge: sidebar, header, menus, popover, panel ----
+  failed += await run('desktop sidebar, header and menus', await uiPage(browser, base, { desktop: true, viewport: DESKTOP }), async ({ page, check, near }) => {
+    await page.goto(`${base}/?bot=assistant`);
+    await page.getByText('Any time.', { exact: false }).first().waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(500);
+    // Sidebar: 320 wide, header 56 tall, no title bar, rows 64 tall inset 8.
+    const side = await page.evaluate(() => {
+      const row = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') ?? '').startsWith('assistant,'));
+      const r = row.getBoundingClientRect().toJSON();
+      let p = row.parentElement; // up to the sidebar column: the first ancestor spanning the full height
+      while (p && p.getBoundingClientRect().height < innerHeight - 1) p = p.parentElement;
+      const sb = p.getBoundingClientRect().toJSON();
+      const title = [...document.querySelectorAll('*')].find((e) => e.children.length === 0 && e.textContent === 'Dork Bot' && e.getBoundingClientRect().width > 0);
+      return { r, sb, title: title?.getBoundingClientRect().toJSON(), titleSize: title && getComputedStyle(title).fontSize };
+    });
+    check(near(side.r.height, 64), `sidebar row must be 64 tall, got ${side.r.height}`);
+    check(near(side.r.left, 8) && near(side.r.right, 312), `sidebar row must be inset 8 inside the 320 sidebar (x ${side.r.left}-${side.r.right})`);
+    check(near(side.sb.width, 320, 1.5), `sidebar must be 320 wide, got ${side.sb.width}`);
+    check(side.title && near(side.title.left, 18) && side.titleSize === '17px', `"Dork Bot" is 17 bold at x 18 in the sidebar header, got ${JSON.stringify(side.title)} ${side.titleSize}`);
+    check(side.title && side.title.top >= 0 && side.title.top + side.title.height <= 56, 'the sidebar header is 56 tall and there is no title bar above it');
+    for (const label of ['More', 'New bot']) {
+      const r = await rectOf(page, label);
+      check(near(r?.width, 32) && near(r?.height, 32), `sidebar "${label}" must be a 32 x 32 button, got ${r?.width} x ${r?.height}`);
+    }
+    check(!/Connected/.test(await page.evaluate(() => document.body.innerText)), 'no row says "Connected"');
+    // Chat header: 56 tall with a hairline, sidebar toggle 32, Chats and ⋯ 32.
+    const hb = await rectOf(page, 'Hide the bot list');
+    check(near(hb?.width, 32) && near(hb?.height, 32), `the sidebar toggle must be 32 x 32, got ${hb?.width} x ${hb?.height}`);
+    check(hb && hb.y + hb.height / 2 > 27 && hb.y + hb.height / 2 < 29, `header icons are centered in a 56 tall row (center y ${hb && hb.y + hb.height / 2})`);
+    for (const label of ["assistant's chats", 'More for this chat']) {
+      const r = await rectOf(page, label);
+      check(near(r?.width, 32) && near(r?.height, 32), `"${label}" must be 32 x 32, got ${r?.width} x ${r?.height}`);
+    }
+    // ⋯ opens the chat menu: 4 items in 3 groups, 32 tall.
+    await page.getByLabel('More for this chat', { exact: false }).first().click();
+    await page.getByRole('menuitem').first().waitFor({ timeout: 5000 });
+    const items = await page.getByRole('menuitem').evaluateAll((els) => els.map((e) => ({ text: e.textContent, h: e.getBoundingClientRect().height })));
+    check(items.length === 4, `the chat ⋯ has 4 items, got ${items.length}`);
+    check(items.map((i) => i.text.replace('Ctrl+N', '')).join('|') === 'New chat|Rename this chat|Bot settings|Delete this chat', `chat menu items, got ${items.map((i) => i.text).join('|')}`);
+    check(items.every((i) => near(i.h, 32)), 'menu items are 32 tall');
+    check(items[0].text.includes('Ctrl+N'), 'New chat shows its Ctrl+N shortcut');
+    const menuBg = await page.getByRole('menu').evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, r: getComputedStyle(el).borderRadius, w: el.getBoundingClientRect().width }));
+    check(menuBg.bg === 'rgb(34, 37, 42)' && menuBg.r === '12px', `menu must be #22252A radius 12, got ${JSON.stringify(menuBg)}`);
+    await shot(page, 'desktop-chat-menu');
+    // Arrow keys move, Esc closes.
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Escape');
+    check((await page.getByRole('menu').count()) === 0, 'Esc closes the menu');
+    // Title opens the bot sheet as a 360 wide popover.
+    await page.getByLabel('Bot settings for assistant').click();
+    await page.getByText('Routine results', { exact: true }).waitFor({ timeout: 5000 });
+    const pop = await page.getByRole('dialog').first().boundingBox();
+    check(near(pop?.width, 360), `the bot sheet is a 360 wide popover, got ${pop?.width}`);
+    await shot(page, 'desktop-bot-popover');
+    await page.keyboard.press('Escape');
+    // Chats opens a 560 wide panel with the 60 tall header.
+    await page.getByLabel("assistant's chats").click();
+    await page.getByText('Mets tickets', { exact: false }).first().waitFor({ timeout: 5000 });
+    const panel = await page.getByRole('dialog').first().boundingBox();
+    check(near(panel?.width, 560), `the panel must be 560 wide, got ${panel?.width}`);
+    const newChat = await rectOf(page, 'New chat');
+    check(near(newChat?.height, 32), `the panel's New chat button must be 32 tall, got ${newChat?.height}`);
+    check(newChat && panel && newChat.y >= panel.y && newChat.y + newChat.height <= panel.y + 60, 'the create action is in the 60 tall panel header');
+    const close = await page.getByRole('button', { name: 'Close' }).first().boundingBox();
+    check(close && near(close.width, 32), `✕ must be 32 x 32, got ${close?.width}`);
+    await shot(page, 'desktop-chats-panel');
+    await page.keyboard.press('Escape');
+    // Ctrl+\ hides the bot list.
+    await page.keyboard.press('Control+\\');
+    await page.getByLabel('Show the bot list').waitFor({ timeout: 5000 });
+    await shot(page, 'desktop-list-hidden');
+  });
+  return { failed, report };
+}
+
 async function main() {
   if (!args.includes('--no-build')) {
     execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', 'dist-web'], { cwd: ROOT, stdio: 'inherit' });
@@ -598,6 +885,11 @@ async function main() {
     const composer = await composerTest(browser, base);
     failed += composer.length ? 1 : 0;
     report.push({ posture: 'desktop', screen: 'composer', path: "/?bot=assistant", problems: composer });
+  }
+  if (!only || only === 'ui') {
+    const ui = await uiPolishTests(browser, base);
+    failed += ui.failed;
+    report.push(...ui.report);
   }
   await browser.close();
   server.close();

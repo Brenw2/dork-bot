@@ -3,12 +3,17 @@
 // app/_layout.tsx) draws them. The phone uses React Native's Alert instead (components/alert.ts).
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Icon, type IconName } from '@/components/AppIcons';
 import { colors } from '@/lib/theme';
 
 export interface DialogButton {
   text: string;
   style?: 'default' | 'cancel' | 'destructive';
   onPress?: (value?: string) => void;
+  /** Menus only: a 16 px icon, a right-aligned shortcut hint, and a separator above this item. */
+  icon?: IconName;
+  shortcut?: string;
+  sepBefore?: boolean;
 }
 
 export type DialogSpec =
@@ -53,13 +58,30 @@ function useEscape(close: () => void) {
   }, [close]);
 }
 
-const MENU_WIDTH = 240;
+const MENU_WIDTH = 248;
+const ITEM_H = 32;
 
 function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>; close: () => void }) {
   const { width, height } = useWindowDimensions();
   useEscape(close);
   const items = spec.items.filter((i) => i.style !== 'cancel');
-  const estHeight = items.length * 40 + (spec.title ? 36 : 0) + 12;
+  const [active, setActive] = useState(-1);
+  // Arrow keys move through the items, Enter picks one (Esc closes, above).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActive((i) => (e.key === 'ArrowDown' ? (i + 1) % items.length : (i <= 0 ? items.length : i) - 1));
+      } else if (e.key === 'Enter' && active >= 0) {
+        e.preventDefault();
+        close();
+        items[active]?.onPress?.();
+      }
+    };
+    globalThis.addEventListener?.('keydown', onKey, true);
+    return () => globalThis.removeEventListener?.('keydown', onKey, true);
+  }, [items, active, close]);
+  const estHeight = items.length * ITEM_H + items.filter((i) => i.sepBefore).length * 13 + 12;
   const a = spec.anchor ?? { x: width / 2 - MENU_WIDTH / 2, y: height / 3 };
   // Open below and to the left of the ⋯, kept on screen.
   const left = Math.max(8, Math.min(a.x - MENU_WIDTH + 24, width - MENU_WIDTH - 8));
@@ -68,19 +90,22 @@ function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
       <View style={[styles.menu, { left, top, width: MENU_WIDTH }]} role="menu" aria-label={spec.title}>
-        {spec.title ? <Text style={styles.menuTitle}>{spec.title}</Text> : null}
         {items.map((it, i) => (
-          <Pressable
-            key={i}
-            role="menuitem"
-            onPress={() => {
-              close();
-              it.onPress?.();
-            }}
-            style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [styles.menuItem, (hovered || pressed) && styles.menuItemHover]}
-          >
-            <Text style={[styles.menuText, it.style === 'destructive' && { color: colors.bad }]}>{it.text.replace(/…$/, '')}</Text>
-          </Pressable>
+          <View key={i}>
+            {it.sepBefore ? <View style={styles.menuSep} /> : null}
+            <Pressable
+              role="menuitem"
+              onPress={() => {
+                close();
+                it.onPress?.();
+              }}
+              style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [styles.menuItem, (hovered || pressed || i === active) && styles.menuItemHover]}
+            >
+              {it.icon ? <Icon name={it.icon} size={16} color={it.style === 'destructive' ? colors.bad : colors.dim} /> : null}
+              <Text style={[styles.menuText, it.style === 'destructive' && { color: colors.bad }]} numberOfLines={1}>{it.text.replace(/…$/, '')}</Text>
+              {it.shortcut ? <Text style={styles.menuShortcut}>{it.shortcut}</Text> : null}
+            </Pressable>
+          </View>
         ))}
       </View>
     </View>
@@ -155,17 +180,18 @@ function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' 
 const styles = StyleSheet.create({
   menu: {
     position: 'absolute',
-    backgroundColor: '#1D2025',
+    backgroundColor: colors.raised,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#353941',
-    paddingVertical: 6,
-    boxShadow: '0 12px 40px rgba(0,0,0,0.55)',
+    borderColor: colors.menuBorder,
+    padding: 6,
+    boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
   },
-  menuTitle: { color: colors.dim, fontSize: 12, fontWeight: '600', paddingHorizontal: 14, paddingTop: 6, paddingBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 },
-  menuItem: { paddingHorizontal: 14, height: 38, justifyContent: 'center', marginHorizontal: 6, borderRadius: 8 },
-  menuItemHover: { backgroundColor: '#2A2E35' },
-  menuText: { color: colors.text, fontSize: 15 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, height: ITEM_H, borderRadius: 7 },
+  menuItemHover: { backgroundColor: colors.menuHover },
+  menuText: { flex: 1, color: colors.text, fontSize: 14 },
+  menuShortcut: { color: colors.faint, fontSize: 12 },
+  menuSep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.menuBorder, marginVertical: 6, marginHorizontal: -0 },
   backdrop: { backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   dialog: {
     width: 420,

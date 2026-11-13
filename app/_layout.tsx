@@ -8,7 +8,6 @@ import { DialogHost } from '@/components/Dialogs';
 import { NotificationRoutes } from '@/components/notifications';
 import { Overlay } from '@/components/Overlay';
 import { TestInsets } from '@/components/TestInsets';
-import { useBotName } from '@/components/useBotName';
 import { applyInitialOrientation, OrientationController } from '@/components/useLayoutClass';
 import { colors } from '@/lib/theme';
 
@@ -37,23 +36,29 @@ export default function RootLayout() {
 }
 
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]']);
+const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]']);
 
-function popupTitle(name: string, bot: string | undefined, shown: string, title: string | undefined): string {
-  if (bot && name === 'look/[bot]') return `${shown}'s look`;
-  if (bot && name === 'connectors/[bot]') return `${shown}'s connectors`;
-  if (bot && name === 'chats/[bot]') return `${shown}'s chats`;
-  if (bot && name === 'routines/[bot]') return `${shown}'s routines`;
-  if (bot && name === 'routine-results/[bot]') return `${shown}'s routine results`;
-  if (bot && name === 'work/[bot]') return `${shown}'s work`;
-  return title || '';
-}
+// The panel's own title; a bot's name goes under it (components/Overlay.tsx, components/Sheet.tsx).
+const TITLES: Record<string, string> = {
+  'look/[bot]': 'Look',
+  'connectors/[bot]': 'Connectors',
+  'model/[bot]': 'Model',
+  'chats/[bot]': 'Chats',
+  'routines/[bot]': 'Routines',
+  'routine-results/[bot]': 'Routine results',
+  'work/[bot]': 'Work',
+  'work-session/[bot]': 'Work',
+  'bot/[bot]': 'Bot settings',
+};
 
-/** The desktop panel; a component so the bot's display name can follow a rename. */
+/** The desktop panel (or, for the bot sheet, the popover under the chat title). */
 function PopupOverlay({ route, title, children }: { route: { name: string; params?: object }; title: string | undefined; children: ReactNode }) {
   const bot = (route.params as { bot?: string } | undefined)?.bot;
-  const shown = useBotName(bot ?? '');
-  return <Overlay title={popupTitle(route.name, bot, shown, title)}>{children}</Overlay>;
+  return (
+    <Overlay title={TITLES[route.name] ?? title ?? ''} bot={bot} popover={route.name === 'bot/[bot]'}>
+      {children}
+    </Overlay>
+  );
 }
 
 function Screens(): ReactNode {
@@ -83,11 +88,14 @@ function Screens(): ReactNode {
           : undefined
       }
     >
-      <Stack.Screen name="index" options={{ title: 'Dork Bot' }} />
+      {/* The bot list draws its own header (large title on the phone, sidebar header on desktop and the open Duo). */}
+      <Stack.Screen name="index" options={{ title: 'Dork Bot', headerShown: false }} />
       <Stack.Screen name="new" options={popup('New bot')} />
       <Stack.Screen name="add" options={popup('Add with a code')} />
       <Stack.Screen name="connect" options={popup('Hermes')} />
-      <Stack.Screen name="chat/[bot]" options={{ title: '' }} />
+      {/* The chat draws its own one-row header (components/ChatHeader.tsx). */}
+      <Stack.Screen name="chat/[bot]" options={{ title: '', headerShown: false }} />
+      <Stack.Screen name="bot/[bot]" options={popup('Bot settings')} />
       <Stack.Screen name="look/[bot]" options={popup('Look')} />
       <Stack.Screen name="gallery" options={{ title: 'Gallery' }} />
       <Stack.Screen name="connectors/[bot]" options={popup('Connectors')} />

@@ -7,7 +7,7 @@ import { ChatView } from '@/components/ChatView';
 import { isDesktop } from '@/components/desktop';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { setListHidden, useListHidden } from '@/components/useListHidden';
-import { CHAT_MAX_WIDTH, foldNavFor, SIDEBAR_WIDTH } from '@/lib/layoutClass';
+import { CHAT_MAX_WIDTH, DESKTOP_SIDEBAR_WIDTH, foldNavFor, SIDEBAR_WIDTH } from '@/lib/layoutClass';
 import { colors } from '@/lib/theme';
 
 // Phones, the folded Duo and the open Duo in portrait: the bot list, and a tap pushes the chat.
@@ -84,7 +84,7 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   row: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
-  sidebar: { width: SIDEBAR_WIDTH, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
+  sidebar: { width: isDesktop ? DESKTOP_SIDEBAR_WIDTH : SIDEBAR_WIDTH, backgroundColor: colors.sidebar, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
   detail: { flex: 1 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: colors.dim, fontSize: 15 },
