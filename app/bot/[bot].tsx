@@ -15,7 +15,7 @@ import { renameBot, useBotName } from '@/components/useBotName';
 import { useChatModel } from '@/components/useChatModel';
 import type { BotMeta } from '@/lib/manager';
 import { mutePatch } from '@/lib/push';
-import { colors } from '@/lib/theme';
+import { colors, switchProps } from '@/lib/theme';
 
 type Path = '/look/[bot]' | '/chats/[bot]' | '/routines/[bot]' | '/connectors/[bot]' | '/model/[bot]' | '/routine-results/[bot]';
 
@@ -97,7 +97,7 @@ export default function BotSheet() {
           {muted !== null ? (
             <GroupRow
               label="Notifications"
-              right={<Switch value={!muted} onValueChange={(v) => void setNotifications(v)} accessibilityLabel={`Notifications from ${name}`} trackColor={{ true: colors.ok }} thumbColor="#FFFFFF" {...({ activeThumbColor: "#FFFFFF" } as object)} />}
+              right={<Switch value={!muted} onValueChange={(v) => void setNotifications(v)} accessibilityLabel={`Notifications from ${name}`} {...switchProps} />}
             />
           ) : null}
           <GroupRow label="Rename" chevron onPress={() => renameBot(bot, name)} />

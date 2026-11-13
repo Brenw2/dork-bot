@@ -9,7 +9,8 @@ import { saveManagerAuth } from '@/lib/bots';
 import type { FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';
 import { managerFromParams } from '@/lib/pairing';
-import { button, colors } from '@/lib/theme';
+import { colors } from '@/lib/theme';
+import { Button } from '@/components/Buttons';
 
 // Opened by a dorkbot://connect?admin=…&chat=…&rt=… code from scripts/pair-hermes.sh.
 export default function Connect() {
@@ -46,17 +47,13 @@ export default function Connect() {
           <>
             <Text style={styles.title}>Connected to Hermes</Text>
             <Text style={styles.text}>Your bots on Hermes are in the list, with the same chats on every device. You can create bots from here too.</Text>
-            <Pressable style={styles.button} onPress={() => router.dismissTo('/')} accessibilityRole="button">
-              <Text style={styles.buttonText}>See your bots</Text>
-            </Pressable>
+            <Button label="See your bots" onPress={() => router.dismissTo('/')} style={styles.button} />
           </>
         ) : (
           <>
             <Text style={styles.title}>Couldn't connect</Text>
             <Text style={styles.error}>{state}</Text>
-            <Pressable style={styles.button} onPress={() => router.dismissTo('/')} accessibilityRole="button">
-              <Text style={styles.buttonText}>Close</Text>
-            </Pressable>
+            <Button label="Close" onPress={() => router.dismissTo('/')} style={styles.button} />
           </>
         )}
       </Column>
@@ -70,6 +67,5 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 20, fontWeight: '600' },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center' },
   error: { color: colors.bad, fontSize: 15, textAlign: 'center' },
-  button: { ...button.primary, marginTop: 10, paddingHorizontal: 28 },
-  buttonText: button.text,
+  button: { marginTop: 10, paddingHorizontal: 28 },
 });

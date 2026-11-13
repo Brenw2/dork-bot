@@ -43,9 +43,19 @@ Chat header button no longer drawn as a grey liquid-glass capsule on iOS 26+ (cl
 
 Custom ⋯ menu and dialogs on desktop; chat buttons in the bot's color; formatted replies with highlighted code and Copy; photos and screenshots (camera/library on the phone, pick/paste/drop on desktop), shown on both devices.
 
-## In flight: UI polish 2/n, fixes 1, 2, 8, 10 (card 19, branch app/ui-polish-bot-list)
+## Card 19, UI polish: where each fix stands
 
-Bot list like Messages (previews, times, Needs you, error copy, large title, desktop sidebar), one-row chat header with the model under the name and a banner only when the model is broken, the shared sheet and panel header (Done, subtitle, create action in the header), Chats as a search plus grouped list, the bot sheet (tap the chat title, long-press a row, or Bot settings), the 4-item chat ⋯ and the app ⋯. Built to docs/design/comps. Layout tests measure the sizes and spacing (`npm run test:layout`, the `ui` group). Not built here: swipe actions on Chats (press and hold instead), the iOS sheet grabber, the UIMenu look (device-only checks in REVIEW.md). Fixes 3-7 and 9 are later slices; PR #37 (fix 7) touches ChatView too.
+Fixes 1, 2, 8, 10 (#39): merged. Fix 7 (#37): merged.
+
+- **Fixes 3, 4, 5 (PR #41, branch app/ui-polish-3):** round Send/Stop inside the field (a message typed during a reply is queued in the app and goes out after it), the typing bubble, friendly step names and "Still working" after 10 s, inline approvals with 44 pt buttons that collapse to a chip. With Design.
+- **Fixes 6 and 9 (this PR, branch app/ui-polish-4, stacked on app/ui-polish-3):** errors in plain words (`lib/errors.ts` has the copy table; a banner for connection and key problems, a card with Try again and Details for a failed turn, "Not sent. Tap to retry." under your bubble), one button set (`components/Buttons.tsx`: 50 tall primary and secondary, 30 tall small; `lib/theme.ts` `button` and `switchProps`), grouped lists (`components/Grouped.tsx`) on Connectors, Model, Notifications, Look's Style, Routines and New bot, the accent rule (bot color inside a bot's screens, purple elsewhere), switches in #4CC38A with a white thumb, Connectors rows that open a detail screen (`app/connector/[bot].tsx`: status, tools, Remove), and Look's Save in the sheet header. Merge #41 first, then this one (retarget to main).
+- **Left to do:** group chat (card 8, #40, with Design). Release 0.10.0 once card 19 is fully merged.
+- **Device-only checks (Brennan or the Duo):** keyboard follow on Send, Dynamic Type xxxL, VoiceOver labels (Send, Stop, Add a picture, Retry now, Pair again), the 44 pt hit areas of the small buttons (hitSlop isn't measurable on the web build), swipe actions on Chats, the sheet header's Save and Cancel on iOS 26, the fold on the Duo in portrait.
+- **Not covered by layout fixtures:** the desktop panel versions of Connectors, Look and Notifications (the desktop composer test covers the message box). Button sizes there follow the spec (40/32/28) by `useDesk()` but have no assertions.
+
+## In flight (earlier slice): UI polish 2/n, fixes 1, 2, 8, 10 (card 19, branch app/ui-polish-bot-list)
+
+Bot list like Messages (previews, times, Needs you, error copy, large title, desktop sidebar), one-row chat header with the model under the name and a banner only when the model is broken, the shared sheet and panel header (Done, subtitle, create action in the header), Chats as a search plus grouped list, the bot sheet (tap the chat title, long-press a row, or Bot settings), the 4-item chat ⋯ and the app ⋯. Built to docs/design/comps. Layout tests measure the sizes and spacing (`npm run test:layout`, the `ui` group). Not built here: swipe actions on Chats (press and hold instead), the iOS sheet grabber, the UIMenu look (device-only checks in REVIEW.md).
 
 ## Design: UI review and locked comps (card 18, branch design/ui-review)
 

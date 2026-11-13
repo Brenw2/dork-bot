@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { loadManager } from '@/components/manager';
 import { Sheet } from '@/components/Sheet';
+import { useTint } from '@/components/Buttons';
+import { GroupHeader } from '@/components/Grouped';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { useChatModel } from '@/components/useChatModel';
@@ -18,6 +20,7 @@ export default function PickModel() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
+  const tint = useTint(bot);
   const { catalog, choice, problem, client, error } = useChatModel(bot);
   const chat = useCurrentChat(bot) ?? firstChatId(bot);
   const [search, setSearch] = useState('');
@@ -77,31 +80,31 @@ export default function PickModel() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.list}
           ListFooterComponent={catalog ? <Text style={styles.note}>Picking one sets {botName}'s model, for this chat and new ones. It applies from your next message.</Text> : undefined}
-          renderSectionHeader={({ section }) => (
-            <Text style={styles.header}>
-              {section.group.name}
-              {section.group.current ? '  ·  set in Hermes' : ''}
-            </Text>
-          )}
-          renderItem={({ item, section }) => {
+          renderSectionHeader={({ section }) => <GroupHeader>{`${section.group.name}${section.group.current ? '  ·  set in Hermes' : ''}`}</GroupHeader>}
+          renderItem={({ item, index, section }) => {
             const provider = section.group.slug;
             const chosen = isChosen(provider, item);
             const working = busy === `${provider}/${item}`;
+            const first = index === 0;
+            const last = index === section.data.length - 1;
             return (
-              <Pressable
-                style={({ pressed }) => [styles.row, chosen && styles.rowChosen, pressed && { opacity: 0.6 }]}
-                onPress={() => pick({ provider, model: item })}
-                disabled={!!busy}
-                accessibilityRole="button"
-                accessibilityLabel={`${item}, ${section.group.name}`}
-                accessibilityState={{ selected: chosen, busy: working }}
-              >
-                <Text style={styles.model} numberOfLines={1}>
-                  {item}
-                </Text>
-                {isDefault(provider, item) ? <Text style={styles.tag}>default</Text> : null}
-                {working ? <ActivityIndicator size="small" /> : chosen ? <Text style={styles.check}>✓</Text> : null}
-              </Pressable>
+              <View style={[styles.rowWrap, first && styles.rowFirst, last && styles.rowLast]}>
+                {first ? null : <View style={styles.sep} />}
+                <Pressable
+                  style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.raised }]}
+                  onPress={() => pick({ provider, model: item })}
+                  disabled={!!busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item}, ${section.group.name}`}
+                  accessibilityState={{ selected: chosen, busy: working }}
+                >
+                  <Text style={styles.model} numberOfLines={1}>
+                    {item}
+                  </Text>
+                  {isDefault(provider, item) ? <Text style={styles.tag}>default</Text> : null}
+                  {working ? <ActivityIndicator size="small" /> : chosen ? <Text style={[styles.check, { color: tint }]}>✓</Text> : null}
+                </Pressable>
+              </View>
             );
           }}
         />
@@ -113,33 +116,16 @@ export default function PickModel() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
-  search: {
-    margin: 16,
-    marginBottom: 8,
-    color: colors.text,
-    fontSize: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-  },
-  problem: { color: colors.bad, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingBottom: 8 },
-  list: { paddingHorizontal: 16, paddingBottom: 40, gap: 6 },
-  header: { color: colors.dim, fontSize: 13, fontWeight: '600', marginTop: 14, marginBottom: 4, textTransform: 'uppercase' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  rowChosen: { borderColor: colors.accent, borderWidth: 1.5 },
-  model: { flex: 1, color: colors.text, fontSize: 15 },
-  tag: { color: colors.dim, fontSize: 12 },
-  check: { color: colors.accent, fontSize: 16, fontWeight: '700' },
-  note: { color: colors.dim, fontSize: 13, textAlign: 'center', marginTop: 16 },
+  search: { margin: 16, marginBottom: 0, color: colors.text, fontSize: 17, height: 36, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.card },
+  problem: { color: colors.bad, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingTop: 8 },
+  list: { paddingHorizontal: 16, paddingBottom: 40 },
+  rowWrap: { backgroundColor: colors.card, overflow: 'hidden' },
+  rowFirst: { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  rowLast: { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52, paddingHorizontal: 16 },
+  model: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22 },
+  tag: { color: colors.dim, fontSize: 13 },
+  check: { fontSize: 22, fontWeight: '700' },
+  note: { color: colors.dim, fontSize: 13, lineHeight: 18, marginHorizontal: 16, marginTop: 14 },
 });

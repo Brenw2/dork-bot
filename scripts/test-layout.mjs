@@ -17,6 +17,7 @@ import { extname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
+import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, checkErrorCard, checkErrorDetails, checkLook, checkNotSent, checkNotifications } from './layout-fixes-69.mjs';
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -245,9 +246,9 @@ const SCREENS = [
   { name: 'bots-empty', bots: false, path: () => '/', waitFor: 'No bots yet' },
   { name: 'chat', path: (p) => (p === 'duo-open-landscape' ? '/?bot=assistant' : '/chat/assistant'), waitFor: 'Any time.' },
   { name: 'new-unpaired', path: () => '/new', waitFor: 'Connect to Hermes first' },
-  { name: 'new', paired: true, path: () => '/new', waitFor: 'Already on Hermes' },
-  { name: 'add', path: () => '/add', waitFor: 'Hermes address' },
-  { name: 'connectors', paired: true, path: () => '/connectors/assistant', waitFor: 'Needs you to sign in' },
+  { name: 'new', paired: true, path: () => '/new', waitFor: 'Already on Hermes', check: (p, po) => checkButtons(p, po, 'new') },
+  { name: 'add', path: () => '/add', waitFor: 'Hermes address', check: (p, po) => checkButtons(p, po, 'add') },
+  { name: 'connectors', paired: true, path: () => '/connectors/assistant', waitFor: 'Needs you to sign in', check: checkConnectors },
   { name: 'chat-model-problem', extraBots: ['chief'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=chief' : '/chat/chief'), waitFor: 'which doesn' },
   { name: 'model', path: () => '/model/assistant', waitFor: 'claude-opus-5-5' },
   { name: 'connectors-unpaired', path: () => '/connectors/assistant', waitFor: 'Connect to Hermes first' },
@@ -274,6 +275,15 @@ const SCREENS = [
   { name: 'chat-working-long', clock: true, extraBots: ['worker'], path: chatPath('worker'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'worker', 'summarize each card', 'Trello: read card'), page.clock.fastForward(48_000), page.getByText('Still working', { exact: false }).first().waitFor()), check: checkWorkingLong },
   { name: 'chat-approval', extraBots: ['approver'], path: chatPath('approver'), waitFor: 'Any time.', act: (page) => sendIn(page, 'approver', 'clean up my old drafts folder', 'Run this command?'), check: checkApproval },
   { name: 'chat-approval-answered', extraBots: ['approver'], path: chatPath('approver'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'approver', 'clean up my old drafts folder', 'Run this command?'), page.getByLabel('Allow once').first().click(), page.getByText('Allowed once', { exact: false }).first().waitFor()), check: checkAnswered },
+  // Fix 6: errors in plain words.
+  { name: 'chat-error', extraBots: ['failer'], path: chatPath('failer'), waitFor: 'Any time.', act: (page) => sendIn(page, 'failer', 'what time is sunset', 'hit an error'), check: checkErrorCard },
+  { name: 'chat-error-details', extraBots: ['failer'], path: chatPath('failer'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'failer', 'what time is sunset', 'hit an error'), page.getByLabel('Details').first().click(), page.getByText('Chat failed: HTTP 500', { exact: false }).first().waitFor()), check: checkErrorDetails },
+  { name: 'chat-unreachable', extraBots: ['offliner'], path: chatPath('offliner'), waitFor: "Can't reach b-lab", check: checkBanner },
+  { name: 'chat-not-sent', extraBots: ['unsender'], path: chatPath('unsender'), waitFor: 'Any time.', act: (page) => sendIn(page, 'unsender', 'what time is sunset', 'Not sent'), check: checkNotSent },
+  // Fix 9: one button set, grouped lists, one accent rule, switches.
+  { name: 'connector', paired: true, path: () => '/connector/assistant?name=trello', waitFor: 'Tools · 14', check: checkConnectorDetail },
+  { name: 'look', path: () => '/look/assistant', waitFor: 'Style', check: checkLook },
+  { name: 'notifications', paired: true, path: () => '/notifications', waitFor: 'Per bot', check: checkNotifications },
 ];
 
 function chatPath(bot) {
@@ -298,6 +308,7 @@ async function fakeHermes(route) {
   // steps, then the stream drops and Hermes still has the run (the chip and the typing row). approver: the same, and
   // Hermes then waits for an OK. failer: Hermes answers HTTP 500.
   if (/\/chat\/stream$/.test(p)) {
+    if (bot === 'unsender') return route.abort('connectionrefused');
     if (bot === 'thinker') return new Promise(() => {});
     if (bot === 'failer') return json(500, { error: 'model runner crashed' });
     answered.delete(`run-${bot}`);
@@ -314,6 +325,8 @@ async function fakeHermes(route) {
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body });
   }
   const run = p.match(/\/v1\/runs\/([^/]+)(\/approval)?$/);
+  // offliner: b-lab can't be reached at all (the chat can't load its history).
+  if (bot === 'offliner' && /\/api\/sessions\//.test(p)) return route.abort('connectionrefused');
   if (run && req.method() === 'POST') {
     answered.add(run[1]);
     return json(200, { ok: true });
@@ -493,7 +506,7 @@ function measureChats() {
   return c === 'rgb(93, 98, 106)' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
 }
 
-const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
+const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-error': ['Message failer'], 'chat-not-sent': ['Message unsender'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'chat-approval': ['Run this command?', 'Hermes flagged it'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 Object.assign(FIXED, ROOM_FIXED);
