@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { useHeaderHeight } from 'expo-router/react-navigation';
 import { fetch } from '@/components/net';
 import { Menu } from '@/components/alert';
 import { chatName } from '@/lib/chats';
@@ -20,17 +18,16 @@ import { getConnection } from '@/lib/bots';
 import { activityLine, awaitingReply, chatReducer, chatRows, initialChat, rowGap, type ChatRow } from '@/lib/chatState';
 import { HermesClient, type ApprovalChoice, type ApprovalRequest, type ChatMessage, type FetchLike } from '@/lib/hermes';
 import { currentChat, openChat, startNewChat, latestChat, useCurrentChat } from '@/components/currentChat';
-import { notificationsSupported, useOnScreen } from '@/components/notifications';
-import { WorkingOn } from '@/components/WorkingOn';
+import { useOnScreen } from '@/components/notifications';
+import { ChatHeader, ModelBanner } from '@/components/ChatHeader';
 import { Alert } from '@/components/alert';
 import { moodFromChat } from '@/lib/sprites';
 import { useBotLook } from '@/components/useBotLook';
-import { renameBot, useBotName } from '@/components/useBotName';
+import { useBotName } from '@/components/useBotName';
 import { useChatModel } from '@/components/useChatModel';
 import { liveRuns, liveRunsReady } from '@/components/liveRuns';
 import { keepWorking } from '@/components/busyWatch';
 import { leaveAction } from '@/lib/busy';
-import { providerName } from '@/lib/models';
 import { ArrowUpIcon, PlusIcon, StopIcon } from '@/components/ChatIcons';
 import { Activity, ApprovalCard, DecisionChip, TypingRow, useDesk } from '@/components/ChatStatus';
 import { colors, mix, mono, onColor } from '@/lib/theme';
@@ -69,7 +66,6 @@ export function ChatView(props: ChatViewProps) {
 
 function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: ChatViewProps & { chat: string }) {
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
@@ -299,6 +295,8 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     void submit(next.text, next.images);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, client, queued]);
+  // The bot list's "Needs you" follows the approval this chat is showing.
+  useEffect(() => liveRuns.setApproval(sessionId, state.approval), [sessionId, state.approval]);
 
   const [answering, setAnswering] = useState(false);
   const answer = async (choice: ApprovalChoice) => {
@@ -392,6 +390,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
   const disconnected = !client && !!state.error && !state.error.startsWith('No saved key');
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
+  const model = useChatModel(bot);
   const onBot = onColor(color);
   useImageDrop(addImages, !!client);
   const attach = (source: PickSource) => void pickImages(source, attached.length).then(addImages).catch((e: Error) => setAttachError(e.message));
@@ -405,32 +404,11 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt }: Chat
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={headerHeight}
+      keyboardVerticalOffset={0}
       onLayout={WEB ? (e) => setPaneHeight(e.nativeEvent.layout.height) : undefined}
     >
-      {inPane ? (
-        <View style={styles.paneHeader}>
-          {list ? (
-            <Pressable
-              onPress={list.toggle}
-              accessibilityRole="button"
-              accessibilityLabel={list.hidden ? 'Show the bot list' : 'Hide the bot list'}
-              hitSlop={8}
-              style={({ pressed }) => [styles.listToggle, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={[styles.headerButton, { color }]}>{list.hidden ? '› Bots' : '‹ Hide'}</Text>
-            </Pressable>
-          ) : null}
-          <BotSprite bot={bot} size={30} />
-          <View>
-            <Text style={[styles.paneTitle, { color }]}>{name}</Text>
-            <WorkingOn bot={bot} />
-          </View>
-          <View style={{ flex: 1 }} />
-          <ChatActions bot={bot} />
-        </View>
-      ) : null}
-      <ModelBar bot={bot} style={column} color={color} />
+      <ChatHeader bot={bot} pane={inPane} list={list} model={model} />
+      {model.problem ? <ModelBanner bot={bot} problem={model.problem} /> : null}
       <FlatList
         ref={listRef}
         inverted={!WEB}
@@ -602,141 +580,7 @@ function useConnectorWarmup(bot: string) {
   return warming;
 }
 
-/**
- * The chat header's buttons: Chats (the bot's chats, and New chat) and ⋯ (new chat, rename or
- * delete this chat, routines, connectors). In the chat header and the open-Duo pane header.
- */
-export function ChatActions({ bot }: { bot: string }) {
-  const { color } = useBotLook(bot);
-  const name = useBotName(bot);
-  const more = (anchor?: { x: number; y: number }) =>
-    Menu.show(
-      name,
-      [
-        { text: 'Rename bot…', onPress: () => renameBot(bot, name) },
-        { text: 'New chat', onPress: () => void startNewChat(bot) },
-        { text: 'Rename this chat…', onPress: () => void renameOpenChat(bot) },
-        { text: 'Delete this chat…', style: 'destructive' as const, onPress: () => void deleteOpenChat(bot) },
-        { text: 'Work…', onPress: () => router.push({ pathname: '/work/[bot]', params: { bot } }) },
-        { text: 'Routines…', onPress: () => router.push({ pathname: '/routines/[bot]', params: { bot } }) },
-        { text: 'Routine results…', onPress: () => router.push({ pathname: '/routine-results/[bot]', params: { bot } }) },
-        { text: 'Connectors…', onPress: () => router.push({ pathname: '/connectors/[bot]', params: { bot } }) },
-        ...(notificationsSupported ? [{ text: 'Notifications…', onPress: () => router.push('/notifications') }] : []),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-      anchor,
-    );
-  return (
-    <View style={styles.actions}>
-      <Pressable
-        onPress={() => router.push({ pathname: '/chats/[bot]', params: { bot } })}
-        accessibilityRole="button"
-        accessibilityLabel={`${name}'s chats`}
-        hitSlop={8}
-      >
-        <Text style={[styles.headerButton, { color }]}>Chats</Text>
-      </Pressable>
-      <Pressable
-        onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
-        accessibilityRole="button"
-        accessibilityLabel={`More for this chat with ${name}`}
-        hitSlop={8}
-      >
-        <Text style={[styles.headerButton, styles.moreButton, { color }]}>⋯</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-async function chatClient(bot: string): Promise<HermesClient | null> {
-  const conn = await getConnection(bot);
-  return conn ? new HermesClient(conn, fetch as unknown as FetchLike) : null;
-}
-
-/** Renames the open chat (an empty name hands naming back to Hermes). */
-export async function renameChat(bot: string, chat: string): Promise<void> {
-  const client = await chatClient(bot);
-  if (!client) return;
-  const current = (await client.listChats().catch(() => [])).find((c) => c.id === chat);
-  if (!current) return Alert.alert('Nothing to rename yet', 'Send a message first; the chat starts then.');
-  Alert.prompt(
-    'Rename chat',
-    `Now: ${chatName(bot, current)}`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Rename',
-        onPress: (title?: string) => {
-          client.renameChat(chat, title ?? '').then(notifyChatsChanged, (e: Error) => Alert.alert("Couldn't rename it", e.message));
-        },
-      },
-    ],
-    'plain-text',
-  );
-}
-
-/** Deletes a chat on Hermes (after a confirm) and opens the bot's next most recent one. */
-export async function deleteChat(bot: string, chat: string): Promise<void> {
-  const client = await chatClient(bot);
-  if (!client) return;
-  Alert.alert('Delete this chat?', 'Its messages are deleted on Hermes, on every device. The bot keeps its memory.', [
-    { text: 'Cancel', style: 'cancel' },
-    {
-      text: 'Delete',
-      style: 'destructive',
-      onPress: async () => {
-        try {
-          await client.deleteChat(chat);
-          notifyChatsChanged();
-          if (currentChat(bot) === chat) {
-            const next = (await client.listChats().catch(() => [])).find((c) => c.id !== chat);
-            if (next) openChat(bot, next.id);
-            else startNewChat(bot);
-          }
-        } catch (e) {
-          Alert.alert("Couldn't delete it", (e as Error).message);
-        }
-      },
-    },
-  ]);
-}
-
-const renameOpenChat = async (bot: string) => renameChat(bot, currentChat(bot) ?? (await latestChat(bot)));
-const deleteOpenChat = async (bot: string) => deleteChat(bot, currentChat(bot) ?? (await latestChat(bot)));
-
-const chatsListeners = new Set<() => void>();
-/** The chat list re-reads when a chat is renamed or deleted from a menu. */
-export function onChatsChanged(fn: () => void): () => void {
-  chatsListeners.add(fn);
-  return () => void chatsListeners.delete(fn);
-}
-function notifyChatsChanged() {
-  chatsListeners.forEach((fn) => fn());
-}
-
-/** The chat's model ("claude-opus-5-5 · Anthropic"); tap to switch. Turns red when the model can't work. */
-function ModelBar({ bot, style, color }: { bot: string; style: ViewStyle | null; color: string }) {
-  const { choice, problem, catalog, error } = useChatModel(bot);
-  const label = choice
-    ? `${choice.model}${choice.provider ? ` · ${providerName(catalog, choice.provider)}` : ''}`
-    : error
-      ? "Couldn't load the model list"
-      : 'Loading model…';
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.modelBar, style, pressed && { opacity: 0.6 }]}
-      onPress={() => router.push({ pathname: '/model/[bot]', params: { bot } })}
-      accessibilityRole="button"
-      accessibilityLabel={`Model: ${label}. Change model`}
-      hitSlop={4}
-    >
-      <Text style={[styles.modelText, problem ? { color: colors.bad } : null]} numberOfLines={problem ? 3 : 1}>
-        {problem ?? label}
-      </Text>
-      <Text style={[styles.modelChange, { color }]}>Change</Text>
-    </Pressable>
-  );
-}
+export { deleteChat, onChatsChanged, renameChat } from '@/components/chatActions';
 
 function Row({ row, bot, since, gap, approval }: { row: ChatRow; bot: string; since: number; gap: number; approval: { busy: boolean; onAnswer: (c: ApprovalChoice) => void } }) {
   return (
@@ -861,31 +705,6 @@ function Picture({ uri, count }: { uri: string; count: number }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  headerButton: { color: colors.accent, fontSize: 16 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingRight: 8 },
-  moreButton: { fontSize: 20, fontWeight: '700', paddingHorizontal: 2 },
-  listToggle: { marginRight: 4 },
-  paneHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  paneTitle: { fontSize: 17, fontWeight: '600' },
-  modelBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  modelText: { flex: 1, color: colors.dim, fontSize: 13 },
-  modelChange: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
   // No list gap: each row carries its own space above it (rowGap).
   listBody: { flexGrow: 1, padding: 14 },

@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { Sheet } from '@/components/Sheet';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fetch } from '@/components/net';
@@ -38,6 +39,7 @@ export default function AddBot() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
+      <Sheet title="Add with a code" close="cancel" />
       {fromLink.key ? <Text style={styles.note}>Filled in from the pairing code. Tap Add to connect.</Text> : null}
       <Field label="Hermes address" value={url} onChangeText={setUrl} keyboardType="url" />
       <Field label="Bot (Hermes profile)" value={bot} onChangeText={setBot} placeholder="assistant" />

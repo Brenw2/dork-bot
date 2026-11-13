@@ -1,7 +1,8 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { loadManager } from '@/components/manager';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { useChatModel } from '@/components/useChatModel';
@@ -53,7 +54,7 @@ export default function PickModel() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${botName}'s model` }} />
+      <Sheet title="Model" bot={bot} />
       <View style={[styles.fill, column]}>
         <TextInput
           style={styles.search}

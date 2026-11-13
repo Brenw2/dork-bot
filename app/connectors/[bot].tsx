@@ -1,8 +1,9 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { Column, useColumnStyle } from '@/components/Column';
 import { desktop } from '@/components/desktop';
@@ -137,7 +138,7 @@ export default function ConnectorsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
-      <Stack.Screen options={{ title: `${botName}'s connectors` }} />
+      <Sheet title="Connectors" bot={bot} />
       {notice ? <Text style={notice.ok ? styles.ok : styles.error}>{notice.text}</Text> : null}
 
       <Text style={styles.label}>Connected</Text>

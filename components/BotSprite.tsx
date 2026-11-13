@@ -3,6 +3,7 @@ import { AccessibilityInfo, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotMood } from '@/components/useBotMood';
+import { mix } from '@/lib/color';
 import { CANVAS, FRAME_MS, framePaths, frameSpec, renderFrame, type CharacterId, type Mood } from '@/lib/sprites';
 
 /**
@@ -71,4 +72,14 @@ function useReduceMotion(): boolean {
     };
   }, []);
   return still;
+}
+
+/** The bot's avatar: its pixel character at 76% inside a disc of its color at 18% (docs/design/REVIEW.md). */
+export function BotAvatar({ bot, size = 52, mood }: { bot: string; size?: number; mood?: Mood }) {
+  const { color } = useBotLook(bot);
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: mix(color, 0.18), alignItems: 'center', justifyContent: 'center' }}>
+      <BotSprite bot={bot} size={Math.round(size * 0.76)} mood={mood} />
+    </View>
+  );
 }

@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, RefreshControl, ScrollView, type ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
+import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
@@ -53,7 +54,7 @@ export default function RoutineResultsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: `${botName}'s routine results` }} />
+      <Sheet title="Routine results" bot={bot} />
       <ScrollView
         ref={scroller}
         contentContainerStyle={[styles.body, column]}

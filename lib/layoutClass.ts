@@ -21,6 +21,8 @@ export const FOLD = { listSize: 455.5, gutterSize: 40 } as const;
  * On the Duo the chat crosses the fold, the same way every screen does in open portrait.
  */
 export const SIDEBAR_WIDTH = 300;
+/** The desktop app's sidebar (docs/design/REVIEW.md, fix 1). */
+export const DESKTOP_SIDEBAR_WIDTH = 320;
 /** Chat column cap on expanded-narrow, so lines stay readable on the 669 pt wide inner screen. */
 export const CHAT_MAX_WIDTH = 640;
 
