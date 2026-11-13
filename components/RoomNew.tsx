@@ -10,6 +10,7 @@ import { newId, roomLink } from '@/components/roomsClient';
 import { listBots, type SavedBot } from '@/lib/bots';
 import { nameOf } from '@/lib/names';
 import { createProblem, MAX_MEMBERS, MIN_MEMBERS } from '@/lib/rooms';
+import { headerSides } from '@/lib/headerItems';
 import { colors } from '@/lib/theme';
 
 /**
@@ -62,16 +63,18 @@ export function RoomNew() {
         <Stack.Screen
           options={{
             title: 'New group chat',
-            headerLeft: () => (
-              <Pressable onPress={confirm} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.barSide}>
-                <Text style={styles.barLink}>Cancel</Text>
-              </Pressable>
-            ),
-            headerRight: () => (
-              <Pressable onPress={create} disabled={!ready} hitSlop={12} accessibilityRole="button" accessibilityLabel="Create" accessibilityState={{ disabled: !ready }} style={[styles.barSide, { alignItems: 'flex-end' }]}>
-                {busy ? <ActivityIndicator color={colors.accent} /> : <Text style={[styles.barLink, { fontWeight: '600' }, !ready && { color: colors.faint }]}>Create</Text>}
-              </Pressable>
-            ),
+            ...headerSides({
+              left: (
+                <Pressable onPress={confirm} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.barSide}>
+                  <Text style={styles.barLink}>Cancel</Text>
+                </Pressable>
+              ),
+              right: (
+                <Pressable onPress={create} disabled={!ready} hitSlop={12} accessibilityRole="button" accessibilityLabel="Create" accessibilityState={{ disabled: !ready }} style={[styles.barSide, { alignItems: 'flex-end' }]}>
+                  {busy ? <ActivityIndicator color={colors.accent} /> : <Text style={[styles.barLink, { fontWeight: '600' }, !ready && { color: colors.faint }]}>Create</Text>}
+                </Pressable>
+              ),
+            }),
           }}
         />
       ) : null}
