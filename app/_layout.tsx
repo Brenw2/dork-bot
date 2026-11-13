@@ -37,7 +37,7 @@ export default function RootLayout() {
 }
 
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]']);
+const POPUPS = new Set(['new', 'room-new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]']);
 
 function popupTitle(name: string, bot: string | undefined, shown: string, title: string | undefined): string {
   if (bot && name === 'look/[bot]') return `${shown}'s look`;
@@ -88,6 +88,8 @@ function Screens(): ReactNode {
       <Stack.Screen name="add" options={popup('Add with a code')} />
       <Stack.Screen name="connect" options={popup('Hermes')} />
       <Stack.Screen name="chat/[bot]" options={{ title: '' }} />
+      <Stack.Screen name="room/[id]" options={{ title: 'Group' }} />
+      <Stack.Screen name="room-new" options={popup('New group chat')} />
       <Stack.Screen name="look/[bot]" options={popup('Look')} />
       <Stack.Screen name="gallery" options={{ title: 'Gallery' }} />
       <Stack.Screen name="connectors/[bot]" options={popup('Connectors')} />

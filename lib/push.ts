@@ -109,7 +109,11 @@ export type PushData =
   /** `chat` + `at`: a "Notify me" routine's result was added to that chat, stamped `at`. Without them, it's in Routine results only. */
   | { kind: 'routine'; bot: string; job?: string; chat?: string; at?: string }
   /** Outside work (lib/work.ts) that ended: `session` is the Hermes session id. */
-  | { kind: 'work'; bot: string; session: string };
+  | { kind: 'work'; bot: string; session: string }
+  /** A bot in a group room needs you (@user): the plugin sends the Hermes room id (lib/rooms.ts). */
+  | { kind: 'room'; bot: string; room: string; roomName?: string };
+
+const ROOM_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/;
 
 /** A push's data, checked. Null for anything that isn't one of ours. */
 export function parsePushData(raw: unknown): PushData | null {
@@ -126,6 +130,9 @@ export function parsePushData(raw: unknown): PushData | null {
       ...(chat ? { chat, ...(typeof r.at === 'string' && isNoteStamp(r.at) ? { at: r.at } : {}) } : {}),
     };
   }
+  if (r.kind === 'room') {
+    return typeof r.room === 'string' && ROOM_ID.test(r.room) ? { kind: 'room', bot, room: r.room, ...(typeof r.roomName === 'string' && r.roomName ? { roomName: r.roomName.slice(0, 100) } : {}) } : null;
+  }
   if (r.kind === 'work') {
     return typeof r.session === 'string' && r.session && r.session.length <= 200 && !isBotChat(bot, r.session) ? { kind: 'work', bot, session: r.session } : null;
   }
@@ -139,7 +146,9 @@ export type PushRoute =
   | { pathname: '/chat/[bot]'; params: { bot: string; chat: string; at?: string } }
   | { pathname: '/'; params: { bot: string; chat: string; at?: string } }
   | { pathname: '/routine-results/[bot]'; params: { bot: string } }
-  | { pathname: '/work-session/[bot]'; params: { bot: string; id: string } };
+  | { pathname: '/work-session/[bot]'; params: { bot: string; id: string } }
+  | { pathname: '/room/[id]'; params: { id: string } }
+  | { pathname: '/'; params: { room: string } };
 
 /**
  * Where a tap goes. A routine's push opens the chat its result was added to, at that message; with
@@ -147,6 +156,7 @@ export type PushRoute =
  * session. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane.
  */
 export function routeFor(data: PushData, twoPane: boolean): PushRoute {
+  if (data.kind === 'room') return twoPane ? { pathname: '/', params: { room: data.room } } : { pathname: '/room/[id]', params: { id: data.room } };
   if (data.kind === 'work') return { pathname: '/work-session/[bot]', params: { bot: data.bot, id: data.session } };
   if (data.kind === 'routine' && !data.chat) return { pathname: '/routine-results/[bot]', params: { bot: data.bot } };
   const chat = data.chat as string;
@@ -158,6 +168,8 @@ export function routeFor(data: PushData, twoPane: boolean): PushRoute {
 export interface OnScreen {
   bot: string;
   chat: string | null;
+  /** A group room on screen (its Hermes room id). */
+  room?: string;
 }
 
 /**
@@ -166,6 +178,7 @@ export interface OnScreen {
  * that sent the message, so the chat on screen may not have it.
  */
 export function showWhileOpen(data: PushData | null, onScreen: OnScreen | null): boolean {
+  if (data?.kind === 'room') return !(onScreen?.room === data.room); // the room is already open: the message is right there
   if (!data || !onScreen || data.kind !== 'reply') return true;
   return !(onScreen.bot === data.bot && onScreen.chat === data.chat);
 }

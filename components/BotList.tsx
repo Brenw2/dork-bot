@@ -16,6 +16,8 @@ import { nameOf } from '@/lib/names';
 import { getConnection, listBots, onBotsChanged, removeBot, type SavedBot } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { botColor, button, colors } from '@/lib/theme';
+import { RoomListRow } from '@/components/RoomRow';
+import { useRoomRows } from '@/components/roomsClient';
 
 type Status = 'checking' | 'ok' | string;
 
@@ -23,11 +25,13 @@ type Status = 'checking' | 'ok' | string;
  * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
  * compact: the slim sidebar next to a chat, with smaller rows.
  */
-export function BotList({ onSelect, selected, compact = false }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean }) {
+export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, Status>>({});
   const { bottom } = useSafeAreaInsets();
   useBusyWatch();
+  // Group rooms on Hermes (card 8): a row each, above the bots. None when Hermes has no rooms or isn't reachable.
+  const { rows: rooms, supported: roomsSupported } = useRoomRows();
 
   const load = useCallback(() => {
     let live = true;
@@ -112,6 +116,22 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
       <FlatList
         data={bots}
         keyExtractor={(b) => b.bot}
+        ListHeaderComponent={
+          rooms.length ? (
+            <View style={styles.rooms}>
+              {rooms.map((r) => (
+                <RoomListRow
+                  key={r.id}
+                  row={r}
+                  label={(id) => nameOf(id, bots?.find((b) => b.bot === id)?.displayName)}
+                  selected={r.id === selectedRoom}
+                  compact={compact}
+                  onPress={() => (onSelectRoom ? onSelectRoom(r.id) : router.push({ pathname: '/room/[id]', params: { id: r.id } }))}
+                />
+              ))}
+            </View>
+          ) : undefined
+        }
         contentContainerStyle={bots.length ? (compact ? styles.listCompact : styles.list) : styles.empty}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
@@ -151,6 +171,11 @@ export function BotList({ onSelect, selected, compact = false }: { onSelect: (bo
           <Text style={styles.addText}>+ New bot</Text>
         </Pressable>
       </Link>
+      {roomsSupported && (bots?.length ?? 0) >= 2 ? (
+        <Pressable onPress={() => router.push('/room-new')} style={styles.newGroup} accessibilityRole="button" accessibilityLabel="New group chat" hitSlop={8}>
+          <Text style={styles.newGroupText}>New group chat</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -197,4 +222,7 @@ const styles = StyleSheet.create({
   add: { ...button.primary, alignSelf: 'center', minWidth: 180, margin: 16 },
   addCompact: { height: 40, minWidth: 0, alignSelf: 'stretch', marginHorizontal: 10, marginTop: 8 },
   addText: button.text,
+  rooms: { marginBottom: 6 },
+  newGroup: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginBottom: 8 },
+  newGroupText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
 });

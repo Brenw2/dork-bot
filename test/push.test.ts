@@ -124,6 +124,18 @@ describe('what a push opens', () => {
     expect(routeFor({ kind: 'routine', bot: 'chief' }, false)).toEqual({ pathname: '/routine-results/[bot]', params: { bot: 'chief' } });
   });
 
+  it('a room push opens the room, and shows no banner while that room is open', () => {
+    const id = '7f1c2a40-1111-4222-8333-444455556666';
+    const room = parsePushData({ bot: 'chief', kind: 'room', room: id, roomName: 'Ops room', name: 'chief' });
+    expect(room).toEqual({ kind: 'room', bot: 'chief', room: id, roomName: 'Ops room' });
+    expect(routeFor(room!, false)).toEqual({ pathname: '/room/[id]', params: { id } });
+    expect(routeFor(room!, true)).toEqual({ pathname: '/', params: { room: id } });
+    expect(showWhileOpen(room, { bot: 'chief', chat: 'dork-bot-chief' })).toBe(true); // another chat is open
+    expect(showWhileOpen(room, { bot: '', chat: null, room: id })).toBe(false);
+    expect(parsePushData({ bot: 'chief', kind: 'room' })).toBeNull();
+    expect(parsePushData({ bot: 'chief', kind: 'room', room: '../x' })).toBeNull();
+  });
+
   it('a finished work session push opens that session (read-only), on one pane or two', () => {
     expect(parsePushData({ bot: 'chief', kind: 'work', session: 'local-abc' })).toEqual({ kind: 'work', bot: 'chief', session: 'local-abc' });
     expect(parsePushData({ bot: 'chief', kind: 'work' })).toBeNull();

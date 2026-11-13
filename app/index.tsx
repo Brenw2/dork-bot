@@ -4,6 +4,7 @@ import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { BotList } from '@/components/BotList';
 import { openChat } from '@/components/currentChat';
 import { ChatView } from '@/components/ChatView';
+import { RoomChat } from '@/components/RoomChat';
 import { isDesktop } from '@/components/desktop';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { setListHidden, useListHidden } from '@/components/useListHidden';
@@ -19,7 +20,15 @@ const DESKTOP_CHAT_MAX = 820;
 export default function Home() {
   const { width } = useWindowDimensions();
   const cls = useLayoutClass();
-  const params = useLocalSearchParams<{ bot?: string; chat?: string; at?: string }>();
+  const params = useLocalSearchParams<{ bot?: string; chat?: string; at?: string; room?: string }>();
+  // A group room open in the right pane (a room push on two panes, or a tap on a room row).
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(params.room ?? null);
+  useEffect(() => {
+    if (params.room) {
+      setSelectedRoom(params.room);
+      setSelected(null);
+    }
+  }, [params.room]);
   useEffect(() => {
     if (params.bot && params.chat) openChat(params.bot, params.chat);
   }, [params.bot, params.chat]);
@@ -54,16 +63,31 @@ export default function Home() {
   }
 
   // With no chat open there's nothing to give the room to, so the list always shows.
-  const showList = !listHidden || !selected;
+  const open = selected ?? selectedRoom;
+  const showList = !listHidden || !open;
   return (
     <View style={styles.row}>
       {showList ? (
         <View style={styles.sidebar}>
-          <BotList onSelect={setSelected} selected={selected} compact />
+          <BotList
+            onSelect={(bot) => {
+              setSelectedRoom(null);
+              setSelected(bot);
+            }}
+            selected={selected}
+            compact
+            onSelectRoom={(room) => {
+              setSelected(null);
+              setSelectedRoom(room);
+            }}
+            selectedRoom={selectedRoom}
+          />
         </View>
       ) : null}
       <View style={styles.detail}>
-        {selected ? (
+        {selectedRoom && !selected ? (
+          <RoomChat key={selectedRoom} id={selectedRoom} inPane maxWidth={isDesktop ? DESKTOP_CHAT_MAX : CHAT_MAX_WIDTH} />
+        ) : selected ? (
           <ChatView
             key={selected}
             bot={selected}
