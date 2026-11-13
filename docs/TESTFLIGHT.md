@@ -41,6 +41,10 @@ Same pipeline as Sports Week: Expo SDK 58, built on GitHub's `xcode-27` macOS ru
 
 Minutes: the free plan's 2,000 minutes a month (macOS billed at 10x) apply to private repos and are shared across the whole account, so Sports Week uses them. dork-bot is public, and GitHub doesn't bill standard hosted runners on public repos. Check the first run under Settings → Billing to confirm `xcode-27` counts as standard.
 
+## Release log
+
+- 0.10.0 (build 10): notification avatars (15), desktop message box (16), Notify me routines (17), Work view (20), UI polish (19), group chat rooms (8). Last uploaded before it: 0.9.0 (9). Not built yet.
+
 ## Phone setup
 
 1. `scripts/expose-hermes.sh` once on b-lab (needs `sudo tailscale set --operator=$USER` the first time).
