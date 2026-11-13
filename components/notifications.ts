@@ -114,7 +114,7 @@ export function NotificationRoutes(): null {
       handled.current.add(id);
       const data = parsePushData(response.notification.request.content.data);
       if (!data) return;
-      const route = routeFor(data, twoPane);
+      const route = routeFor(data, twoPane, String(Date.now()));
       if (route.pathname === '/') router.navigate(route);
       else router.push(route);
     };

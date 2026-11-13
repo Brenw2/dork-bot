@@ -143,8 +143,8 @@ export function parsePushData(raw: unknown): PushData | null {
 }
 
 export type PushRoute =
-  | { pathname: '/chat/[bot]'; params: { bot: string; chat: string; at?: string } }
-  | { pathname: '/'; params: { bot: string; chat: string; at?: string } }
+  | { pathname: '/chat/[bot]'; params: { bot: string; chat: string; at?: string; n?: string } }
+  | { pathname: '/'; params: { bot: string; chat: string; at?: string; n?: string } }
   | { pathname: '/routine-results/[bot]'; params: { bot: string } }
   | { pathname: '/work-session/[bot]'; params: { bot: string; id: string } }
   | { pathname: '/room/[id]'; params: { id: string } }
@@ -155,13 +155,24 @@ export type PushRoute =
  * no chat (the bot had none) it opens that bot's Routine results. A finished work session opens that
  * session. Two panes (open Duo in landscape, wide desktop): the chat opens in the right pane.
  */
-export function routeFor(data: PushData, twoPane: boolean): PushRoute {
+export function routeFor(data: PushData, twoPane: boolean, nonce?: string): PushRoute {
   if (data.kind === 'room') return twoPane ? { pathname: '/', params: { room: data.room } } : { pathname: '/room/[id]', params: { id: data.room } };
   if (data.kind === 'work') return { pathname: '/work-session/[bot]', params: { bot: data.bot, id: data.session } };
   if (data.kind === 'routine' && !data.chat) return { pathname: '/routine-results/[bot]', params: { bot: data.bot } };
   const chat = data.chat as string;
-  const params = { bot: data.bot, chat, ...(data.kind === 'routine' && data.at ? { at: data.at } : {}) };
+  // `n` changes on every tap, so tapping the same routine's notification again is a new route (same params would not re-render the chat).
+  const params = { bot: data.bot, chat, ...(data.kind === 'routine' && data.at ? { at: data.at, ...(nonce ? { n: nonce } : {}) } : {}) };
   return twoPane ? { pathname: '/', params } : { pathname: '/chat/[bot]', params };
+}
+
+/** The target a chat should land on: the routine's stamp plus the tap's nonce. A new key means a new tap. Null when there's no target. */
+export function focusKey(at: string | undefined, nonce: string | undefined): string | null {
+  return at ? `${at}|${nonce ?? ''}` : null;
+}
+
+/** Whether a chat should act on `key`: every key it hasn't acted on yet, so a re-tap of the same routine counts. */
+export function shouldFocus(done: string | null, key: string | null): boolean {
+  return key !== null && key !== done;
 }
 
 /** The chat on screen right now, if any. */

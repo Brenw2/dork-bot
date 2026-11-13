@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import { NOTE_AT, ROUTINE_SCREENS } from './layout-routine.mjs';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
 import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, checkErrorCard, checkErrorDetails, checkLook, checkNotSent, checkNotifications } from './layout-fixes-69.mjs';
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
@@ -48,7 +49,7 @@ export const POSTURES = {
     // crosses the fold, the same way every screen crosses it in open portrait.
     keepOut: [{ name: 'status rail', x: 867, y: 0, width: 84, height: 669 }],
   },
-  // A wide desktop window (two panes). Only the group chat screens run here (card 8, comps g1..g6 --desktop).
+  // A wide desktop window (two panes). Only the group chat screens (card 8, comps g1..g6 --desktop) and the routine cards (card 24) run here.
   desktop: { width: 1280, height: 800, insets: { top: 0, right: 0, bottom: 0, left: 0 }, keepOut: [], roomsOnly: true },
 };
 
@@ -130,7 +131,7 @@ const RICH_MESSAGES = [
 const NOTE_MESSAGES = [
   { id: 1, role: 'user', content: 'what is in the news today' },
   { id: 2, role: 'assistant', content: 'Here you go.' },
-  { id: 3, role: 'user', content: `[Routine · daily_digest · ${new Date(Date.now() - 36e5).toISOString()}]\nThree stories today.\n\n- The Mets won 4-2.\n- Rain after 9.\n- Markets are flat.` },
+  { id: 3, role: 'user', content: `[Routine · daily_digest · ${NOTE_AT}]\nThree stories today.\n\n- The Mets won 4-2.\n- Rain after 9.\n- Markets are flat.` },
   { id: 4, role: 'user', content: 'thanks' },
   { id: 5, role: 'assistant', content: 'Any time.' },
 ];
@@ -263,6 +264,8 @@ const SCREENS = [
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
+  // Card 24: the routine card collapsed, expanded, and opened from a notification (scripts/layout-routine.mjs).
+  ...ROUTINE_SCREENS,
   // Card 19 fix 10: the bot sheet (tap the chat title, long-press a row).
   { name: 'bot-sheet', paired: true, path: () => '/bot/assistant', waitFor: 'Routine results' },
   { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
@@ -929,8 +932,8 @@ async function main() {
     if (only && posture !== only) continue;
     for (const screen of SCREENS) {
       if (screen.postures && !screen.postures.includes(posture)) continue;
-      if (shape.roomsOnly && !screen.name.startsWith('room-')) continue;
-      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2 });
+      if (shape.roomsOnly && !screen.name.startsWith('room-') && !screen.name.startsWith('routine-')) continue;
+      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2, reducedMotion: screen.reducedMotion ? 'reduce' : 'no-preference' });
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
@@ -955,7 +958,7 @@ async function main() {
         if (screen.fill) await page.getByLabel(screen.fill[0]).fill(screen.fill[1]);
         if (screen.then) await page.getByText(screen.then, { exact: false }).first().waitFor({ timeout: 15_000 });
         if (screen.act) await screen.act(page);
-        await page.waitForTimeout(400); // let the list scroll to the end and statuses settle
+        await page.waitForTimeout(screen.settle ?? 400); // let the list scroll to the end and statuses settle
         problems = await page.evaluate(audit, {
           insets: shape.insets,
           keepOut: shape.keepOut,

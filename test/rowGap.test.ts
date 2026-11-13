@@ -29,9 +29,13 @@ describe('rowGap (transcript rhythm)', () => {
     expect(rowGap(chip, msg('assistant', 2))).toBe(10);
     expect(rowGap(chip, pending)).toBe(10);
   });
-  it('a routine card counts as the bot', () => {
+  it('a routine card has 16 above and below, from bubbles and replies alike', () => {
     const note = msg('user', 3, { routine: { name: 'r', at: '2026-01-01T00:00:00Z', text: 'x' } as never });
     expect(rowGap(msg('user'), note)).toBe(16);
-    expect(rowGap(note, msg('user', 4))).toBe(20);
+    expect(rowGap(msg('assistant'), note)).toBe(16);
+    expect(rowGap(note, msg('user', 4))).toBe(16);
+    expect(rowGap(note, msg('assistant', 4))).toBe(16);
+    expect(rowGap(note, note)).toBe(16);
+    expect(rowGap(undefined, note)).toBe(0);
   });
 });
