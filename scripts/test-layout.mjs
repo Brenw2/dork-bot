@@ -717,7 +717,7 @@ async function uiPolishTests(browser, base) {
     const sub = await textRect(page, 'assistant');
     check(sub, 'the bot name is the 12 pt subtitle');
     const rows = await page.evaluate(() =>
-      [...document.querySelectorAll('[role=button]')].filter((e) => /, (now|Tue|Oct|\d+:\d\d)/.test(e.getAttribute('aria-label') ?? '')).map((e) => e.getBoundingClientRect().toJSON()),
+      [...document.querySelectorAll('[role=button]')].filter((e) => /^(Mets tickets|Dork Bot: assistant|What model|why does this test)/i.test(e.getAttribute('aria-label') ?? '')).map((e) => e.getBoundingClientRect().toJSON()),
     );
     check(rows.length >= 3, `3 chat rows expected, got ${rows.length}`);
     for (const r of rows) {
