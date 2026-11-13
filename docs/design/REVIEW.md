@@ -425,6 +425,58 @@ Done when the chat ⋯ has 4 items in 3 groups, everything bot-level is in the b
 
 ---
 
+## Fix 11: routine cards (card 24) — LOCKED 2026-11-13
+
+Replaces the card 17 look (3 pt bot-colour left bar, "Routine · name · time" 12 pt dim, output always open). Brennan's ask: routines appear in the chat, collapse, look different from chat, and a notification tap lands on the entry.
+
+Comps (in context: your bubble → routine card → your bubble → bot reply), `docs/design/comps/`:
+- `24-routine-collapsed--iphone` / `--desktop`
+- `24-routine-expanded--iphone` / `--desktop`
+- `24-routine-highlight--iphone` / `--desktop` (the ~1 s frame, shown expanded)
+
+Same layout on phone and desktop; only the body type size and the card's width differ. Existing tokens only. Written for the assistant bot (c = #4CC38A); every tint is `mix(c, t)` over bg #0F1012, so use the bot's own colour. Example values below are for c = #4CC38A.
+
+**Container (LOCKED)**
+- Full width of the transcript column: iPhone 361 (16 margin each side), desktop the 760 column. Never a left or right bubble, never narrower. `alignSelf: stretch`.
+- Radius 16 (the card radius), overflow hidden.
+- Fill `mix(c, 0.08)` = #141E1C. Border 0.5 `mix(c, 0.22)` = #1C372C (hairline).
+- Your bubbles stay `mix(c, 0.30)` (right aligned, radius 18, max 78%). The card is a much fainter tint, full width, radius 16 with a hairline border, and carries the icon, so it can't be mistaken for a bubble or a bot reply. No left bar anymore.
+- Vertical spacing: 16 above and 16 below, from bubbles and replies alike. The "Friday 8:00 PM" timestamp separator above it stays as in fix 7 (12/16, 500 dim).
+
+**Header row (collapsed and expanded, LOCKED)**
+- The whole row is one Pressable, min height 44, padding 10 top and bottom, 12 left, 4 right. Collapsed the header is 58 (10 + 20 name + 18 preview + 10); with the hairline border the card is 59 (measured 60 in the 1x web render). Expanded the header is 48 (the 28 icon disc + 10 + 10). Both are over the 44 minimum, and the chevron box is 44×44.
+- Icon: 28 disc, fill `mix(c, 0.18)` = #1A3028 (same as the avatar disc), clock glyph 16 in c, stroke 1.8. This is the same clock as the Routines tile in the bot sheet. Gap 10 to the text.
+- Name: 15/20 semibold #ECEDEF, one line, ellipsis. Time: 13/18 regular dim #9298A0, right of the name, 8 gap, never wraps ("Fri 8:00 PM", the same `whenLabel`).
+- Preview (collapsed only): 13/18 regular dim #9298A0, ONE line, ellipsis, under the name. It is the output's first text with Markdown stripped (reuse `stripMarkdown` as the bot list preview does). Hidden when expanded.
+- Chevron: › glyph 9×15, stroke 2.2, colour #5D626A (the same as the list chevrons), in a 44×44 hit box at the right edge. Collapsed points right (0°). Expanded rotates to 90° (points down). Rotation 200 ms ease-out.
+- Tap anywhere on the header toggles. Accessibility: role button, label "Routine {name}, {when}", state expanded/collapsed, hint "Double tap to expand".
+- Pressed state: fill `mix(c, 0.12)`, no other change. Desktop hover: same `mix(c, 0.12)`, cursor pointer.
+
+**Expanded (LOCKED)**
+- Header as above (preview gone), then a 0.5 divider `mix(c, 0.22)` (#1C372C) full width, then the body.
+- Body: padding 12 top, 16 left and right, 14 bottom. Output through the shared `<Markdown>` with the bot's accent, exactly the reply styles: iPhone 17/24, desktop 16/24, paragraph gap 10, code blocks, tables and links as fix 7. No second font size.
+- No footer, no buttons.
+- Animation: height 200 ms ease-out, body opacity 0 → 1 over 150 ms, chevron 200 ms together. Collapse is the reverse (180 ms ease-in, no fade delay). Reduce Motion on: no animation, state changes instantly (chevron included).
+- Collapsed is the default for every routine card on first render. State is per message and lives only in memory: scrolling away and back keeps it, leaving the chat resets it. Not persisted.
+- A routine with no output text has no body and no chevron; the row is not tappable.
+- Long output: no inner scroll, the card grows with the chat (the transcript scrolls).
+
+**Opened from a notification (LOCKED)**
+- Tap on a routine notification: open that bot's chat, scroll the card into view (align its top 16 below the header, or centred if the card is taller than the screen), expand it, highlight it. The notification payload must carry the chat id and the message id.
+- Expands on arrival (that is what the tap asked for), with the normal 200 ms animation.
+- Highlight: fill `mix(c, 0.22)` = #1C372C and border 1.5 `mix(c, 0.60)` = #347B5A. Holds 600 ms, then fades back to the resting fill and border over 400 ms ease-out (about 1 s total). Runs once. No glow, no shadow, no movement, no haptic.
+- Reduce Motion on: same colours, no fade; hold 1 s, then snap back.
+- If the message is not loaded yet (older than the loaded page): load until it is found, then do the above. If it can't be found, open at the bottom with no highlight and no error.
+- A tap on a notification for a chat that is already open does the same (scroll, expand, highlight).
+
+**Other places**
+- Bot list and desktop sidebar preview keep "Routine · name" (already shipped, `lib/routineNotes.ts`).
+- Group rooms (later): same card, with the bot's name 14 semibold in the bot colour above it per fix G3.
+
+**Done when** collapsed routine cards are about 59 tall, full width, tinted, with the clock disc, name, time, one-line preview and › on iPhone and desktop; tapping the header toggles with the 200 ms rotation and height animation; the header row is at least 44; a notification tap lands on the card, expands it and runs the 1 s highlight; and nothing else in the transcript changed.
+
+---
+
 ## Group chat (card 8)
 
 These comps follow Hermes Bot Mode rooms (`hermes-agent/website/docs/user-guide/bot-mode.md` → Groups and group chats): 2-6 members, @-mentions scope a round and everyone answers when nobody is mentioned, bots may pass, `@user` raises Needs you, Stop holds members, and approvals answer on one click. Same tokens as above. The accent rule: rooms use accent #8B7CF6 for chrome, and each reply uses its bot's color for the name and mentions.
