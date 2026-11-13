@@ -43,6 +43,7 @@ Minutes: the free plan's 2,000 minutes a month (macOS billed at 10x) apply to pr
 
 ## Release log
 
+- 0.10.1 (build 11): no liquid-glass capsules on sheet and New group chat headers (22), group chat keyboard and Members title fixes (#45, #46). Not built yet.
 - 0.10.0 (build 10): notification avatars (15), desktop message box (16), Notify me routines (17), Work view (20), UI polish (19), group chat rooms (8). Last uploaded before it: 0.9.0 (9). Not built yet.
 
 ## Phone setup
