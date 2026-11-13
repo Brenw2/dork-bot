@@ -229,4 +229,24 @@ desktop('g6-held--desktop', `<div class="dwin">${sidebar([{ ...ROOM, sel: true, 
 duoL('01-bot-list--duo-landscape', `<div class="dwin" style="padding-right:84px"><div class="side" style="width:300px"><div style="height:24px"></div><div class="sidehd"><div class="t" style="font-size:20px">Dork Bot</div><div class="dib" style="color:${ACCENT};width:44px;height:44px">${I.more}</div><div class="dib" style="color:${ACCENT};width:44px;height:44px">${I.compose}</div></div>${[{ ...ROSTER[0], sel: true }, ROSTER[1], ROSTER[2], ROSTER[3], ROSTER[4], ROSTER[5]].map(drow).join('').replace(/font: 600 15px/g, '')}</div><div class="main">${dChatHd('chief', { toggle: true, sub: 'claude-opus-5-5 · Anthropic' }).replace('class="dhd"', 'class="dhd" style="margin-top:24px"')}<div class="transcript" style="padding:12px 20px 12px">${mine('chief', 'can we get group chats in the app?')}${chip('Used Trello, Terminal · 7 steps')}<div class="reply"><p>Yes. Hermes already has group rooms built in, so Dork Bot will use those.</p></div></div>${composer('chief')}<div style="height:26px"></div></div></div><div style="position:absolute;right:0;top:0;bottom:0;width:84px;background:#08090a"></div>`,
   ann(310, 4, 'open Duo landscape: desktop sidebar layout, iOS sizes (44 hit, 17 body)'));
 
+// ================= FIX 11: routine cards (card 24) =================
+const chevR = `<svg viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7.5 7.5l-6 6"/></svg>`;
+function rcard(bot, o = {}) {
+  const c = C(bot);
+  const vars = `--rf:${mix(c, 0.08)};--rb:${mix(c, 0.22)};--rh:${mix(c, 0.22)};--rhb:${mix(c, 0.6)}`;
+  const head = `<div class="rh"><div class="ri" style="background:${mix(c, 0.18)};color:${c}">${I.clock}</div><div class="rm"><div class="rl1"><div class="rn">Friday packing reminder</div><div class="rt">Fri 8:00 PM</div></div>${o.open ? '' : '<div class="rp">Saturday hike: dry until about 2 PM, then showers. Pack a rain jacket, bring water, start early</div>'}</div><div class="rc">${chevR}</div></div>`;
+  const body = o.open ? `<div class="rbody"><div class="reply"><p>Saturday hike: dry until about 2 PM, then showers.</p><ul><li>Pack a rain jacket</li><li>Bring water</li><li>Start early</li></ul></div></div>` : '';
+  return `<div class="rcard ${o.open ? 'open' : ''} ${o.hl ? 'hl' : ''}" style="${vars}">${head}${body}</div>`;
+}
+const R_CTX = (bot, o) => `${mine(bot, 'remind me friday night to pack a rain jacket anyway')}<div class="reply"><p>Done. I’ll message you Friday at 8 PM.</p></div><div class="stamp"><b>Friday</b> 8:00 PM</div>${rcard(bot, o)}${mine(bot, 'thanks, got it')}<div class="reply"><p>Anytime. Want me to check the forecast again Saturday morning?</p></div>`;
+const R_ANN = {
+  collapsed: ann(20, 276, 'collapsed: full width, ~59 tall, r16, fill mix(bot,.08), icon disc 28'),
+  expanded: ann(20, 260, 'expanded: › rotated 90°, preview hides, 0.5 divider, Markdown 17/24'),
+  highlight: ann(20, 250, 'highlight ≈1 s: fill mix(bot,.22), border 1.5 mix(bot,.6)'),
+};
+for (const [key, o] of [['collapsed', {}], ['expanded', { open: true }], ['highlight', { open: true, hl: true }]]) {
+  iphone(`24-routine-${key}--iphone`, `${chatNav('assistant')}<div class="transcript">${R_CTX('assistant', o)}</div>${composer('assistant')}${safe}`, R_ANN[key]);
+  desktop(`24-routine-${key}--desktop`, `<div class="dwin">${sidebar([ROSTER[0], ROSTER[1], { ...ROSTER[2], sel: true, badge: null, pv: 'Routine · Friday packing reminder' }, ROSTER[3], ROSTER[4], ROSTER[5], ROSTER[6]])}<div class="main">${dChatHd('assistant', { toggle: true })}<div class="transcript dcol">${R_CTX('assistant', o)}</div><div class="dcomp dcol">${composer('assistant')}</div></div></div>`);
+}
+
 document.body.innerHTML = frames.join('\n');
