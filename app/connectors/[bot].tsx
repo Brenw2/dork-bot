@@ -1,25 +1,22 @@
-import { useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Alert } from '@/components/alert';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Button, SmallButton } from '@/components/Buttons';
 import { Sheet } from '@/components/Sheet';
+import { Group, GroupFootnote, GroupHeader, GroupRow } from '@/components/Grouped';
 import { useBotName } from '@/components/useBotName';
 import { Column, useColumnStyle } from '@/components/Column';
-import { desktop } from '@/components/desktop';
+import { browser } from '@/components/connectorBrowser';
 import { loadManager } from '@/components/manager';
 import { connectorNotes } from '@/lib/connectorNotes';
-import { Connectors, type CatalogEntry, type Connector, type SignInBrowser } from '@/lib/connectors';
-import { button, colors, mono } from '@/lib/theme';
-
-// The sign-in page opens in an in-app browser (it shares Safari's logins, so it's often one tap).
-// The provider sends it back to Hermes on b-lab; Connectors.signIn sees the approval and closes it.
-const browser: SignInBrowser = {
-  open: (url) => (desktop ? desktop.openAuth(url) : WebBrowser.openAuthSessionAsync(url, 'dorkbot://connected').then(() => undefined)),
-  close: () => (desktop ? desktop.closeAuth() : WebBrowser.dismissAuthSession()),
-};
+import { Connectors, type CatalogEntry, type Connector } from '@/lib/connectors';
+import { colors, mono } from '@/lib/theme';
 
 type Health = { state: 'checking' } | { state: 'ok'; tools: number } | { state: 'signin' } | { state: 'error'; message: string };
+
+const healthText = (h: Health, working: string | null) =>
+  working ??
+  (h.state === 'checking' ? 'Checking…' : h.state === 'ok' ? `${h.tools} tools` : h.state === 'signin' ? 'Needs you to sign in' : h.message);
 
 export default function ConnectorsScreen() {
   const { bot } = useLocalSearchParams<{ bot: string }>();
@@ -121,202 +118,142 @@ export default function ConnectorsScreen() {
       }),
     );
 
-  const remove = (c: Connector) =>
-    Alert.alert(`Remove ${c.name}?`, `${botName} loses its ${c.name} tools. You can connect it again any time.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () =>
-          api
-            .remove(c.name)
-            .then(() => connectorNotes.removed(bot, c.name))
-            .then(() => refresh(api))
-            .catch((e: Error) => setNotice({ ok: false, text: e.message })),
-      },
-    ]);
+  const open = (name: string) => router.push({ pathname: '/connector/[bot]', params: { bot, name } });
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
       <Sheet title="Connectors" bot={bot} />
-      {notice ? <Text style={notice.ok ? styles.ok : styles.error}>{notice.text}</Text> : null}
+      {notice ? <Text style={[notice.ok ? styles.ok : styles.error, styles.notice]}>{notice.text}</Text> : null}
 
-      <Text style={styles.label}>Connected</Text>
+      <GroupHeader>Connected</GroupHeader>
       {mine === null ? (
         <ActivityIndicator color={colors.dim} />
       ) : mine.length === 0 ? (
-        <Text style={styles.hint}>Nothing yet. Pick one below and sign in; {botName} gets its tools.</Text>
+        <GroupFootnote>Nothing yet. Pick one below and sign in; {botName} gets its tools.</GroupFootnote>
       ) : (
-        mine.map((c) => {
-          const h = health[c.name] ?? { state: 'checking' };
-          const working = busy?.name === c.name;
-          return (
-            <View key={c.name} style={styles.row}>
-              <View style={styles.rowText}>
-                <Text style={styles.name}>{c.name}</Text>
-                <Text style={[styles.sub, h.state === 'error' && { color: colors.bad }]} numberOfLines={2}>
-                  {working
-                    ? busy.status
-                    : h.state === 'checking'
-                      ? 'Checking…'
-                      : h.state === 'ok'
-                        ? `${h.tools} tools`
-                        : h.state === 'signin'
-                          ? 'Needs you to sign in'
-                          : h.message}
-                </Text>
-              </View>
-              {h.state === 'signin' && !working ? (
-                <SmallButton
-                  label="Sign in"
-                  disabled={!!busy}
-                  onPress={() => run(c.name, (onStatus) => api.signIn(c.name, browser, { onStatus }).then((t) => t.length))}
-                />
-              ) : null}
-              {!c.fromPlugin && !working ? <SmallButton label="Remove" quiet disabled={!!busy} onPress={() => remove(c)} /> : null}
-              {working ? <ActivityIndicator color={colors.dim} /> : null}
-            </View>
-          );
-        })
+        <Group>
+          {mine.map((c) => {
+            const h = health[c.name] ?? { state: 'checking' };
+            const working = busy?.name === c.name;
+            return (
+              <GroupRow
+                key={c.name}
+                label={c.name}
+                detail={healthText(h, working ? busy.status : null)}
+                detailColor={h.state === 'error' ? colors.bad : undefined}
+                chevron={!(h.state === 'signin' && !working)}
+                onPress={() => open(c.name)}
+                accessibilityLabel={`${c.name}, ${healthText(h, working ? busy.status : null)}. Details`}
+                right={
+                  working ? (
+                    <ActivityIndicator color={colors.dim} />
+                  ) : h.state === 'signin' ? (
+                    <SmallButton
+                      label="Sign in"
+                      bot={bot}
+                      tone="filled"
+                      disabled={!!busy}
+                      onPress={() => run(c.name, (onStatus) => api.signIn(c.name, browser, { onStatus }).then((t) => t.length))}
+                    />
+                  ) : null
+                }
+              />
+            );
+          })}
+        </Group>
       )}
 
-      <Text style={[styles.label, { marginTop: 10 }]}>Add a connector</Text>
+      <GroupHeader>Add a connector</GroupHeader>
       <TextInput
         style={styles.input}
         value={search}
         onChangeText={setSearch}
         placeholder="Search Notion, Linear, Strava…"
-        placeholderTextColor={colors.dim}
+        placeholderTextColor={colors.faint}
         autoCapitalize="none"
         autoCorrect={false}
         accessibilityLabel="Search connectors"
       />
-      {available.map((e) => {
-        const working = busy?.name === e.name;
-        return (
-          <View key={e.name} style={[styles.row, styles.rowColumn]}>
-            <View style={styles.rowLine}>
-              <View style={styles.rowText}>
-                <Text style={styles.name}>{e.name}</Text>
-                <Text style={styles.sub} numberOfLines={2}>
-                  {working ? busy.status : e.description}
-                </Text>
+      {available.length ? (
+        <Group style={{ marginTop: 12 }}>
+          {available.map((e) => {
+            const working = busy?.name === e.name;
+            return (
+              <View key={e.name}>
+                <GroupRow
+                  label={e.name}
+                  detail={working ? busy.status : e.description}
+                  right={working ? <ActivityIndicator color={colors.dim} /> : <SmallButton label={e.auth === 'oauth' ? 'Connect' : 'Add'} bot={bot} tone="tint" disabled={!!busy} onPress={() => connectEntry(e)} accessibilityLabel={`${e.auth === 'oauth' ? 'Connect' : 'Add'} ${e.name}`} />}
+                />
+                {setupFor === e.name ? (
+                  <View style={styles.setup}>
+                    {e.needs.map((n) => (
+                      <TextInput
+                        key={n.name}
+                        style={styles.input}
+                        value={values[n.name] ?? ''}
+                        onChangeText={(t) => setValues((v) => ({ ...v, [n.name]: t }))}
+                        placeholder={n.prompt}
+                        placeholderTextColor={colors.faint}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        secureTextEntry={/secret|token|key/i.test(n.name)}
+                        accessibilityLabel={n.prompt}
+                      />
+                    ))}
+                  </View>
+                ) : null}
               </View>
-              {working ? (
-                <ActivityIndicator color={colors.dim} />
-              ) : (
-                <SmallButton label={e.auth === 'oauth' ? 'Connect' : 'Add'} disabled={!!busy} onPress={() => connectEntry(e)} />
-              )}
-            </View>
-            {setupFor === e.name
-              ? e.needs.map((n) => (
-                  <TextInput
-                    key={n.name}
-                    style={styles.input}
-                    value={values[n.name] ?? ''}
-                    onChangeText={(t) => setValues((v) => ({ ...v, [n.name]: t }))}
-                    placeholder={n.prompt}
-                    placeholderTextColor={colors.dim}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry={/secret|token|key/i.test(n.name)}
-                    accessibilityLabel={n.prompt}
-                  />
-                ))
-              : null}
-          </View>
-        );
-      })}
+            );
+          })}
+        </Group>
+      ) : null}
 
-      <Text style={[styles.label, { marginTop: 10 }]}>Custom connector</Text>
-      <Text style={styles.hint}>Any remote MCP server. If it needs a sign-in, the page opens here.</Text>
+      <GroupHeader>Custom connector</GroupHeader>
       <TextInput
         style={styles.input}
         value={custom.name}
         onChangeText={(name) => setCustom((c) => ({ ...c, name: name.toLowerCase() }))}
         placeholder="name, e.g. my-tools"
-        placeholderTextColor={colors.dim}
+        placeholderTextColor={colors.faint}
         autoCapitalize="none"
         autoCorrect={false}
         accessibilityLabel="Connector name"
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { marginTop: 8 }]}
         value={custom.url}
         onChangeText={(url) => setCustom((c) => ({ ...c, url }))}
         placeholder="https://example.com/mcp"
-        placeholderTextColor={colors.dim}
+        placeholderTextColor={colors.faint}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"
         accessibilityLabel="Connector URL"
       />
-      <Pressable
-        style={[styles.button, (!custom.name || !custom.url || !!busy) && button.disabled]}
+      <GroupFootnote>Any remote MCP server. If it needs a sign-in, the page opens here.</GroupFootnote>
+      <Button
+        bot={bot}
+        style={{ marginTop: 16 }}
+        label={busy && busy.name === custom.name ? busy.status : 'Connect'}
+        accessibilityLabel="Connect custom connector"
         disabled={!custom.name || !custom.url || !!busy}
         onPress={connectCustom}
-        accessibilityRole="button"
-        accessibilityLabel="Connect custom connector"
-      >
-        <Text style={styles.buttonText}>{busy && busy.name === custom.name ? busy.status : 'Connect'}</Text>
-      </Pressable>
+      />
     </ScrollView>
-  );
-}
-
-function SmallButton({ label, onPress, disabled, quiet }: { label: string; onPress: () => void; disabled?: boolean; quiet?: boolean }) {
-  return (
-    <Pressable
-      style={[styles.small, quiet && styles.smallQuiet, disabled && { opacity: 0.5 }]}
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      hitSlop={6}
-    >
-      <Text style={[styles.smallText, quiet && { color: colors.dim }]}>{label}</Text>
-    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  body: { padding: 20, gap: 10, paddingBottom: 48 },
+  body: { padding: 16, paddingBottom: 48 },
   title: { color: colors.text, fontSize: 20, fontWeight: '600' },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center', lineHeight: 22 },
   code: { color: colors.text, fontFamily: mono },
-  label: { color: colors.dim, fontSize: 13 },
-  hint: { color: colors.dim, fontSize: 13, lineHeight: 18 },
+  notice: { marginHorizontal: 16, marginTop: 8 },
   ok: { color: colors.ok, fontSize: 14, lineHeight: 20 },
   error: { color: colors.bad, fontSize: 14, lineHeight: 20 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: colors.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  rowColumn: { flexDirection: 'column', alignItems: 'stretch' },
-  rowLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowText: { flex: 1 },
-  name: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
-  input: {
-    color: colors.text,
-    fontSize: 16,
-    padding: 13,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  small: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.accent },
-  smallQuiet: { backgroundColor: 'transparent', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  smallText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  button: { ...button.primary, height: 50, borderRadius: 25 },
-  buttonText: button.text,
+  setup: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
+  input: { color: colors.text, fontSize: 17, minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.card },
 });

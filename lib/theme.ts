@@ -23,17 +23,24 @@ export const colors = {
   errorBg: '#24171A',
   errorLine: '#4A2A2E',
   errorText: '#F0C7C9',
+  errorDetail: '#C9A9AC', // the "Hermes said" line
 };
 
 export const mono = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
-/** Dork Bot's one button shape: a pill. Disabled buttons go flat grey instead of see-through purple. */
+/**
+ * Dork Bot's one button set (docs/design/REVIEW.md, fix 9). iPhone: primary and secondary 50 tall pills, small row
+ * buttons 30 tall. Desktop: 40 (forms), 32 (panel headers) and 28 (small). Disabled is flat: #1A1C20, #6B7078 text, no border.
+ */
 export const button = {
-  primary: { height: 48, borderRadius: 24, paddingHorizontal: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  disabled: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
-  text: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  disabledText: { color: colors.dim },
+  primary: { height: 50, borderRadius: 25, paddingHorizontal: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  disabled: { backgroundColor: colors.card },
+  text: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  disabledText: { color: colors.faint },
 } as const;
+
+/** Every switch: the iOS default with on = #4CC38A and a white thumb, the same on the web (fix 9). */
+export const switchProps = { trackColor: { true: colors.ok, false: colors.border }, thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF', ios_backgroundColor: colors.border } as const;
 
 /** Avatar color from the bot's name, so each bot keeps its own. */
 export function botColor(name: string): string {
