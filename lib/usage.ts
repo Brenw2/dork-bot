@@ -454,3 +454,16 @@ export function usageBotNames(profiles: { name: string; isDefault: boolean }[], 
   const names = profiles.filter((p) => !p.isDefault || have.has(p.name)).map((p) => p.name);
   return { names, hidden: Object.fromEntries(names.map((n) => [n, !have.has(n)])) };
 }
+
+/**
+ * Windows whose reset time has passed ("Reset due", Fix 12): the screen refetches once for each. The key is
+ * provider + label + the reset time shown, so a refetch that still carries the same stale time doesn't loop.
+ */
+export function dueResets(list: ProviderUsage[], now: number): string[] {
+  const keys: string[] = [];
+  for (const p of list) {
+    const windows = p.kind === 'accounts' ? p.accounts.flatMap((a) => a.windows) : p.windows;
+    for (const w of windows) if (w.resetsAt !== null && w.resetsAt <= now) keys.push(`${p.slug}|${w.label}|${w.resetsAt}`);
+  }
+  return keys;
+}

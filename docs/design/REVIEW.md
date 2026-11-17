@@ -623,6 +623,17 @@ Existing: bg #0F1012, card #1A1C20, raised #22252A, hover #1C1E22, border #2A2D3
 
 ---
 
+### Mobile notes (card 25, as built)
+
+Hermes serve (`/api/model/options` and `/api/analytics/usage`) doesn't send everything Fix 12 draws. These rows are built to the comp and **hidden when the data is absent** (no placeholder, no 0):
+- **Credits row** (OpenRouter, Nous): shows only if Hermes sends `usage.credits` (a number, or `{amount|remaining|balance, currency}`). Not sent today for Anthropic or Nous.
+- **Plan** (`plan` subtitle replacement) and **window `detail`** line: not on serve (only `hermes usage --json --provider` has them). The subtitle stays "{Provider} subscription".
+- **`unavailable_reason`** line under "No usage data from Hermes": not on serve.
+- **Per-provider fetch error** ("Couldn't read Codex usage" + Retry): one call serves every provider, so a provider can't fail alone. The whole-call failures (banner, "Couldn't update · Retry", "Can't reach b-lab") are built.
+- Provider under a model name (`claude-opus-5-5 · Anthropic`) comes from Hermes's own model lists; hidden when no list has the model. Tool calls = sum of Hermes's per-tool counts.
+
+Refresh (Chief's ruling, 2026-11-18): once at open, on pull, when the app returns to the foreground with data over 5 minutes old, and once for each window that shows "Reset due". No timer. The phone's "‹ Bots" stays in a fixed nav row; the large title collapses into it with a hairline once scrolled.
+
 ## Group chat (card 8)
 
 These comps follow Hermes Bot Mode rooms (`hermes-agent/website/docs/user-guide/bot-mode.md` → Groups and group chats): 2-6 members, @-mentions scope a round and everyone answers when nobody is mentioned, bots may pass, `@user` raises Needs you, Stop holds members, and approvals answer on one click. Same tokens as above. The accent rule: rooms use accent #8B7CF6 for chrome, and each reply uses its bot's color for the name and mentions.

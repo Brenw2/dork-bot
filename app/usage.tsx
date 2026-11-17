@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, type NativeScrollEvent, type NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/AppIcons';
 import { useColumnStyle } from '@/components/Column';
@@ -8,7 +8,7 @@ import { isDesktop } from '@/components/desktop';
 import { BotUsageRow, FailBanner, ProviderCard, Segmented, SkeletonBotRows, SkeletonCard, TotalsCard, Unreachable, UpdatedLine } from '@/components/UsageParts';
 import { useBotsUsage, useDays, useUsageSnapshot } from '@/components/useUsage';
 import { colors } from '@/lib/theme';
-import { clockLabel, hasActivity, localTokens, sortBots, updatedLine } from '@/lib/usage';
+import { clockLabel, dueResets, hasActivity, localTokens, sortBots, updatedLine } from '@/lib/usage';
 
 const Header = ({ children }: { children: string }) => (
   <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
@@ -17,8 +17,8 @@ const Header = ({ children }: { children: string }) => (
 );
 
 // Usage (card 25, docs/design/REVIEW.md Fix 12): the AI subscriptions (Hermes's account limits), then what each bot
-// used. Everything comes from `hermes serve` (lib/usage.ts); nothing is stored. Pull to refresh (↻ on desktop);
-// the numbers refresh every 60 s while this is open.
+// used. Everything comes from `hermes serve` (lib/usage.ts); nothing is stored. Refreshes once on open, on pull (↻ on
+// desktop), on returning to the app after 5 minutes, and once for each window that shows "Reset due". No timer.
 export default function UsageScreen() {
   const column = useColumnStyle();
   const insets = useSafeAreaInsets();
@@ -32,6 +32,20 @@ export default function UsageScreen() {
     return () => clearInterval(id);
   }, []);
   useEffect(() => setNow(Date.now()), [snapshot]);
+  // "Reset due": refetch once for each window whose reset has passed (the clock tick above only re-renders).
+  const refetched = useRef(new Set<string>());
+  const lastDue = useRef(0);
+  useEffect(() => {
+    if (!snapshot) return;
+    const fresh = dueResets(snapshot.providers, now).filter((k) => !refetched.current.has(k));
+    if (!fresh.length || now - lastDue.current < 30_000) return; // never more than one due-refetch per 30 s
+    lastDue.current = now;
+    fresh.forEach((k) => refetched.current.add(k));
+    void refresh(true);
+  }, [snapshot, now, refresh]);
+  // The nav row stays put; the large title collapses into it once scrolled (Fix 12, 25-usage-scrolled--iphone).
+  const [scrolled, setScrolled] = useState(false);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => setScrolled(e.nativeEvent.contentOffset.y > 40);
 
   const all = useCallback(async () => {
     await Promise.all([refresh(true), bots.refresh().catch(() => undefined)]);
@@ -53,7 +67,24 @@ export default function UsageScreen() {
 
   return (
     <View style={[styles.screen, !isDesktop && { paddingTop: insets.top }]}>
+      {!isDesktop ? (
+        <View style={[styles.nav, scrolled && styles.navScrolled]}>
+          <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityRole="button" accessibilityLabel="Back to Bots" style={styles.back}>
+            <Icon name="back" size={31} color={colors.accent} stroke={2.6} />
+            <Text style={styles.backText} maxFontSizeMultiplier={1.4}>
+              Bots
+            </Text>
+          </Pressable>
+          {scrolled ? (
+            <Text style={styles.navTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4} pointerEvents="none">
+              Usage
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={32}
         contentContainerStyle={[styles.body, column]}
         refreshControl={isDesktop ? undefined : <RefreshControl refreshing={pulling} onRefresh={() => void pull()} tintColor={colors.dim} />}
       >
@@ -66,13 +97,7 @@ export default function UsageScreen() {
           </View>
         ) : (
           <>
-            <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityRole="button" accessibilityLabel="Back to Bots" style={styles.back}>
-              <Icon name="back" size={31} color={colors.accent} stroke={2.6} />
-              <Text style={styles.backText} maxFontSizeMultiplier={1.4}>
-                Bots
-              </Text>
-            </Pressable>
-            <Text style={styles.title} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.title, scrolled && { opacity: 0 }]} accessibilityRole={scrolled ? undefined : 'header'} maxFontSizeMultiplier={1.4}>
               Usage
             </Text>
             <View style={styles.updatedWrap}>
@@ -151,7 +176,10 @@ export default function UsageScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { paddingHorizontal: 16, paddingBottom: 40 },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, alignSelf: 'flex-start', marginLeft: -4 },
+  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'transparent' },
+  navScrolled: { borderBottomColor: colors.border },
+  navTitle: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  back: { position: 'absolute', top: 0, left: 8, flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 },
   backText: { color: colors.accent, fontSize: 17 },
   title: { color: colors.text, fontSize: 34, lineHeight: 41, fontWeight: '700' },
   updatedWrap: { marginTop: 4, marginBottom: 4 },

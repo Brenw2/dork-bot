@@ -9,7 +9,8 @@ const ANALYTICS = JSON.parse(readFileSync(join(FX, 'analytics-usage.json'), 'utf
 const EMPTY = JSON.parse(readFileSync(join(FX, 'analytics-usage-empty.json'), 'utf8'));
 const OPTIONS = JSON.parse(readFileSync(join(FX, 'model-options-usage.json'), 'utf8'));
 
-const iso = (minutes) => new Date(Date.now() + minutes * 60_000).toISOString();
+const T0 = Date.now(); // fixed, so a reset that is already past stays the same time on every request
+const iso = (minutes) => new Date((minutes < 0 ? T0 : Date.now()) + minutes * 60_000).toISOString();
 const win = (label, used_percent, minutes) => ({ label, used_percent, resets_at: iso(minutes), scope: 'account' });
 const SOON = 119.5; // minutes: "Resets in 1h 59m" (2h 0m for the first seconds)
 const WEEK = 3 * 24 * 60 + 18 * 60 + 0.5;
@@ -20,6 +21,7 @@ function options(variant) {
   const claude = providers.find((p) => p.slug === 'anthropic');
   if (variant === 'none') delete claude.usage;
   else if (variant === 'normal') claude.usage = { windows: [win('Current session', 29, SOON), win('Current week', 9, WEEK)] };
+  else if (variant === 'due') claude.usage = { windows: [win('Current session', 29, -1), win('Current week', 9, WEEK)] }; // a reset that already passed, every time
   else if (variant === 'warn') claude.usage = { windows: [win('Current session', 75, SOON), win('Current week', 40, WEEK)] };
   else if (variant === 'bad') claude.usage = { windows: [win('Current session', 93, SOON), win('Current week', 71, WEEK)] };
   else if (variant === 'pool') {
@@ -43,14 +45,24 @@ function options(variant) {
 }
 
 export async function usageMock(page, variant) {
-  await page.route('https://hermes.test:8443/api/model/options*', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(options(variant)) }),
-  );
+  page.optionCalls = 0;
+  await page.route('https://hermes.test:8443/api/model/options*', (route) => {
+    page.optionCalls++;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(options(variant)) });
+  });
   await page.route('https://hermes.test:8443/api/analytics/usage*', (route) => {
     const profile = new URL(route.request().url()).searchParams.get('profile');
     const body = profile === 'scout' ? EMPTY : ANALYTICS;
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
+}
+
+async function scrollToBots(page) {
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('div')].find((d) => d.scrollHeight > d.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(d).overflowY));
+    if (el) el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(300);
 }
 
 // Fix 12 states that need Hermes to misbehave.
@@ -86,6 +98,10 @@ export const USAGE_SCREENS = [
   { name: 'usage-bot', paired: true, path: () => '/usage/assistant', waitFor: 'By model', mock: (page) => usageMock(page, 'normal'), check: (page, posture) => page.evaluate(measureBot, { posture }) },
   { name: 'usage-bot-idle', paired: true, path: () => '/usage/scout', waitFor: 'No activity in the last 30 days', mock: (page) => usageMock(page, 'normal'), check: (page) => page.evaluate(measureBotIdle) },
   { name: 'usage-unreachable', paired: true, path: () => '/usage', waitFor: "Can't reach b-lab", mock: failing, check: (page) => page.evaluate(() => (document.body.innerText.includes('Try again') ? [] : ['the Try again button is missing'])) },
+  // The back button stays on screen when scrolled to Bots, and the large title collapses into the nav row with a hairline.
+  screen('usage-scrolled', 'normal', 'Local model · no limits', measureUsage, { postures: ['iphone', 'duo-closed', 'duo-open-portrait', 'duo-open-landscape'], act: scrollToBots, check: (page, posture) => page.evaluate(measureScrolled, { posture }) }),
+  // "Reset due": a window already past its reset refetches once (open + one more), then stops: no timer.
+  screen('usage-reset-due', 'due', 'Reset due', measureUsage, { check: async (page) => { await page.waitForTimeout(2500); return page.optionCalls === 2 ? [] : [`Reset due should refetch exactly once (2 calls to model/options), got ${page.optionCalls}`]; } }),
   gauge('usage-gauge-none', 'none', 'none'),
   gauge('usage-gauge-ok', 'normal', 'ok'),
   gauge('usage-gauge-warn', 'warn', 'warn'),
@@ -203,5 +219,23 @@ function measureGauge({ level, posture }) {
     if (text && getComputedStyle(text).color !== COLORS[level]) problems.push(`percent text should be ${COLORS[level]}`);
   }
   if (['iphone', 'duo-closed', 'duo-open-portrait'].includes(posture) && Math.abs(r.left - 16) > 10) problems.push(`on the phone the pill sits at the left (16 from the edge), got x=${r.left}`);
+  return problems;
+}
+
+function measureScrolled() {
+  const problems = [];
+  const back = document.querySelector('[aria-label="Back to Bots"]');
+  if (!back) return ['"‹ Bots" is missing after scrolling to Bots'];
+  const r = back.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > window.innerHeight || r.width < 44 || r.height < 44) problems.push(`back should be on screen and 44+ (got ${JSON.stringify(r)})`);
+  const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  if (!top || !back.contains(top)) problems.push('"‹ Bots" is covered by something when scrolled');
+  const bots = [...document.querySelectorAll('[role=heading]')].find((h) => h.textContent.trim() === 'Bots');
+  if (bots && bots.getBoundingClientRect().top < 0) problems.push('the Bots header should still be on screen after scrolling to the end');
+  const nav = back.parentElement;
+  if (getComputedStyle(nav).borderBottomWidth === '0px' || getComputedStyle(nav).borderBottomColor === 'rgba(0, 0, 0, 0)') problems.push('the nav row should show its hairline when scrolled');
+  const title = [...nav.querySelectorAll('*')].find((d) => d.children.length === 0 && d.textContent === 'Usage');
+  if (!title) problems.push('the collapsed 17 semibold "Usage" title is missing from the nav row');
+  else if (getComputedStyle(title).fontSize !== '17px') problems.push('the collapsed title should be 17');
   return problems;
 }

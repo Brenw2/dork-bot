@@ -10,6 +10,7 @@ import {
   countdown,
   daySeries,
   displayName,
+  dueResets,
   formatCount,
   localTokens,
   niceTop,
@@ -365,5 +366,24 @@ describe('usageBotNames', () => {
     const profiles = [{ name: 'default', isDefault: true }, { name: 'chief', isDefault: false }, { name: 'quiet', isDefault: false }];
     expect(usageBotNames(profiles, ['chief'])).toEqual({ names: ['chief', 'quiet'], hidden: { chief: false, quiet: true } });
     expect(usageBotNames(profiles, ['default', 'chief']).names).toEqual(['default', 'chief', 'quiet']);
+  });
+});
+
+describe('dueResets (Reset due refetches once)', () => {
+  const at = Date.parse('2026-11-18T12:00:00Z');
+  const list = parseProviderUsage({
+    providers: [
+      { slug: 'anthropic', name: 'Anthropic', authenticated: true, usage: { windows: [
+        { label: 'Current session', used_percent: 50, resets_at: '2026-11-18T11:59:00Z' },
+        { label: 'Current week', used_percent: 10, resets_at: '2026-11-21T12:00:00Z' },
+        { label: 'No reset', used_percent: 10 },
+      ] } },
+      { slug: 'openai-codex', name: 'Codex', authenticated: true, usage: { accounts: [{ id: 'a', label: 'a', state: 'ready', windows: [{ label: '5-hour', used_percent: 5, resets_at: '2026-11-18T12:00:00Z' }] }] } },
+    ],
+  });
+  it('lists only windows already past their reset, with a stable key', () => {
+    expect(dueResets(list, at)).toEqual([`anthropic|Current session|${Date.parse('2026-11-18T11:59:00Z')}`, `openai-codex|5-hour|${at}`]);
+    expect(dueResets(list, at - 120000)).toEqual([]);
+    expect(dueResets(list, at)).toEqual(dueResets(list, at + 5000)); // same keys later: the screen has already refetched for them
   });
 });
