@@ -110,6 +110,13 @@ Lock a hand-added provider as plain `custom`, not `custom:dork`: Hermes checks t
 
 The model line at the top of every chat opens the picker. A chat whose model doesn't match the bot's provider shows in red. Providers come from Hermes (signed-in ones only; `-acp` duplicates hidden), the bot's own first, then Dork. A brand-new bot can see a shorter list for its first minute while Hermes fills its model cache, and deleting a bot while that runs can leave `profiles/<bot>/provider_models_cache.json.lock` behind.
 
+## Usage (card 25)
+
+The Usage screen (lib/usage.ts) reads two `hermes serve` endpoints with the bearer token the app already holds (checked on b-lab, 2026-11-17):
+
+- `GET /api/model/options?include_unconfigured=false` → each signed-in provider may have `usage.windows` (`[{label, used_percent, resets_at, scope}]`, one account) or `usage.accounts` (`[{id, label, state, resets_at, windows}]`, a credential pool). Anthropic's "Current session" and "Current week" match `hermes usage --json`. Gotchas: Hermes answers from a cache and refreshes it in the background (one try per provider per 120 s, stale after 15 min), so the first call after a cold start has **no `usage`**; `refresh=true` only busts the model-id cache, **not** usage. The app asks once more after 4 s when no provider has usage. Only Anthropic reports on b-lab today; Nous (not signed in for usage) and local Dork have none. No credits or balance field exists for Anthropic or Nous; the parser reads `usage.credits` if Hermes ever sends it.
+- `GET /api/analytics/usage?days=7|30|90&profile=<bot>` → `daily[]`, `by_model[]`, `totals` (`total_input`, `total_output`, `total_cache_read`, `total_estimated_cost`, `total_api_calls`; SQL sums are `null` for an idle bot). `actual_cost` is 0 for subscription and local models, so the screen shows the estimate. Fixtures: test/fixtures/model-options-usage.json, analytics-usage.json.
+
 ## Several chats per bot
 
 Each chat is a Hermes session in the bot's profile: the first one is `dork-bot-<bot>` (from when bots had one chat), new ones are `dork-bot-<bot>--<id>`. The Chats screen lists `GET /p/<bot>/api/sessions?source=api_server&limit=200` filtered to those ids with messages, newest first (`lib/chats.ts`). A new chat's session is only created on its first message (`POST /api/sessions` without a title), and Hermes titles it after the first reply. Rename: `PATCH /api/sessions/<id>` `{title}` (null hands naming back to Hermes). Delete: `DELETE /api/sessions/<id>` (409 `session_active_turn` while a reply runs). Nothing about which chat is open is saved on the device: a bot opens on its most recently used chat, so the phone picks up where the desktop left off.

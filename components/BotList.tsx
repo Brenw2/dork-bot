@@ -16,10 +16,13 @@ import { liveRuns } from '@/components/liveRuns';
 import { fetch } from '@/components/net';
 import { syncNow } from '@/components/sync';
 import { useBotMood } from '@/components/useBotMood';
+import { useGaugeSnapshot } from '@/components/useUsage';
+import { UsageGauge } from '@/components/UsageParts';
 import { getConnection, listBots, onBotsChanged, type SavedBot } from '@/lib/bots';
 import { connectError, doingLine, errorLine, latestPreview, rowTime, sortRows, type BotPreview, type ConnectState } from '@/lib/botList';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { nameOf } from '@/lib/names';
+import type { UsageSnapshot } from '@/lib/usage';
 import { colors, mix } from '@/lib/theme';
 
 const REFRESH_MS = 15_000;
@@ -47,6 +50,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
   useBusyWatch();
   const approvals = useApprovalTick();
   const insets = useSafeAreaInsets();
+  const usage = useGaugeSnapshot();
   // Group rooms on Hermes (card 8): a row each, above the bots. None when Hermes has no rooms or isn't reachable.
   const { rows: rooms, supported: roomsSupported } = useRoomRows();
 
@@ -106,6 +110,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
     Menu.show(
       'Dork Bot',
       [
+        { text: 'Usage…', onPress: () => router.push('/usage') },
         { text: 'Notifications…', onPress: () => router.push('/notifications') },
         { text: 'Add with a code…', onPress: () => router.push('/add') },
         { text: 'Show hidden bots', onPress: () => router.push('/new') },
@@ -120,7 +125,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
       ? Menu.show('New', [{ text: 'New bot', onPress: () => router.push('/new') }, { text: 'New group chat', onPress: () => router.push('/room-new') }, { text: 'Cancel', style: 'cancel' }], anchor)
       : router.push('/new');
 
-  const header = <ListHeader compact={compact} top={insets.top} onMenu={appMenu} onCompose={compose} />;
+  const header = <ListHeader compact={compact} top={insets.top} usage={usage} onMenu={appMenu} onCompose={compose} />;
   if (bots === null) return <View style={styles.screen}>{header}</View>;
 
   const open = (b: SavedBot) => {
@@ -170,7 +175,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
   );
 }
 
-function ListHeader({ compact, top, onMenu, onCompose }: { compact: boolean; top: number; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
+function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boolean; top: number; usage: UsageSnapshot | null; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
@@ -181,6 +186,7 @@ function ListHeader({ compact, top, onMenu, onCompose }: { compact: boolean; top
   ];
   const buttons = (
     <View style={styles.headerButtons}>
+      <UsageGauge snapshot={usage} onPress={() => router.push('/usage')} />
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
         <Icon name="ellipsis" size={icon} color={colors.accent} />
       </Pressable>
