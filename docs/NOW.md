@@ -16,6 +16,10 @@ Last updated: 2026-11-13
 - Hermes chat accepts images inline (`message: [{type: text}, {type: image_url, image_url: {url: data:…}}]`, 10 MB request limit; probe: chief read "BLUE 42" from a PNG in 2 s). History keeps them as `[Image attached at: <profile>/cache/documents/native-inputs/…]`. gemma4:31b reports vision.
 - Ollama's model runner crashed once on 2026-11-04 11:23 (a desktop test turn hung until stopped). Watch for it.
 
+## In flight: Usage screen (card 25, branch app/usage-screen, PR #52)
+
+AI subscription limits and per-bot usage from `hermes serve` (docs/HERMES.md → Usage): `lib/usage.ts`, `components/UsageParts.tsx`, `components/useUsage.ts`, `app/usage.tsx`, `app/usage/[bot].tsx`, header gauge in the bot list. Tests: `test/usage.test.ts`, live `test/live-usage.test.ts`, layout screens `usage*` (`scripts/layout-usage.mjs`). Built before the comps merged: next is merging origin/main once design/usage-screen (Fix 12) lands and matching it (header, provider rows, totals card, bot detail tiles). Needs Design PASS before merge.
+
 ## In flight: routine cards in the chat (card 24, branch app/routine-card)
 
 Routine results in the chat are collapsible, bot-tinted cards (design Fix 11): `components/RoutineCard.tsx`, `lib/routineCard.ts`, wiring in `components/ChatView.tsx`. A routine push tap opens the chat, expands, scrolls to and flashes the card (history reloaded up to 5 times if the entry isn't there yet, else Routine results). Tests: `test/routineCard.test.ts`, `test/rowGap.test.ts`, layout screens `routine-collapsed|expanded|notified` (`scripts/layout-routine.mjs`, iPhone, Duo, desktop). Not tried on a device: the scroll position on the phone's inverted list and the animations need a TestFlight build (Chief/Brennan's call). Needs Design PASS before merge.
