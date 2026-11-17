@@ -36,6 +36,7 @@ Same pipeline as Sports Week: Expo SDK 58, built on GitHub's `xcode-27` macOS ru
 ## Every release after that
 
 1. Bump `ios.buildNumber` in `app.json` in a PR (TestFlight rejects a reused number).
+   If the version changes, update `expo.version` in `app.json`, `version` in `package.json` and `version` in `desktop/package.json` together. `npm test` (test/versions.test.ts) fails when they differ.
 2. `gh workflow run ios-testflight.yml -R Brenw2/dork-bot` (or GitHub → Actions → "iOS build + TestFlight" → Run workflow on `main`).
 3. About 15 minutes warm, 40 cold, then Apple processing (~10–15 min) before it shows in TestFlight.
 
