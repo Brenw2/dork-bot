@@ -18,7 +18,7 @@ Last updated: 2026-11-13
 
 ## In flight: Usage screen (card 25, branch app/usage-screen, PR #52)
 
-AI subscription limits and per-bot usage from `hermes serve` (docs/HERMES.md → Usage): `lib/usage.ts`, `components/UsageParts.tsx`, `components/useUsage.ts`, `app/usage.tsx`, `app/usage/[bot].tsx`, header gauge in the bot list. Tests: `test/usage.test.ts`, live `test/live-usage.test.ts`, layout screens `usage*` (`scripts/layout-usage.mjs`). Built before the comps merged: next is merging origin/main once design/usage-screen (Fix 12) lands and matching it (header, provider rows, totals card, bot detail tiles). Needs Design PASS before merge.
+AI subscription limits and per-bot usage from `hermes serve` (docs/HERMES.md → Usage): `lib/usage.ts`, `components/UsageParts.tsx`, `components/useUsage.ts`, `app/usage.tsx`, `app/usage/[bot].tsx`, header gauge in the bot list. Tests: `test/usage.test.ts`, live `test/live-usage.test.ts`, layout screens `usage*` (`scripts/layout-usage.mjs`). Matched to the locked comps (Fix 12). Not built because Hermes serve doesn't send it: credits row, per-provider plan/detail and `unavailable_reason` (all hidden when absent), per-provider fetch errors (one call serves all providers). Desktop is the existing panel (not the two-column main pane); the large title doesn't collapse on scroll; the 7/30/90 pick is remembered only while the app runs. Needs Design PASS before merge.
 
 ## In flight: routine cards in the chat (card 24, branch app/routine-card)
 

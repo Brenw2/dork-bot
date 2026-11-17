@@ -11,11 +11,21 @@ import { fail, type HermesManager } from './manager';
 
 export type Level = 'ok' | 'warn' | 'bad';
 
-/** Normal under 70% used, warning 70 to 90, red over 90 (card 25, decision 2). */
+/** Judged on the DISPLAYED integer (Fix 12): 0-69 normal, 70-90 warning, 91+ red. */
 export function levelFor(percent: number): Level {
-  if (percent > 90) return 'bad';
-  if (percent >= 70) return 'warn';
+  const shown = Math.round(percent);
+  if (shown > 90) return 'bad';
+  if (shown >= 70) return 'warn';
   return 'ok';
+}
+
+/** The word next to a warning or red window: Running low (70-90), Almost out (91-99), Limit reached (100). */
+export function stateWord(percent: number): string | null {
+  const shown = Math.round(percent);
+  if (shown >= 100) return 'Limit reached';
+  if (shown > 90) return 'Almost out';
+  if (shown >= 70) return 'Running low';
+  return null;
 }
 
 export interface UsageWindow {
@@ -45,6 +55,8 @@ export interface ProviderUsage {
   accounts: UsageAccount[];
   /** A money balance, only when Hermes sends one (it doesn't today for Anthropic or Nous; see docs/HERMES.md). */
   credits: { amount: number; currency: string } | null;
+  /** Model ids Hermes lists for this provider (to tell which provider a bot's model belongs to, and local tokens). */
+  models: string[];
   /** Local provider (Ollama and other custom endpoints): there's no account to limit, only tokens. */
   local: boolean;
   /** The provider's Hermes row has no usage yet but could (cold cache): worth one more look. */
@@ -111,6 +123,7 @@ export function parseProviderUsage(body: unknown): ProviderUsage[] {
       windows: kind === 'windows' ? windows : [],
       accounts,
       credits: usage ? parseCredits(usage.credits) : null,
+      models: Array.isArray(p.models) ? p.models.filter((m): m is string => typeof m === 'string') : [],
       local,
       pending: kind === 'none' && !local && !usage,
     });
@@ -124,39 +137,73 @@ export function sortProviders(list: ProviderUsage[]): ProviderUsage[] {
   return list.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p);
 }
 
-/** The Claude session window, which drives the header gauge. Prefers the window called "Current session". */
-export function claudeSession(list: ProviderUsage[]): UsageWindow | null {
-  const claude = list.find((p) => p.slug === 'anthropic');
-  if (!claude) return null;
-  const all = claude.kind === 'accounts' ? claude.accounts.flatMap((a) => a.windows) : claude.windows;
-  const session = all.filter((w) => /session/i.test(w.label));
-  const pool = session.length ? session : [];
-  return pool.length ? pool.reduce((a, b) => (b.percent > a.percent ? b : a)) : null;
+/** The highest used window across every window of every provider (Fix 12), with who and which. */
+export function topWindow(list: ProviderUsage[]): { provider: string; label: string; percent: number } | null {
+  let best: { provider: string; label: string; percent: number } | null = null;
+  for (const p of list) {
+    const all = p.kind === 'accounts' ? p.accounts.flatMap((a) => a.windows) : p.windows;
+    for (const w of all) if (!best || w.percent > best.percent) best = { provider: displayName(p), label: w.label, percent: w.percent };
+  }
+  return best;
 }
 
-export type GaugeState = { kind: 'none' } | { kind: 'value'; percent: number; level: Level };
+export type GaugeState = { kind: 'none' } | { kind: 'value'; percent: number; level: Level; provider: string; label: string };
 
-/** The header gauge: grey with no data, red over 90% on the Claude session window (decision 5), amber 70 to 90. */
+/** The header gauge: hidden when nothing reports a percent; the top window's ring otherwise. */
 export function gaugeState(list: ProviderUsage[] | null): GaugeState {
-  const w = list ? claudeSession(list) : null;
-  return w ? { kind: 'value', percent: w.percent, level: levelFor(w.percent) } : { kind: 'none' };
+  const w = list ? topWindow(list) : null;
+  return w ? { kind: 'value', percent: w.percent, level: levelFor(w.percent), provider: w.provider, label: w.label } : { kind: 'none' };
 }
 
-/** "1h 59m", "3d 4h", "12m", "now". */
-export function formatReset(resetsAt: number | null, now: number): string | null {
-  if (resetsAt === null) return null;
-  const mins = Math.ceil((resetsAt - now) / 60000);
-  if (mins <= 0) return 'now';
+/** What the comps call providers: Claude and Codex, else Hermes's own name. */
+export function displayName(p: Pick<ProviderUsage, 'slug' | 'name'>): string {
+  if (p.slug === 'anthropic') return 'Claude';
+  if (p.slug === 'openai-codex') return 'Codex';
+  return p.name;
+}
+
+export function subtitle(p: ProviderUsage): string {
+  if (p.local) return 'Local model · no limits';
+  if (p.kind !== 'none') return `${p.name} subscription`;
+  return p.credits ? 'Credits' : '';
+}
+
+/** Countdown, floored to the unit, two units max: 3d 18h, 1h 59m, 42m, <1m. Null when past due. */
+export function countdown(resetsAt: number, now: number): string | null {
+  const ms = resetsAt - now;
+  if (ms <= 0) return null;
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return '<1m';
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ${mins % 60}m`;
   return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
 
-/** The screen's "resets in 1h 59m" line (the local time is added by the screen with the device's locale). */
+/** "Resets in 1h 59m", or "Reset due" once it's past. */
 export function resetLine(resetsAt: number | null, now: number): string {
-  const rel = formatReset(resetsAt, now);
-  return rel === null ? 'Reset time not given' : rel === 'now' ? 'Resetting now' : `Resets in ${rel}`;
+  if (resetsAt === null) return 'Reset time not given';
+  const c = countdown(resetsAt, now);
+  return c === null ? 'Reset due' : `Resets in ${c}`;
+}
+
+/** Device-local clock: today "7:00 PM", within 7 days "Sat 12:00 PM", later "Nov 28, 12:00 PM". */
+export function clockLabel(at: number, now: number, locale?: string): string {
+  const d = new Date(at);
+  const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === new Date(now).toDateString()) return time;
+  if (at - now < 7 * 86400000 && at > now) return `${d.toLocaleDateString(locale, { weekday: 'short' })} ${time}`;
+  return `${d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+/** "Updated just now", "Updated 12 min ago", "Updated 3 h ago", then "Updated Mon 9:41 AM". */
+export function updatedLine(fetchedAt: number, now: number, locale?: string): string {
+  const mins = Math.floor((now - fetchedAt) / 60000);
+  if (mins < 1) return 'Updated just now';
+  if (mins < 60) return `Updated ${mins} min ago`;
+  if (mins < 24 * 60) return `Updated ${Math.floor(mins / 60)} h ago`;
+  const d = new Date(fetchedAt);
+  return `Updated ${d.toLocaleDateString(locale, { weekday: 'short' })} ${d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 // ---- History -------------------------------------------------------------------------------------------------
@@ -188,6 +235,8 @@ export interface BotUsage {
   output: number;
   cacheRead: number;
   apiCalls: number;
+  /** Sum of Hermes's per-tool counts (the totals row has no tool_calls). */
+  toolCalls: number;
   /** Estimated cost in USD. Hermes's actual cost is 0 for subscription and local models, so this is the estimate. */
   cost: number;
   daily: DayUsage[];
@@ -222,6 +271,7 @@ export function parseBotUsage(bot: string, days: Days, body: unknown): BotUsage 
     output: n(t.total_output),
     cacheRead: n(t.total_cache_read),
     apiCalls: n(t.total_api_calls),
+    toolCalls: (Array.isArray(b.tools) ? b.tools : []).filter(isObj).reduce((a, x) => a + n(x.count), 0),
     cost: n(t.total_estimated_cost),
     daily,
     models,
@@ -229,20 +279,112 @@ export function parseBotUsage(bot: string, days: Days, body: unknown): BotUsage 
   };
 }
 
-/** 1,234 → "1.2K", 3,400,000 → "3.4M". */
+/** Tokens (Fix 12): exact under 1,000, then 1.2K, 10K, 912K, 1M (never 1000K), 14.9M, 120M, 1.3B. */
 export function formatTokens(v: number): string {
   if (v < 1000) return String(Math.round(v));
-  if (v < 1e6) return `${(v / 1e3).toFixed(v < 1e4 ? 1 : 0).replace(/\.0$/, '')}K`;
-  return `${(v / 1e6).toFixed(v < 1e7 ? 1 : 0).replace(/\.0$/, '')}M`;
+  const units = ['K', 'M', 'B'];
+  let i = v < 1e6 ? 0 : v < 1e9 ? 1 : 2;
+  for (;;) {
+    const val = v / 1000 ** (i + 1);
+    const oneDecimal = i === 0 ? val < 10 : val < 100;
+    let r = oneDecimal ? Math.round(val * 10) / 10 : Math.round(val);
+    if (r >= 1000 && i < 2) {
+      i += 1;
+      continue;
+    }
+    return `${r}${units[i]}`.replace(/\.0(?=[KMB])/, '');
+  }
 }
 
+/** A whole count with thousands separators: 1,284. */
+export function formatCount(v: number): string {
+  return Math.round(v).toLocaleString('en-US');
+}
+
+/** $3.41, $0.00, $1,284.50, <$0.01 for a non-zero amount under half a cent. */
 export function formatCost(v: number): string {
-  if (v === 0) return '$0.00';
-  return v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
+  if (v > 0 && v < 0.005) return '<$0.01';
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function formatCredits(c: { amount: number; currency: string }): string {
-  return c.currency === 'USD' ? `$${c.amount.toFixed(2)}` : `${c.amount.toFixed(2)} ${c.currency}`;
+  return c.currency === 'USD' ? formatCost(c.amount) : `${c.amount.toFixed(2)} ${c.currency}`;
+}
+
+export const botTokens = (u: BotUsage): number => u.input + u.output;
+export const hasActivity = (u: BotUsage): boolean => botTokens(u) > 0 || u.apiCalls > 0;
+
+/** Most tokens first; bots with no activity last, in their own order. */
+export function sortBots(list: BotUsage[]): BotUsage[] {
+  return list.map((u, i) => ({ u, i })).sort((a, b) => Number(hasActivity(b.u)) - Number(hasActivity(a.u)) || botTokens(b.u) - botTokens(a.u) || a.i - b.i).map((x) => x.u);
+}
+
+export function totalsOf(list: BotUsage[]): { tokens: number; apiCalls: number; cost: number } {
+  return list.reduce((a, u) => ({ tokens: a.tokens + botTokens(u), apiCalls: a.apiCalls + u.apiCalls, cost: a.cost + u.cost }), { tokens: 0, apiCalls: 0, cost: 0 });
+}
+
+/** The provider (display name) that lists this model, from Hermes's own model lists; null when none does. */
+export function providerOfModel(model: string, providers: ProviderUsage[]): string | null {
+  const p = providers.find((x) => x.models.includes(model));
+  return p ? displayName(p) : null;
+}
+
+/** Tokens on a local provider's models across every bot in the period. */
+export function localTokens(p: ProviderUsage, bots: BotUsage[]): number {
+  const set = new Set(p.models);
+  return bots.reduce((a, u) => a + u.models.filter((m) => set.has(m.model)).reduce((b, m) => b + m.input + m.output, 0), 0);
+}
+
+/** A model's share of the bot's tokens, a whole percent. */
+export function shareOf(m: ModelUsage, u: BotUsage): number {
+  const total = botTokens(u);
+  return total > 0 ? Math.round(((m.input + m.output) / total) * 100) : 0;
+}
+
+export interface DayPoint {
+  day: string;
+  tokens: number;
+}
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** One point per calendar day for the period ending today, input plus output (cache left out); days with nothing are 0. */
+export function daySeries(u: BotUsage, now: number): DayPoint[] {
+  const byDay = new Map(u.daily.map((d) => [d.day, d.input + d.output]));
+  const out: DayPoint[] = [];
+  const end = new Date(now);
+  for (let i = u.days - 1; i >= 0; i--) {
+    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i);
+    out.push({ day: ymd(d), tokens: byDay.get(ymd(d)) ?? 0 });
+  }
+  return out;
+}
+
+/** A tidy top for the chart: 1, 2 or 5 times a power of ten (426K draws against 500K). */
+export function niceTop(max: number): number {
+  if (max <= 0) return 1;
+  const pow = 10 ** Math.floor(Math.log10(max));
+  for (const m of [1, 2, 5, 10]) if (m * pow >= max) return m * pow;
+  return 10 * pow;
+}
+
+/** "Tue, Nov 10 · 409K tokens". Day is a local YYYY-MM-DD. */
+export function calloutText(day: string, tokens: number, locale?: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+  return `${label} · ${formatTokens(tokens)} tokens`;
+}
+
+/** Labels under the plot: weekday letters (7), first/middle/Today (30), month starts (90). Index is the bar. */
+export function axisLabels(series: DayPoint[], days: Days, locale?: string): { index: number; text: string }[] {
+  const at = (i: number) => {
+    const [y, m, d] = series[i].day.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  if (!series.length) return [];
+  if (days === 7) return series.map((_, i) => ({ index: i, text: at(i).toLocaleDateString(locale, { weekday: 'narrow' }) }));
+  if (days === 30) return [0, Math.ceil((series.length - 1) / 2), series.length - 1].map((i, k) => ({ index: i, text: k === 2 ? 'Today' : at(i).toLocaleDateString(locale, { month: 'short', day: 'numeric' }) }));
+  return series.flatMap((_, i) => (at(i).getDate() === 1 ? [{ index: i, text: at(i).toLocaleDateString(locale, { month: 'short' }) }] : []));
 }
 
 // ---- Client --------------------------------------------------------------------------------------------------
@@ -301,4 +443,14 @@ export class UsageClient {
     usage.sort((a, b) => names.indexOf(a.bot) - names.indexOf(b.bot));
     return { usage, errors };
   }
+}
+
+/**
+ * The bots on this Hermes, like lib/sync.ts: every profile is a bot, except the default one unless it was added by
+ * hand. `hidden` marks the ones this phone doesn't list (hidden on Hermes), which Fix 12 still shows.
+ */
+export function usageBotNames(profiles: { name: string; isDefault: boolean }[], saved: string[]): { names: string[]; hidden: Record<string, boolean> } {
+  const have = new Set(saved);
+  const names = profiles.filter((p) => !p.isDefault || have.has(p.name)).map((p) => p.name);
+  return { names, hidden: Object.fromEntries(names.map((n) => [n, !have.has(n)])) };
 }

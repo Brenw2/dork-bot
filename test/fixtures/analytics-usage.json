@@ -129,5 +129,16 @@
   },
   "period_days": 7,
   "skills": [],
-  "tools": []
+  "tools": [
+    {
+      "tool": "terminal",
+      "count": 24,
+      "percentage": 80
+    },
+    {
+      "tool": "skill_view",
+      "count": 6,
+      "percentage": 20
+    }
+  ]
 }

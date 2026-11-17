@@ -4,10 +4,25 @@ import { describe, expect, it } from 'vitest';
 import type { FetchLike, FetchResponse } from '@/lib/hermes';
 import {
   UsageClient,
-  claudeSession,
+  axisLabels,
+  calloutText,
+  clockLabel,
+  countdown,
+  daySeries,
+  displayName,
+  formatCount,
+  localTokens,
+  niceTop,
+  providerOfModel,
+  shareOf,
+  sortBots,
+  stateWord,
+  subtitle,
+  totalsOf,
+  updatedLine,
+  usageBotNames,
   formatCost,
   formatCredits,
-  formatReset,
   formatTokens,
   gaugeState,
   levelFor,
@@ -29,14 +44,21 @@ function res(status: number, body: unknown = {}): FetchResponse {
   return { ok: status >= 200 && status < 300, status, text: async () => text, json: async () => JSON.parse(text), body: null };
 }
 
-describe('levelFor (thresholds)', () => {
-  it('is normal under 70, warning 70 to 90, red over 90', () => {
+describe('levelFor (thresholds, on the rounded value)', () => {
+  it('is normal under 70, warning 70 to 90, red 91 and up', () => {
     expect(levelFor(0)).toBe('ok');
-    expect(levelFor(69.9)).toBe('ok');
+    expect(levelFor(69)).toBe('ok');
+    expect(levelFor(69.4)).toBe('ok');
+    expect(levelFor(69.5)).toBe('warn'); // shows 70
     expect(levelFor(70)).toBe('warn');
     expect(levelFor(90)).toBe('warn');
-    expect(levelFor(90.1)).toBe('bad');
+    expect(levelFor(90.4)).toBe('warn'); // shows 90
+    expect(levelFor(90.5)).toBe('bad'); // shows 91
+    expect(levelFor(91)).toBe('bad');
     expect(levelFor(100)).toBe('bad');
+  });
+  it('has a word for warning and red, never for normal', () => {
+    expect([30, 69, 70, 90, 91, 99, 100].map(stateWord)).toEqual([null, null, 'Running low', 'Running low', 'Almost out', 'Almost out', 'Limit reached']);
   });
 });
 
@@ -45,8 +67,9 @@ describe('parseProviderUsage', () => {
     const list = parseProviderUsage(OPTIONS);
     const claude = list.find((p) => p.slug === 'anthropic')!;
     expect(claude.kind).toBe('windows');
-    expect(claude.windows.map((w) => [w.label, w.percent])).toEqual([['Current session', 34], ['Current week', 10]]);
-    expect(claude.windows[0].resetsAt).toBe(Date.parse('2026-11-18T00:00:00.287832+00:00'));
+    const real = OPTIONS.providers.find((x: { slug: string }) => x.slug === 'anthropic').usage.windows;
+    expect(claude.windows.map((w) => [w.label, w.percent])).toEqual(real.map((w: { label: string; used_percent: number }) => [w.label, w.used_percent]));
+    expect(claude.windows[0].resetsAt).toBe(Date.parse(real[0].resets_at));
     expect(claude.windows[0].scope).toBe('account');
     expect(list.find((p) => p.slug === 'nous')!.kind).toBe('none');
     const dork = list.find((p) => p.slug === 'custom:dork')!;
@@ -104,7 +127,7 @@ describe('parseProviderUsage', () => {
       ],
     });
     expect(list.map((p) => p.slug)).toEqual(['a', 'c']);
-    expect(list[0]).toMatchObject({ kind: 'none', pending: true, windows: [], accounts: [], credits: null });
+    expect(list[0]).toMatchObject({ kind: 'none', pending: true, windows: [], accounts: [], credits: null, models: [] });
     // Percent clamps to 0..100, a missing label becomes "Usage", a missing reset stays null.
     expect(list[1].windows).toEqual([
       { label: 'Usage', percent: 100, resetsAt: null, scope: 'account' },
@@ -119,24 +142,28 @@ describe('parseProviderUsage', () => {
 });
 
 describe('header gauge', () => {
-  const claude = (percent: number, label = 'Current session') =>
-    parseProviderUsage({ providers: [{ slug: 'anthropic', name: 'Anthropic', authenticated: true, usage: { windows: [{ label, used_percent: percent, resets_at: null }] } }] });
+  const one = (slug: string, windows: { label: string; used_percent: number }[]) => ({ slug, name: slug, authenticated: true, usage: { windows } });
 
-  it('shows the Claude session window and goes red over 90', () => {
-    expect(gaugeState(parseProviderUsage(OPTIONS))).toEqual({ kind: 'value', percent: 34, level: 'ok' });
-    expect(gaugeState(claude(75))).toEqual({ kind: 'value', percent: 75, level: 'warn' });
-    expect(gaugeState(claude(90))).toMatchObject({ level: 'warn' });
-    expect(gaugeState(claude(91))).toEqual({ kind: 'value', percent: 91, level: 'bad' });
+  it('shows the highest window across every provider, not just Claude', () => {
+    expect(gaugeState(parseProviderUsage(OPTIONS))).toMatchObject({ kind: 'value', percent: Math.max(...OPTIONS.providers.find((x: { slug: string }) => x.slug === 'anthropic').usage.windows.map((w: { used_percent: number }) => w.used_percent)), provider: 'Claude' });
+    const list = parseProviderUsage({ providers: [one('anthropic', [{ label: 'Current session', used_percent: 29 }, { label: 'Current week', used_percent: 94 }]), one('openai-codex', [{ label: '5-hour', used_percent: 78 }])] });
+    expect(gaugeState(list)).toMatchObject({ percent: 94, level: 'bad', provider: 'Claude', label: 'Current week' });
+    expect(gaugeState(parseProviderUsage({ providers: [one('openai-codex', [{ label: '5-hour', used_percent: 78 }])] }))).toMatchObject({ level: 'warn', provider: 'Codex' });
   });
 
-  it('is empty with no data, and ignores the week window', () => {
+  it('is red from 91 on the Claude session, amber at 90', () => {
+    const claude = (n: number) => parseProviderUsage({ providers: [one('anthropic', [{ label: 'Current session', used_percent: n }])] });
+    expect(gaugeState(claude(90))).toMatchObject({ level: 'warn' });
+    expect(gaugeState(claude(91))).toMatchObject({ level: 'bad' });
+  });
+
+  it('is hidden with no data', () => {
     expect(gaugeState(null)).toEqual({ kind: 'none' });
     expect(gaugeState([])).toEqual({ kind: 'none' });
-    expect(gaugeState(claude(99, 'Current week'))).toEqual({ kind: 'none' });
-    expect(claudeSession(parseProviderUsage({ providers: [{ slug: 'nous', name: 'N', authenticated: true, usage: { windows: [{ label: 'Current session', used_percent: 99 }] } }] }))).toBeNull();
+    expect(gaugeState(parseProviderUsage({ providers: [{ slug: 'nous', name: 'N', authenticated: true }] }))).toEqual({ kind: 'none' });
   });
 
-  it('uses the worst session across a Claude pool', () => {
+  it('reads pooled accounts too', () => {
     const list = parseProviderUsage({
       providers: [{ slug: 'anthropic', name: 'Anthropic', authenticated: true, usage: { accounts: [
         { id: 'a', label: 'a', state: 'ready', windows: [{ label: 'Current session', used_percent: 20 }] },
@@ -149,15 +176,29 @@ describe('header gauge', () => {
 
 describe('reset text', () => {
   const now = Date.parse('2026-11-17T22:00:00Z');
-  it('counts down in the unit that fits', () => {
-    expect(formatReset(now + 119 * 60000, now)).toBe('1h 59m');
-    expect(formatReset(now + 12 * 60000, now)).toBe('12m');
-    expect(formatReset(now + 28 * 3600000 + 60000, now)).toBe('1d 4h');
-    expect(formatReset(now - 1000, now)).toBe('now');
-    expect(formatReset(null, now)).toBeNull();
-    expect(resetLine(now + 119 * 60000, now)).toBe('Resets in 1h 59m');
+  it('counts down, floored, two units', () => {
+    expect(countdown(now + 119 * 60000 + 30000, now)).toBe('1h 59m');
+    expect(countdown(now + 42 * 60000 + 59000, now)).toBe('42m');
+    expect(countdown(now + 30000, now)).toBe('<1m');
+    expect(countdown(now + (3 * 24 + 18) * 3600000 + 60000, now)).toBe('3d 18h');
+    expect(countdown(now - 1, now)).toBeNull();
+    expect(resetLine(now + 119 * 60000 + 30000, now)).toBe('Resets in 1h 59m');
+    expect(resetLine(now - 1000, now)).toBe('Reset due');
     expect(resetLine(null, now)).toBe('Reset time not given');
-    expect(resetLine(now, now)).toBe('Resetting now');
+  });
+  it('writes the clock in the device zone: today, this week, later', () => {
+    const local = new Date(2026, 10, 17, 12, 0).getTime();
+    expect(clockLabel(new Date(2026, 10, 17, 19, 0).getTime(), local, 'en-US')).toBe('7:00 PM');
+    expect(clockLabel(new Date(2026, 10, 21, 12, 0).getTime(), local, 'en-US')).toBe('Sat 12:00 PM');
+    expect(clockLabel(new Date(2026, 10, 28, 12, 0).getTime(), local, 'en-US')).toBe('Nov 28, 12:00 PM');
+  });
+  it('words the Updated line', () => {
+    const t = new Date(2026, 10, 17, 9, 41).getTime();
+    expect(updatedLine(t, t + 30000)).toBe('Updated just now');
+    expect(updatedLine(t, t + 60000)).toBe('Updated 1 min ago');
+    expect(updatedLine(t, t + 12 * 60000)).toBe('Updated 12 min ago');
+    expect(updatedLine(t, t + 3 * 3600000)).toBe('Updated 3 h ago');
+    expect(updatedLine(t, t + 30 * 3600000, 'en-US')).toBe('Updated Tue 9:41 AM');
   });
 });
 
@@ -189,15 +230,79 @@ describe('parseBotUsage', () => {
   });
 });
 
-describe('number formats', () => {
-  it('shortens tokens and costs', () => {
-    expect(formatTokens(950)).toBe('950');
-    expect(formatTokens(1234)).toBe('1.2K');
-    expect(formatTokens(12000)).toBe('12K');
-    expect(formatTokens(3400000)).toBe('3.4M');
+describe('number formats (locked)', () => {
+  it('shortens tokens', () => {
+    const f = formatTokens;
+    expect([0, 812, 999].map(f)).toEqual(['0', '812', '999']);
+    expect([1000, 1234, 9900, 9949].map(f)).toEqual(['1K', '1.2K', '9.9K', '9.9K']);
+    expect([9999, 10000, 340000, 912000].map(f)).toEqual(['10K', '10K', '340K', '912K']);
+    expect([999499, 999500, 999950, 1e6, 1234567, 14.9e6].map(f)).toEqual(['999K', '1M', '1M', '1M', '1.2M', '14.9M']);
+    expect([99.94e6, 99.96e6, 120e6, 999.95e6, 1.3e9].map(f)).toEqual(['99.9M', '100M', '120M', '1B', '1.3B']);
+    expect(f(4.8e6)).toBe('4.8M');
+  });
+  it('formats counts and costs', () => {
+    expect(formatCount(1284)).toBe('1,284');
     expect(formatCost(0)).toBe('$0.00');
     expect(formatCost(0.004)).toBe('<$0.01');
-    expect(formatCost(1.236)).toBe('$1.24');
+    expect(formatCost(0.005)).toBe('$0.01');
+    expect(formatCost(3.41)).toBe('$3.41');
+    expect(formatCost(1284.5)).toBe('$1,284.50');
+  });
+});
+
+describe('providers and bots', () => {
+  const list = parseProviderUsage(OPTIONS);
+  it('names providers like the comps and says what they are', () => {
+    expect(list.map(displayName)).toEqual(['Nous Portal', 'Claude', 'dork']);
+    expect(subtitle(list[1])).toBe('Anthropic subscription');
+    expect(subtitle(list[2])).toBe('Local model · no limits');
+    expect(subtitle(list[0])).toBe('');
+  });
+  it('finds a model\'s provider from Hermes\'s lists, never a guess', () => {
+    expect(providerOfModel('claude-opus-5-5', list)).toBe('Claude');
+    expect(providerOfModel('qwen3.8:27b', list)).toBe('dork');
+    expect(providerOfModel('mystery-model', list)).toBeNull();
+  });
+  const a = parseBotUsage('assistant', 7, ANALYTICS);
+  const idle = parseBotUsage('default', 7, EMPTY);
+  it('counts tool calls from the per-tool counts and local tokens from the local models', () => {
+    expect(a.toolCalls).toBe(ANALYTICS.tools.reduce((n: number, t: { count: number }) => n + t.count, 0));
+    expect(a.toolCalls).toBeGreaterThan(0);
+    const dork = list.find((p) => p.local)!;
+    const q = ANALYTICS.by_model.find((m: { model: string }) => m.model === 'qwen3.8:27b');
+    expect(localTokens(dork, [a, idle])).toBe(q.input_tokens + q.output_tokens);
+  });
+  it('sorts by tokens, idle last, and sums the totals', () => {
+    const big = { ...a, bot: 'big', input: 9e6 };
+    expect(sortBots([idle, a, big]).map((u) => u.bot)).toEqual(['big', 'assistant', 'default']);
+    expect(totalsOf([a, big]).tokens).toBe(a.input + a.output + big.input + big.output);
+  });
+  it('gives model shares that sum to about 100', () => {
+    const sum = a.models.reduce((n, m) => n + shareOf(m, a), 0);
+    expect(Math.abs(sum - 100)).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('chart maths', () => {
+  const now = new Date(2026, 10, 17, 12).getTime();
+  it('makes one point per day ending today, empty days 0', () => {
+    const u = parseBotUsage('x', 7, { daily: [{ day: '2026-11-16', input_tokens: 100, output_tokens: 50, cache_read_tokens: 9999 }] });
+    const s = daySeries(u, now);
+    expect(s.map((p) => p.day)).toEqual(['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16', '2026-11-17']);
+    expect(s.map((p) => p.tokens)).toEqual([0, 0, 0, 0, 0, 150, 0]); // cache is left out
+    expect(daySeries({ ...u, days: 90 }, now)).toHaveLength(90);
+  });
+  it('picks a nice top', () => {
+    expect([0, 1, 426000, 500000, 500001, 90, 1.1e6].map(niceTop)).toEqual([1, 1, 500000, 500000, 1e6, 100, 2e6]);
+  });
+  it('words the callout and the axis', () => {
+    expect(calloutText('2026-11-10', 409000, 'en-US')).toBe('Tue, Nov 10 · 409K tokens');
+    const s7 = daySeries({ ...parseBotUsage('x', 7, {}), days: 7 }, now);
+    expect(axisLabels(s7, 7, 'en-US').map((l) => l.text)).toEqual(['W', 'T', 'F', 'S', 'S', 'M', 'T']);
+    const s30 = daySeries({ ...parseBotUsage('x', 30, {}), days: 30 }, now);
+    expect(axisLabels(s30, 30, 'en-US').map((l) => l.text)).toEqual(['Oct 19', 'Nov 3', 'Today']);
+    const s90 = daySeries({ ...parseBotUsage('x', 90, {}), days: 90 }, now);
+    expect(axisLabels(s90, 90, 'en-US').map((l) => l.text)).toEqual(['Sep', 'Oct', 'Nov']);
   });
 });
 
@@ -252,5 +357,13 @@ describe('UsageClient', () => {
     expect(Object.keys(errors)).toEqual(['scout']);
     expect(errors.scout).toContain('no profile');
     expect(calls).toContain('/api/analytics/usage?days=30&profile=scout');
+  });
+});
+
+describe('usageBotNames', () => {
+  it('lists every profile but the default, and marks the ones this phone does not list', () => {
+    const profiles = [{ name: 'default', isDefault: true }, { name: 'chief', isDefault: false }, { name: 'quiet', isDefault: false }];
+    expect(usageBotNames(profiles, ['chief'])).toEqual({ names: ['chief', 'quiet'], hidden: { chief: false, quiet: true } });
+    expect(usageBotNames(profiles, ['default', 'chief']).names).toEqual(['default', 'chief', 'quiet']);
   });
 });

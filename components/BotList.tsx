@@ -186,7 +186,6 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   ];
   const buttons = (
     <View style={styles.headerButtons}>
-      <UsageGauge snapshot={usage} onPress={() => router.push('/usage')} />
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
         <Icon name="ellipsis" size={icon} color={colors.accent} />
       </Pressable>
@@ -195,19 +194,26 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
       </Pressable>
     </View>
   );
+  const gauge = <UsageGauge snapshot={usage} onPress={() => router.push('/usage')} />;
   if (compact) {
     return (
       <View style={[styles.sidebarHeader, { paddingTop: top, height: 56 + top }]}>
         <Text style={styles.sidebarTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
           Dork Bot
         </Text>
-        {buttons}
+        <View style={styles.sidebarRight}>
+          {gauge}
+          {buttons}
+        </View>
       </View>
     );
   }
   return (
     <View style={{ paddingTop: top }}>
-      <View style={styles.largeButtons}>{buttons}</View>
+      <View style={styles.largeButtons}>
+        <View style={styles.gaugeSlot}>{gauge}</View>
+        {buttons}
+      </View>
       <Text style={styles.largeTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
         Dork Bot
       </Text>
@@ -334,7 +340,9 @@ const styles = StyleSheet.create({
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  largeButtons: { flexDirection: 'row', justifyContent: 'flex-end', height: 44, paddingRight: 8 },
+  largeButtons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, paddingLeft: 16, paddingRight: 8 },
+  gaugeSlot: { flexDirection: 'row', alignItems: 'center' },
+  sidebarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   largeTitle: { color: colors.text, fontSize: 34, lineHeight: 41, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
   sidebarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 18, paddingRight: isDesktop ? 12 : 4 },
   sidebarTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },

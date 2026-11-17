@@ -112,8 +112,9 @@ function Screens(): ReactNode {
       <Stack.Screen name="work/[bot]" options={popup('Work')} />
       <Stack.Screen name="work-session/[bot]" options={popup('Work')} />
       <Stack.Screen name="notifications" options={popup('Notifications')} />
-      <Stack.Screen name="usage" options={popup('Usage')} />
-      <Stack.Screen name="usage/[bot]" options={popup('Usage')} />
+      {/* Usage draws its own header (back, large title, Updated line) on the phone: a pushed screen, not a sheet. */}
+      <Stack.Screen name="usage" options={isDesktop ? popup('Usage') : { title: '', headerShown: false }} />
+      <Stack.Screen name="usage/[bot]" options={isDesktop ? popup('Usage') : { title: '', headerShown: false }} />
     </Stack>
   );
 }

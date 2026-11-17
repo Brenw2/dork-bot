@@ -1,24 +1,40 @@
-// Pieces of the Usage screen (card 25): progress bars, provider cards, the 7/30/90 control, bot rows, the
-// daily chart and the header gauge. Colors follow the thresholds in lib/usage.ts; layout waits for the comps
-// (design/usage-screen, docs/design/REVIEW.md Fix 12) and is adjusted when they merge.
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+// Pieces of the Usage screen (card 25, docs/design/REVIEW.md "Fix 12", comps in docs/design/comps/25-*).
+// Thresholds, number formats and copy are the tested rules in lib/usage.ts.
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { Icon } from '@/components/AppIcons';
 import { BotAvatar } from '@/components/BotSprite';
 import { isDesktop } from '@/components/desktop';
 import { useBotName } from '@/components/useBotName';
-import { colors } from '@/lib/theme';
+import { colors, mix } from '@/lib/theme';
 import {
   DAY_CHOICES,
+  axisLabels,
+  calloutText,
+  clockLabel,
+  countdown,
+  daySeries,
+  displayName,
   formatCost,
+  formatCount,
   formatCredits,
   formatTokens,
   gaugeState,
+  hasActivity,
   levelFor,
+  niceTop,
+  providerOfModel,
   resetLine,
+  shareOf,
+  stateWord,
+  subtitle,
+  totalsOf,
   type BotUsage,
   type Days,
   type GaugeState,
   type Level,
+  type ModelUsage,
   type ProviderUsage,
   type UsageAccount,
   type UsageSnapshot,
@@ -26,104 +42,318 @@ import {
 } from '@/lib/usage';
 
 export const levelColor: Record<Level, string> = { ok: colors.ok, warn: colors.warn, bad: colors.bad };
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
-/** "today 5:30 PM" / "Fri 10:00 AM", in the device's own time zone. */
-export function localReset(resetsAt: number | null, now: number): string | null {
-  if (resetsAt === null) return null;
-  const d = new Date(resetsAt);
-  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const sameDay = d.toDateString() === new Date(now).toDateString();
-  return sameDay ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
-}
+// ---- subscriptions ----
 
+/** Bar 8 tall, radius 4, track #2A2D33; the fill is max(8px, pct%) when pct > 0. */
 export function ProgressBar({ percent, level }: { percent: number; level: Level }) {
+  const shown = Math.round(percent);
   return (
-    <View style={styles.track} accessibilityRole="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
-      <View style={[styles.fill, { width: `${Math.max(percent, percent > 0 ? 2 : 0)}%`, backgroundColor: levelColor[level] }]} />
+    <View style={styles.track} aria-hidden>
+      {shown > 0 ? <View style={[styles.fill, { width: `${shown}%`, minWidth: 8, backgroundColor: levelColor[level] }]} /> : null}
     </View>
   );
+}
+
+function spokenCountdown(at: number, now: number): string {
+  const c = countdown(at, now) ?? '';
+  return c
+    .replace(/(\d+)d/, (_, n) => `${n} ${n === '1' ? 'day' : 'days'}`)
+    .replace(/(\d+)h/, (_, n) => `${n} ${n === '1' ? 'hour' : 'hours'}`)
+    .replace(/(\d+)m/, (_, n) => `${n} ${n === '1' ? 'minute' : 'minutes'}`)
+    .replace('<1 minutes', 'under a minute')
+    .replace('<1m', 'under a minute');
+}
+
+function spoken(w: UsageWindow, now: number): string {
+  const word = stateWord(w.percent);
+  const reset = w.resetsAt === null ? 'reset time not given' : countdown(w.resetsAt, now) === null ? 'reset due' : `resets in ${spokenCountdown(w.resetsAt, now)} at ${clockLabel(w.resetsAt, now)}`;
+  return `${w.label}, ${Math.round(w.percent)} percent used, ${reset}${word ? `. ${word}` : ''}`;
 }
 
 export function WindowRow({ w, now }: { w: UsageWindow; now: number }) {
   const level = levelFor(w.percent);
-  const at = localReset(w.resetsAt, now);
+  const word = stateWord(w.percent);
+  const c = level === 'ok' ? colors.text : levelColor[level];
+  const clock = w.resetsAt !== null && countdown(w.resetsAt, now) !== null ? ` · ${clockLabel(w.resetsAt, now)}` : '';
   return (
-    <View style={styles.window} accessible accessibilityLabel={`${w.label}, ${Math.round(w.percent)} percent used. ${resetLine(w.resetsAt, now)}`}>
-      <View style={styles.windowTop}>
-        <Text style={styles.windowLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+    <View style={styles.window} accessible accessibilityLabel={spoken(w, now)}>
+      <View style={styles.line}>
+        <Text style={[styles.windowLabel, { flexShrink: 1 }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
           {w.label}
         </Text>
-        <Text style={[styles.percent, { color: level === 'ok' ? colors.text : levelColor[level] }]} maxFontSizeMultiplier={1.4}>
-          {Math.round(w.percent)}% used
+        <Text style={[styles.windowPercent, TABULAR, { color: c }]} maxFontSizeMultiplier={1.4}>
+          {Math.round(w.percent)}%
         </Text>
       </View>
       <ProgressBar percent={w.percent} level={level} />
-      <Text style={styles.reset} maxFontSizeMultiplier={1.4}>
-        {resetLine(w.resetsAt, now)}
-        {at ? ` · ${at}` : ''}
-      </Text>
-    </View>
-  );
-}
-
-function AccountBlock({ a, now }: { a: UsageAccount; now: number }) {
-  return (
-    <View style={styles.account}>
-      <Text style={styles.accountLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-        {a.label}
-      </Text>
-      {a.windows.length ? (
-        a.windows.map((w, i) => <WindowRow key={`${w.label}-${i}`} w={w} now={now} />)
-      ) : (
-        <Text style={styles.note} maxFontSizeMultiplier={1.4}>
-          {a.state === 'limited' ? `Limit reached. ${resetLine(a.resetsAt, now)}` : a.state === 'unavailable' ? 'Not signed in' : 'No usage data from Hermes'}
+      <View style={styles.line}>
+        <Text style={[styles.reset, { flexShrink: 1 }]} maxFontSizeMultiplier={1.4}>
+          {resetLine(w.resetsAt, now)}
+          {clock}
         </Text>
-      )}
+        {word ? (
+          <Text style={[styles.word, { color: levelColor[level] }]} maxFontSizeMultiplier={1.4}>
+            {word}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
-/** One card per provider. */
-export function ProviderCard({ p, now }: { p: ProviderUsage; now: number }) {
+/** The generic chip glyph in the provider disc (v1 has no provider logos). */
+function ChipGlyph() {
   return (
-    <View style={styles.card} accessibilityLabel={`${p.name} usage`}>
-      <Text style={styles.cardTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-        {p.name}
-      </Text>
-      {p.kind === 'windows' ? p.windows.map((w, i) => <WindowRow key={`${w.label}-${i}`} w={w} now={now} />) : null}
-      {p.kind === 'accounts' ? p.accounts.map((a) => <AccountBlock key={a.id} a={a} now={now} />) : null}
-      {p.credits ? (
-        <View style={styles.windowTop}>
-          <Text style={styles.windowLabel} maxFontSizeMultiplier={1.4}>
-            Credits
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.dim} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x={6} y={6} width={12} height={12} rx={2} />
+      <Rect x={10} y={10} width={4} height={4} rx={0.5} />
+      <Path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" />
+    </Svg>
+  );
+}
+
+function ProviderHead({ p }: { p: ProviderUsage }) {
+  const sub = subtitle(p);
+  return (
+    <View style={styles.head} accessibilityRole="header">
+      <View style={styles.disc}>
+        <ChipGlyph />
+      </View>
+      <View style={styles.headText}>
+        <Text style={styles.providerName} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          {displayName(p)}
+        </Text>
+        {sub ? (
+          <Text style={styles.providerSub} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            {sub}
           </Text>
-          <Text style={styles.percent} maxFontSizeMultiplier={1.4}>
-            {formatCredits(p.credits)}
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const Sep = () => <View style={styles.sep} />;
+
+function AccountRows({ a, now }: { a: UsageAccount; now: number }) {
+  return (
+    <>
+      <Sep />
+      <View style={styles.accountHead}>
+        <Text style={styles.accountLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          {a.label}
+        </Text>
+      </View>
+      {a.windows.length ? (
+        a.windows.map((w, i) => (
+          <View key={`${w.label}-${i}`}>
+            {i > 0 ? <Sep /> : null}
+            <WindowRow w={w} now={now} />
+          </View>
+        ))
+      ) : (
+        <View style={styles.plainRow}>
+          <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
+            {a.state === 'limited' ? `Limit reached. ${resetLine(a.resetsAt, now)}` : a.state === 'unavailable' ? 'Not signed in' : 'No usage data from Hermes'}
           </Text>
         </View>
+      )}
+    </>
+  );
+}
+
+/** One grouped card per provider. `localTokens`/`days` feed the local-model row; Hermes sends no plan or detail, so none shows. */
+export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; now: number; localTokens: number | null; days: Days }) {
+  return (
+    <View style={styles.card} accessibilityLabel={`${displayName(p)} usage`}>
+      <ProviderHead p={p} />
+      {p.kind === 'windows'
+        ? p.windows.map((w, i) => (
+            <View key={`${w.label}-${i}`}>
+              <Sep />
+              <WindowRow w={w} now={now} />
+            </View>
+          ))
+        : null}
+      {p.kind === 'accounts' ? p.accounts.map((a) => <AccountRows key={a.id} a={a} now={now} />) : null}
+      {p.credits ? (
+        <>
+          <Sep />
+          <View style={styles.window}>
+            <View style={styles.line}>
+              <Text style={styles.windowLabel} maxFontSizeMultiplier={1.4}>
+                Credits
+              </Text>
+              <Text style={[styles.windowPercent, TABULAR]} maxFontSizeMultiplier={1.4}>
+                {formatCredits(p.credits)}
+              </Text>
+            </View>
+            <Text style={styles.reset} maxFontSizeMultiplier={1.4}>
+              Balance from {p.name}
+            </Text>
+          </View>
+        </>
       ) : null}
-      {p.kind === 'none' ? (
-        <Text style={styles.note} maxFontSizeMultiplier={1.4}>
-          {p.local ? 'Local model: tokens only (see Bots below)' : 'No usage data from Hermes'}
-        </Text>
+      {p.local ? (
+        <>
+          <Sep />
+          <View style={[styles.plainRow, styles.line]}>
+            <Text style={styles.windowLabel} maxFontSizeMultiplier={1.4}>
+              Tokens · {days} days
+            </Text>
+            <Text style={[styles.windowPercent, TABULAR]} maxFontSizeMultiplier={1.4}>
+              {localTokens === null ? '…' : formatTokens(localTokens)}
+            </Text>
+          </View>
+        </>
+      ) : null}
+      {p.kind === 'none' && !p.local && !p.credits ? (
+        <>
+          <Sep />
+          <View style={styles.plainRow}>
+            <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
+              No usage data from Hermes
+            </Text>
+          </View>
+        </>
       ) : null}
     </View>
   );
 }
 
-export function Segmented({ value, onChange }: { value: Days; onChange: (d: Days) => void }) {
+export function SkeletonCard() {
+  const block = (w: number, h: number) => <View style={[styles.skel, { width: w, height: h }]} />;
+  return (
+    <View style={styles.card} accessibilityLabel="Loading subscriptions">
+      <View style={styles.head}>
+        <View style={styles.disc} />
+        <View style={{ gap: 6 }}>
+          {block(90, 14)}
+          {block(140, 11)}
+        </View>
+      </View>
+      <Sep />
+      <View style={styles.window}>
+        <View style={styles.line}>
+          {block(120, 14)}
+          {block(34, 14)}
+        </View>
+        <View style={[styles.track, { backgroundColor: colors.raised }]} />
+        {block(180, 11)}
+      </View>
+    </View>
+  );
+}
+
+export function SkeletonBotRows() {
+  return (
+    <View style={styles.group} accessibilityLabel="Loading bots">
+      {[0, 1, 2].map((i) => (
+        <View key={i}>
+          {i > 0 ? <View style={[styles.sep, { marginLeft: 68 }]} /> : null}
+          <View style={styles.botRow}>
+            <View style={[styles.skel, { width: 40, height: 40, borderRadius: 20 }]} />
+            <View style={{ gap: 6 }}>
+              <View style={[styles.skel, { width: 110, height: 14 }]} />
+              <View style={[styles.skel, { width: 200, height: 11 }]} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ---- states ----
+
+/** "Couldn't update. Showing data from 9:38 AM." above the cards, old numbers kept. */
+export function FailBanner({ since, onRetry }: { since: string; onRetry: () => void }) {
+  return (
+    <View style={styles.banner} accessibilityRole="alert">
+      <Icon name="warning" size={18} color={colors.bad} />
+      <Text style={styles.bannerText} maxFontSizeMultiplier={1.4}>
+        Couldn't update. Showing data from {since}.
+      </Text>
+      <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry" hitSlop={7} style={styles.bannerButton}>
+        <Text style={styles.bannerButtonText} maxFontSizeMultiplier={1.4}>
+          Retry
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export function Unreachable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={styles.unreachable}>
+      <Icon name="warning" size={36} color={colors.dim} />
+      <Text style={styles.unreachableTitle} maxFontSizeMultiplier={1.4}>
+        Can't reach b-lab
+      </Text>
+      <Text style={styles.unreachableText} maxFontSizeMultiplier={1.4}>
+        Usage comes from Hermes. Check the connection and try again.
+      </Text>
+      <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Try again" style={styles.primary}>
+        <Text style={styles.primaryText} maxFontSizeMultiplier={1.4}>
+          Try again
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** The Updated line: spinner + Updating…, Couldn't update · Retry, or the age. */
+export function UpdatedLine({ text, loading, failed, onRetry }: { text: string | null; loading: boolean; failed: boolean; onRetry: () => void }) {
+  if (loading)
+    return (
+      <View style={styles.updated}>
+        <ActivityIndicator size="small" color={colors.dim} style={{ transform: [{ scale: 0.6 }], width: 12, height: 12 }} />
+        <Text style={styles.updatedText} maxFontSizeMultiplier={1.4}>
+          Updating…
+        </Text>
+      </View>
+    );
+  if (failed)
+    return (
+      <View style={styles.updated}>
+        <Text style={styles.updatedText} maxFontSizeMultiplier={1.4}>
+          Couldn't update ·
+        </Text>
+        <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry" hitSlop={10}>
+          <Text style={[styles.updatedText, { color: colors.accent }]} maxFontSizeMultiplier={1.4}>
+            Retry
+          </Text>
+        </Pressable>
+      </View>
+    );
+  return (
+    <View style={styles.updated}>
+      <Text style={styles.updatedText} maxFontSizeMultiplier={1.4}>
+        {text ?? ''}
+      </Text>
+    </View>
+  );
+}
+
+// ---- bots ----
+
+/** 7 / 30 / 90 days. 36 tall, radius 10, padding 2; selected fill is mix(color, .30); each segment is a 44 tall target. */
+export function Segmented({ value, onChange, color = colors.accent }: { value: Days; onChange: (d: Days) => void; color?: string }) {
   return (
     <View style={styles.segmented} accessibilityRole="tablist">
       {DAY_CHOICES.map((d) => (
         <Pressable
           key={d}
           onPress={() => onChange(d)}
+          hitSlop={{ top: 4, bottom: 4 }}
           accessibilityRole="tab"
           accessibilityState={{ selected: d === value }}
           accessibilityLabel={`${d} days`}
-          style={[styles.segment, d === value && styles.segmentOn]}
+          style={[styles.segment, d === value && { backgroundColor: mix(color, 0.3) }]}
         >
-          <Text style={[styles.segmentText, d === value && { color: colors.text }]} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.segmentText, d === value ? { color: colors.text, fontWeight: '600' } : { fontWeight: '500' }]} maxFontSizeMultiplier={1.4}>
             {d} days
           </Text>
         </Pressable>
@@ -132,172 +362,326 @@ export function Segmented({ value, onChange }: { value: Days; onChange: (d: Days
   );
 }
 
-export function Stat({ label, value }: { label: string; value: string }) {
+function Column3({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+    <View style={styles.col}>
+      <Text style={[styles.colValue, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
         {value}
       </Text>
-      <Text style={styles.statLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
         {label}
       </Text>
     </View>
   );
 }
 
-export function BotUsageRow({ u, onPress }: { u: BotUsage; onPress: () => void }) {
+/** Tokens, API calls, Est. cost across every bot. */
+export function TotalsCard({ bots }: { bots: BotUsage[] }) {
+  const t = totalsOf(bots);
+  return (
+    <View style={styles.totals} accessible accessibilityLabel={`${formatTokens(t.tokens)} tokens, ${formatCount(t.apiCalls)} API calls, ${formatCost(t.cost)} estimated cost`}>
+      <Column3 label="Tokens" value={formatTokens(t.tokens)} />
+      <Column3 label="API calls" value={formatCount(t.apiCalls)} />
+      <Column3 label="Est. cost" value={formatCost(t.cost)} />
+    </View>
+  );
+}
+
+function spokenTokens(v: number): string {
+  if (v < 1000) return String(v);
+  const f = formatTokens(v);
+  const unit = { K: 'thousand', M: 'million', B: 'billion' }[f.slice(-1) as 'K' | 'M' | 'B'];
+  return `${f.slice(0, -1)} ${unit}`;
+}
+
+export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hidden: boolean; providers: ProviderUsage[]; onPress: () => void }) {
   const name = useBotName(u.bot);
+  const active = hasActivity(u);
+  const top = u.topModel ? [u.topModel, providerOfModel(u.topModel, providers)].filter(Boolean).join(' · ') : null;
+  const cost = active ? formatCost(u.cost) : '—';
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${formatTokens(u.input)} in, ${formatTokens(u.output)} out, ${u.apiCalls} API calls, ${formatCost(u.cost)} estimated${u.topModel ? `, top model ${u.topModel}` : ''}`}
-      style={({ pressed }) => [styles.botRow, pressed && { backgroundColor: colors.raised }]}
+      accessibilityLabel={
+        active
+          ? `${name}${hidden ? ', hidden' : ''}, ${spokenTokens(u.input)} tokens in, ${spokenTokens(u.output)} out, ${formatCount(u.apiCalls)} calls, ${formatCost(u.cost)} estimated`
+          : `${name}${hidden ? ', hidden' : ''}, no activity in ${u.days} days`
+      }
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.botRow, hovered && isDesktop && { backgroundColor: colors.hover }, pressed && { backgroundColor: colors.raised }]}
     >
-      <BotAvatar bot={u.bot} size={36} />
+      <BotAvatar bot={u.bot} size={isDesktop ? 36 : 40} mood={active ? undefined : 'sleeping'} />
       <View style={styles.botBody}>
-        <View style={styles.botTop}>
-          <Text style={styles.botName} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <View style={styles.line}>
+          <Text style={[styles.botName, !active && { color: colors.dim }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
             {name}
+            {hidden ? <Text style={styles.hiddenTag}>  Hidden</Text> : null}
           </Text>
-          <Text style={styles.cost} maxFontSizeMultiplier={1.4}>
-            {formatCost(u.cost)}
+          <Text style={[styles.botCost, TABULAR, !active && { color: colors.dim }]} maxFontSizeMultiplier={1.4}>
+            {cost}
           </Text>
         </View>
-        <Text style={styles.botLine} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-          {formatTokens(u.input)} in · {formatTokens(u.output)} out · {u.apiCalls} calls
-        </Text>
-        <Text style={styles.botLine} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-          {u.topModel ?? 'No activity'}
-        </Text>
+        {active ? (
+          <>
+            <Text style={[styles.botLine, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+              {formatTokens(u.input)} in · {formatTokens(u.output)} out · {formatCount(u.apiCalls)} calls
+            </Text>
+            {top ? (
+              <Text style={styles.botLine} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                {top}
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.botLine} maxFontSizeMultiplier={1.4}>
+            No activity in {u.days} days
+          </Text>
+        )}
       </View>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
   );
 }
 
-/** Daily tokens (input + output) as bars; the tallest day fills the chart. */
-export function DailyChart({ u }: { u: BotUsage }) {
-  const max = Math.max(1, ...u.daily.map((d) => d.input + d.output));
-  if (!u.daily.length) {
-    return (
-      <Text style={styles.note} maxFontSizeMultiplier={1.4}>
-        No activity in the last {u.days} days.
-      </Text>
-    );
-  }
+// ---- bot detail ----
+
+export function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <View accessible accessibilityLabel={`Daily tokens, ${u.daily.length} days with activity, busiest ${formatTokens(max)}`}>
-      <View style={styles.chart}>
-        {u.daily.map((d) => {
-          const total = d.input + d.output;
-          return (
-            <View key={d.day} style={styles.barSlot}>
-              <View style={[styles.bar, { height: `${Math.max((total / max) * 100, total > 0 ? 3 : 0)}%` }]} />
-            </View>
-          );
-        })}
+    <View style={styles.tile} accessible accessibilityLabel={`${label}, ${value}`}>
+      <Text style={[styles.colValue, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        {value}
+      </Text>
+      <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const PLOT = isDesktop ? 168 : 132;
+
+/**
+ * Tokens per day: a bar per day in the bot's color (input plus output), gridlines at 0, 50% and 100% of a nice top,
+ * labels in a 36 gutter on the right. Tap or drag anywhere on the chart to pick a day; the rest dim to mix(c, .45).
+ */
+export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now: number }) {
+  const [plotW, setPlotW] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const series = daySeries(u, now);
+  const max = Math.max(0, ...series.map((p) => p.tokens));
+  const top = niceTop(max);
+  const gap = u.days === 7 ? 4 : u.days === 90 ? 1 : isDesktop ? 3 : 2;
+  const pick = (e: GestureResponderEvent) => {
+    if (!plotW) return;
+    setPicked(Math.max(0, Math.min(series.length - 1, Math.floor((e.nativeEvent.locationX / plotW) * series.length))));
+  };
+  const busiest = series.reduce((b, p, i) => (p.tokens > series[b].tokens ? i : b), 0);
+  const labels = axisLabels(series, u.days);
+  const point = picked === null ? null : series[picked];
+  const slot = plotW / Math.max(1, series.length);
+  return (
+    <View
+      style={styles.chartCard}
+      accessible
+      accessibilityLabel={`Tokens per day, busiest day ${calloutText(series[busiest].day, series[busiest].tokens).replace(' tokens', '')}`}
+    >
+      <View style={{ height: 30 }}>
+        {point ? (
+          <View style={[styles.callout, { left: Math.max(0, Math.min(plotW - 190, (picked ?? 0) * slot + slot / 2 - 95)) }]}>
+            <Text style={styles.calloutText} maxFontSizeMultiplier={1.4}>
+              <Text style={{ fontWeight: '600', color: colors.text }}>{calloutText(point.day, point.tokens).split(' · ')[0]}</Text> · {formatTokens(point.tokens)} tokens
+            </Text>
+          </View>
+        ) : null}
       </View>
-      <View style={styles.chartAxis}>
-        <Text style={styles.axis} maxFontSizeMultiplier={1.4}>
-          {u.daily[0].day.slice(5)}
-        </Text>
-        <Text style={styles.axis} maxFontSizeMultiplier={1.4}>
-          {formatTokens(max)} max
-        </Text>
-        <Text style={styles.axis} maxFontSizeMultiplier={1.4}>
-          {u.daily[u.daily.length - 1].day.slice(5)}
-        </Text>
+      <View style={{ flexDirection: 'row' }}>
+        <View
+          style={{ flex: 1, height: PLOT }}
+          onLayout={(e) => setPlotW(e.nativeEvent.layout.width)}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+          onResponderGrant={pick}
+          onResponderMove={pick}
+        >
+          {[0, 0.5, 1].map((f) => (
+            <View key={f} style={[styles.grid, { bottom: f * (PLOT - 1) }]} />
+          ))}
+          <View style={[styles.bars, { gap }]}>
+            {series.map((p, i) => (
+              <View key={p.day} style={styles.barSlot}>
+                {p.tokens > 0 ? (
+                  <View
+                    style={{
+                      width: '100%',
+                      height: Math.max(2, (p.tokens / top) * PLOT),
+                      backgroundColor: picked === null || picked === i ? color : mix(color, 0.45),
+                      borderTopLeftRadius: 2,
+                      borderTopRightRadius: 2,
+                    }}
+                  />
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </View>
+        <View style={styles.gutter}>
+          {[1, 0.5].map((f) => (
+            <Text key={f} style={[styles.axis, TABULAR, { position: 'absolute', left: 6, bottom: f * (PLOT - 1) - 8 }]} maxFontSizeMultiplier={1.4}>
+              {formatTokens(top * f)}
+            </Text>
+          ))}
+        </View>
+      </View>
+      <View style={[styles.axisRow, { marginRight: 36 }]}>
+        {labels.map((l, k) => (
+          <Text
+            key={`${l.index}-${l.text}`}
+            style={[styles.axis, { position: 'absolute', left: Math.max(0, Math.min(plotW - 40, l.index * slot + slot / 2 - 20)), width: 40, textAlign: 'center' }]}
+            maxFontSizeMultiplier={1.4}
+          >
+            {l.text}
+          </Text>
+        ))}
       </View>
     </View>
   );
 }
 
-const GAUGE = isDesktop ? 22 : 26;
+export function EmptyChart({ days }: { days: number }) {
+  return (
+    <View style={[styles.chartCard, { height: PLOT + 24, alignItems: 'center', justifyContent: 'center' }]}>
+      <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
+        No activity in the last {days} days
+      </Text>
+    </View>
+  );
+}
 
-/** The header gauge: a ring with the Claude session % in it. Grey with no data, amber 70 to 90, red over 90. */
-export function UsageGaugeView({ state, onPress, size = GAUGE }: { state: GaugeState; onPress: () => void; size?: number }) {
-  const hit = isDesktop ? 32 : 44;
-  const stroke = 3;
-  const r = (size - stroke) / 2;
+export function ModelRow({ m, u, providers, color }: { m: ModelUsage; u: BotUsage; providers: ProviderUsage[]; color: string }) {
+  const share = shareOf(m, u);
+  const provider = providerOfModel(m.model, providers);
+  return (
+    <View style={styles.modelRow} accessible accessibilityLabel={`${m.model}${provider ? `, ${provider}` : ''}, ${spokenTokens(m.input)} tokens in, ${spokenTokens(m.output)} out, ${formatCount(m.apiCalls)} calls, ${share} percent, ${formatCost(m.cost)}`}>
+      <View style={styles.line}>
+        <Text style={[styles.botName, { fontWeight: '400' }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          {m.model}
+        </Text>
+        <Text style={[styles.windowPercent, TABULAR]} maxFontSizeMultiplier={1.4}>
+          {formatCost(m.cost)}
+        </Text>
+      </View>
+      {provider ? (
+        <Text style={styles.botLine} maxFontSizeMultiplier={1.4}>
+          {provider}
+        </Text>
+      ) : null}
+      <View style={styles.share}>
+        <View style={{ width: `${share}%`, minWidth: share > 0 ? 2 : 0, height: 4, borderRadius: 2, backgroundColor: color }} />
+      </View>
+      <Text style={[styles.botLine, TABULAR]} maxFontSizeMultiplier={1.4}>
+        {formatTokens(m.input)} in · {formatTokens(m.output)} out · {formatCount(m.apiCalls)} calls · {share}%
+      </Text>
+    </View>
+  );
+}
+
+// ---- header gauge ----
+
+/**
+ * The header gauge (Fix 12): a pill 32 tall in a 44 target with a 20 ring and the highest used percent across every
+ * provider window. Normal #1A1C20 / green, warning mix(#F2A65A,.14), red mix(#F06A6A,.18). Hidden with no data.
+ */
+export function GaugePill({ state, onPress, active = false }: { state: GaugeState; onPress: () => void; active?: boolean }) {
+  if (state.kind === 'none') return null;
+  const c = levelColor[state.level];
+  const r = 8.5;
   const circ = 2 * Math.PI * r;
-  const color = state.kind === 'value' ? levelColor[state.level] : colors.faint;
-  const frac = state.kind === 'value' ? state.percent / 100 : 0;
-  const label = state.kind === 'value' ? `Claude session ${Math.round(state.percent)} percent used. Open usage` : 'Usage. No Claude session data yet';
+  const fill = state.level === 'ok' ? colors.card : mix(c, state.level === 'warn' ? 0.14 : 0.18);
+  const pressedFill = state.level === 'ok' ? colors.raised : mix(c, state.level === 'warn' ? 0.18 : 0.22);
+  const shown = Math.round(state.percent);
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
-        { width: hit, height: hit, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-        (hovered || pressed) && isDesktop && { backgroundColor: colors.raised },
-        pressed && !isDesktop && { opacity: 0.6 },
-      ]}
+      accessibilityLabel={`${state.provider}, ${state.label}, ${shown} percent used. Opens Usage.`}
+      hitSlop={isDesktop ? 0 : { top: 6, bottom: 6, left: 4, right: 4 }}
+      style={({ pressed }) => [styles.pill, { backgroundColor: pressed || (active && state.level === 'ok') ? pressedFill : fill }]}
+      {...({ title: `${state.provider} · ${state.label} · ${shown}% used` } as object)}
     >
-      <View style={{ width: size, height: size }}>
-        <Svg width={size} height={size}>
-          <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.border} strokeWidth={stroke} fill="none" />
-          {frac > 0 ? (
-            <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={r}
-              stroke={color}
-              strokeWidth={stroke}
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={`${circ * frac} ${circ}`}
-              transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-          ) : null}
-        </Svg>
-        <View style={styles.gaugeText} pointerEvents="none">
-          <Text style={[styles.gaugePct, { color }]} maxFontSizeMultiplier={1}>
-            {state.kind === 'value' ? Math.round(state.percent) : '–'}
-          </Text>
-        </View>
-      </View>
+      <Svg width={20} height={20} viewBox="0 0 20 20">
+        <Circle cx={10} cy={10} r={r} stroke={colors.border} strokeWidth={3} fill="none" />
+        {shown > 0 ? <Circle cx={10} cy={10} r={r} stroke={c} strokeWidth={3} fill="none" strokeLinecap="round" strokeDasharray={`${circ * (shown / 100)} ${circ}`} transform="rotate(-90 10 10)" /> : null}
+      </Svg>
+      <Text style={[styles.pillText, TABULAR, { color: state.level === 'ok' ? colors.text : c, fontSize: isDesktop ? 13 : 15 }]} maxFontSizeMultiplier={1.2}>
+        {shown}%
+      </Text>
     </Pressable>
   );
 }
 
-export function UsageGauge({ snapshot, onPress }: { snapshot: UsageSnapshot | null; onPress: () => void }) {
-  return <UsageGaugeView state={gaugeState(snapshot?.providers ?? null)} onPress={onPress} />;
+export function UsageGauge({ snapshot, onPress, active }: { snapshot: UsageSnapshot | null; onPress: () => void; active?: boolean }) {
+  return <GaugePill state={gaugeState(snapshot?.providers ?? null)} onPress={onPress} active={active} />;
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.card, borderRadius: 12, padding: 16, gap: 14 },
-  cardTitle: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  window: { gap: 6 },
-  windowTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
-  windowLabel: { flexShrink: 1, color: colors.text, fontSize: 15, lineHeight: 20 },
-  percent: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '600' },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
+  card: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
+  group: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 16, paddingVertical: 8 },
+  disc: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center' },
+  headText: { flex: 1, minWidth: 0 },
+  providerName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  providerSub: { color: colors.dim, fontSize: 13, lineHeight: 18 },
+  window: { paddingHorizontal: 16, paddingVertical: 12 },
+  line: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+  windowLabel: { color: colors.text, fontSize: 17, lineHeight: 22 },
+  windowPercent: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  track: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden', marginTop: 8, marginBottom: 6 },
   fill: { height: 8, borderRadius: 4 },
   reset: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  note: { color: colors.dim, fontSize: 14, lineHeight: 20 },
-  account: { gap: 10 },
+  word: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  plainRow: { paddingHorizontal: 16, paddingVertical: 14 },
+  noData: { color: colors.dim, fontSize: 15, lineHeight: 20 },
+  accountHead: { paddingHorizontal: 16, paddingTop: 10 },
   accountLabel: { color: colors.dim, fontSize: 13, lineHeight: 18, textTransform: 'uppercase', letterSpacing: 0.3 },
-  segmented: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 10, padding: 3 },
-  segment: { flex: 1, minHeight: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  segmentOn: { backgroundColor: colors.raised },
-  segmentText: { color: colors.dim, fontSize: 14, fontWeight: '600' },
-  stat: { flex: 1, minWidth: 0, gap: 2 },
-  statValue: { color: colors.text, fontSize: 20, lineHeight: 26, fontWeight: '600' },
-  statLabel: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  botRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72, paddingHorizontal: 16, paddingVertical: 10 },
-  botBody: { flex: 1, minWidth: 0, gap: 1 },
-  botTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
-  botName: { flexShrink: 1, color: colors.text, fontSize: 17, lineHeight: 22 },
-  cost: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '600' },
+  skel: { backgroundColor: colors.raised, borderRadius: 6 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.errorBg, borderColor: colors.errorLine, borderWidth: 0.5, borderRadius: 12, padding: 12 },
+  bannerText: { flex: 1, color: colors.errorText, fontSize: 13, lineHeight: 18 },
+  bannerButton: { height: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
+  bannerButtonText: { color: colors.errorText, fontSize: 13, fontWeight: '600' },
+  unreachable: { alignItems: 'center', gap: 10, paddingVertical: 80, paddingHorizontal: 32 },
+  unreachableTitle: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', marginTop: 6 },
+  unreachableText: { color: colors.dim, fontSize: 15, lineHeight: 20, textAlign: 'center' },
+  primary: { height: 50, borderRadius: 25, paddingHorizontal: 28, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  primaryText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  updated: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 18 },
+  updatedText: { color: colors.dim, fontSize: 13, lineHeight: 18 },
+  segmented: { flexDirection: 'row', height: 36, backgroundColor: colors.card, borderRadius: 10, padding: 2 },
+  segment: { flex: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  segmentText: { color: colors.dim, fontSize: 15 },
+  totals: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 12, gap: 8 },
+  col: { flex: 1, minWidth: 0 },
+  colValue: { color: colors.text, fontSize: isDesktop ? 17 : 20, lineHeight: isDesktop ? 22 : 24, fontWeight: '600' },
+  colLabel: { color: colors.dim, fontSize: 13, lineHeight: 18 },
+  tile: { flexGrow: 1, flexBasis: '30%', minHeight: isDesktop ? 64 : 68, backgroundColor: colors.card, borderRadius: 12, padding: 12, justifyContent: 'center' },
+  botRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: isDesktop ? 60 : 64, paddingHorizontal: 16, paddingVertical: 10 },
+  botBody: { flex: 1, minWidth: 0 },
+  botName: { flexShrink: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  hiddenTag: { color: colors.dim, fontSize: 13, fontWeight: '400' },
+  botCost: { color: colors.text, fontSize: 17, lineHeight: 22 },
   botLine: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   chevron: { color: colors.disclosure, fontSize: 17 },
-  chart: { height: 120, flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  chartCard: { backgroundColor: colors.card, borderRadius: 12, paddingTop: 14, paddingRight: 12, paddingBottom: 10, paddingLeft: 16 },
+  grid: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  bars: { flex: 1, flexDirection: 'row', alignItems: 'flex-end' },
   barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
-  bar: { width: '100%', backgroundColor: colors.accent, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
-  chartAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  axis: { color: colors.faint, fontSize: 12, lineHeight: 16 },
-  gaugeText: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  gaugePct: { fontSize: 9, fontWeight: '700' },
+  gutter: { width: 36, height: PLOT },
+  axis: { color: colors.dim, fontSize: 12, lineHeight: 16 },
+  axisRow: { height: 16, marginTop: 8 },
+  callout: { position: 'absolute', bottom: 6, width: 190, alignItems: 'center', backgroundColor: colors.raised, borderColor: colors.menuBorder, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' },
+  calloutText: { color: colors.dim, fontSize: 13, lineHeight: 18 },
+  modelRow: { paddingHorizontal: 16, paddingVertical: 12 },
+  share: { height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 6, marginBottom: 6, overflow: 'hidden' },
+  pill: { height: 32, borderRadius: 16, paddingLeft: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pillText: { fontWeight: '600' },
 });
