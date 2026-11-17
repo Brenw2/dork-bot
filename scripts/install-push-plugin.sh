@@ -21,6 +21,7 @@ unset HERMES_HOME
 HERMES_ROOT="$HOME/.hermes"
 
 remove=0
+failed=0
 bots=()
 for arg in "$@"; do
   case "$arg" in
@@ -52,8 +53,22 @@ for bot in "${bots[@]}"; do
   mkdir -p "$dest"
   # A copy, not a symlink: the gateway keeps running the installed version whatever branch this
   # checkout is on. Tests and caches stay behind.
-  cp "$SRC/plugin.yaml" "$SRC/__init__.py" "$SRC/push.py" "$dest/"
+  # Every top-level .py file plus plugin.yaml, not a fixed list (a module left out means the
+  # plugin fails to import and no push goes out). .py files no longer in the source are removed.
+  for f in "$dest"/*.py; do
+    if [[ -e "$f" && ! -e "$SRC/$(basename "$f")" ]]; then
+      rm -f "$f"
+      echo "  $bot: removed stale $(basename "$f")"
+    fi
+  done
+  cp "$SRC"/*.py "$SRC/plugin.yaml" "$dest/"
   rm -rf "$dest/__pycache__"
   hermes -p "$bot" plugins enable "$NAME" --no-allow-tool-override
-  echo "✓ $bot: $NAME installed and enabled"
+  if hermes -p "$bot" plugins doctor "$NAME"; then
+    echo "✓ $bot: $NAME installed and enabled"
+  else
+    echo "✗ $bot: $NAME installed but plugins doctor failed"
+    failed=1
+  fi
 done
+exit "$failed"
