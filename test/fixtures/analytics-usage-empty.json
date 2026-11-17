@@ -1,0 +1,18 @@
+{
+  "daily": [],
+  "by_model": [],
+  "by_task": [],
+  "totals": {
+    "total_input": null,
+    "total_output": null,
+    "total_cache_read": null,
+    "total_reasoning": null,
+    "total_estimated_cost": 0,
+    "total_actual_cost": 0,
+    "total_sessions": 0,
+    "total_api_calls": null
+  },
+  "period_days": 7,
+  "skills": [],
+  "tools": []
+}

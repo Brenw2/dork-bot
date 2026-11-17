@@ -1,0 +1,41 @@
+{
+  "providers": [
+    {
+      "slug": "nous",
+      "name": "Nous Portal",
+      "is_current": false,
+      "is_user_defined": false,
+      "authenticated": true
+    },
+    {
+      "slug": "anthropic",
+      "name": "Anthropic",
+      "is_current": true,
+      "is_user_defined": false,
+      "authenticated": true,
+      "usage": {
+        "windows": [
+          {
+            "label": "Current session",
+            "used_percent": 34,
+            "resets_at": "2026-11-18T00:00:00.287832+00:00",
+            "scope": "account"
+          },
+          {
+            "label": "Current week",
+            "used_percent": 10,
+            "resets_at": "2026-11-21T17:00:00.287855+00:00",
+            "scope": "account"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "custom:dork",
+      "name": "dork",
+      "is_current": false,
+      "is_user_defined": true,
+      "authenticated": true
+    }
+  ]
+}
