@@ -477,6 +477,152 @@ Same layout on phone and desktop; only the body type size and the card's width d
 
 ---
 
+## Fix 12: Usage screen (card 25) — LOCKED 2026-11-17
+
+Brennan's ask: "Add the ability to see AI subscription usage from the app. I don't want to have to leave the app to see those metrics." Docs only: no app code here, Mobile builds from this.
+
+Comps (`docs/design/comps/`, iPhone 393x852 @2x, desktop 1280x800):
+- `25-usage--iphone` / `25-usage--desktop`: the Usage screen (Subscriptions, then Bots). The iPhone comp is the top of the scroll; `25-usage-scrolled--iphone` is the same screen scrolled to Bots.
+- `25-usage-states--iphone`: loading, refresh failed, one provider failed, Hermes unreachable, quiet period.
+- `25-usage-bot-detail--iphone` / `--desktop`: one bot, daily chart plus by-model.
+- `25-header-gauge--iphone` / `--desktop`: the bot list header gauge in 3 states.
+- Source: `comps/src/usage.js` + `usage.css` (`node docs/design/comps/src/render.mjs 25`). Number formatting in the comp is the real rule code (`fmtTok`, `fmtCost`, `level`).
+
+**Data honesty.** Only Claude's two windows are real (`hermes usage --json`: Current session 29%, resets 19:00 local; Current week 9%, resets Sat 12:00). Every other number in the comps (Codex 78%/93%, OpenRouter $12.40, all per-bot tokens, calls, costs, the daily bars and the model split) is SAMPLE data to show layout and formatting. Never ship them. The bot "systems" has no sprite or color in the repo yet, so the comp recolors a sprite; use that bot's real look.
+
+### Data mapping
+- Subscriptions: one `hermes usage --json --provider <p>` per provider. Fields used: `provider`, `title`, `plan`, `windows[].label`, `windows[].used_percent`, `windows[].resets_at`, `windows[].detail`, `details[]`, `unavailable_reason`, `fetched_at`. Window labels are shown exactly as Hermes sends them (Claude: "Current session", "Current week"; Codex: its 5-hour and weekly labels). Don't rename or re-derive them.
+- `plan`, when not null, replaces the card's subtitle ("Anthropic subscription" becomes "Anthropic · {plan}"). `window.detail`, when not null, is a 13/18 dim line under the reset line.
+- `used_percent` is a float (35.0). Display `Math.round`, half up, an integer, never decimals. Clamp to 0-100.
+- Bots: the 7/30/90-day totals Hermes gives per bot (input, output and cache tokens, API calls, tool calls, estimated cost, by model, daily). Show only what Hermes returns; never re-sum from chat text.
+
+### Where it lives
+- **iPhone**: top-level screen pushed from the bot list. Opened two ways: the header gauge (below) and "Usage" in the app ⋯ menu (first item, gauge icon; the menu becomes Usage, Notifications…, Add with a code…, Show hidden bots). Back is "‹ Bots" in accent #8B7CF6 (app-level screen).
+- **Desktop**: a main-pane view with the sidebar kept. Opened from the sidebar gauge or the ⋯ menu (same item, Ctrl+U). A bot row opens the bot detail in the same pane with "‹ Usage" back; Esc goes back.
+- Header: large title "Usage" 34/41 700 (iPhone), then the Updated line. Desktop header 56 tall: "Usage" 16/20 semibold, Updated 12/16 dim under it, a 32x32 ↻ at the right (desktop has no pull to refresh).
+- Large title collapses to a 17 semibold centered title with a hairline when scrolled (`25-usage-scrolled--iphone`).
+
+### Subscriptions (iPhone, then desktop deltas)
+Section header "Subscriptions": 13/18 uppercase dim, 32 left, 18 above, 7 below (the grouped-list header from fix 9). One grouped card per provider: #1A1C20, radius 12, 16 margin, 12 between cards, rows hairline-separated (#2A2D33, inset 16).
+- **Provider head row**: min 52 (measured 56 with the 32 disc), padding 8x16. A 32 disc #22252A with a generic chip glyph 18 in #9298A0 (v1 has no provider logos; there are no licensed assets in the repo and a text monogram is worse), name 17/22 semibold, subtitle 13/18 dim ("Anthropic subscription", "OpenAI subscription", "Credits", "Local model · no limits").
+- **Window row** (measured 86 tall): padding 12x16.
+  - Line 1: label 17/22 regular left; percent 17/22 semibold right, tabular figures. Percent is #ECEDEF when normal and the state color when warning or red.
+  - Bar 8 tall, radius 4, 8 above and 6 below. Track #2A2D33. Fill in the state color. The fill is `max(8px, pct%)` when pct > 0 (a 1% window still shows a rounded stub); 0% shows no fill.
+  - Line 2: 13/18 dim. Left "Resets in 1h 59m · 7:00 PM". Right, only when warning or red, the state word 13 semibold in the state color.
+- **Credits row** (OpenRouter, Nous): label "Credits" 17 regular, amount 17 semibold right (`$12.40`), caption 13/18 dim "Balance from OpenRouter" (use the provider's name). No bar and no threshold colors: Hermes gives an amount, not a limit. If Hermes later gives a total, use a window row.
+- **No data** (Copilot, or `unavailable_reason` set): one row, "No usage data from Hermes" 15/20 dim. If `unavailable_reason` has text, show it under that line, 13/18 #6B7078, as Hermes sent it. Never a bar, never 0%.
+- **Local models** (Ollama): row "Tokens · 30 days" with the token count, 17 semibold right. It follows the 7/30/90 control below. Subtitle says "Local model · no limits".
+- **Order**: providers with data first, in the order Hermes lists them; providers without data last. Nothing is hidden.
+- Desktop: two columns, each with its own scroll. Left Subscriptions, right Bots. Window 960 main pane: 24 outer margin, 24 gutter, columns 444. Section headers 12/16 600 uppercase +0.5, 14 inset. Provider heads 48, window rows 10x14 with 15/20 label (500) and percent. Everything else as iPhone.
+
+### Thresholds (LOCKED)
+Judged on the DISPLAYED integer, so the color never disagrees with the number.
+
+| Shown % | State | Color | Hex | Extra |
+|---|---|---|---|---|
+| 0-69 | normal | ok green | #4CC38A | none |
+| 70-90 | warning | warn (new) | #F2A65A | word "Running low" |
+| 91-99 | red | bad | #F06A6A | word "Almost out" |
+| 100 | red | bad | #F06A6A | word "Limit reached" |
+
+- `warn` #F2A65A is a new token. It is the existing orange from the bot palette, used only for this threshold (no new hue). It never shows as interactive color.
+- Color is never the only signal: the percent and the state word carry it too.
+- Track #2A2D33 (the border token) for every bar. Skeleton and idle bars use #22252A.
+
+### Reset time format
+- Countdown: floor to the unit, two units max. 1d or more: `3d 18h`. Under 1d: `1h 59m`. Under 1h: `42m`. Under 1 minute: `<1m`. Past due (resets_at before now): "Reset due" and refetch once.
+- Clock, device local time, 12-hour: today `7:00 PM`; within 7 days `Sat 12:00 PM`; later `Nov 28, 12:00 PM`. Joined with " · ".
+- The countdown recomputes every minute while the screen is open (no refetch).
+
+### Bots section
+- Section header "Bots". A 3-way segmented control "7 days / 30 days / 90 days", default 30, remembered. 36 tall, 16 margin, radius 10, padding 2, track #1A1C20, selected segment radius 8 filled `mix(#8B7CF6, .30)` = #343056 with 15 semibold #ECEDEF; others 15 medium dim. Each segment is 44 tall to tap (hit slop). It also drives the Ollama card and the bot detail.
+- A totals card under it (radius 12, #1A1C20, 16 margin, 12 padding): three columns, value 20/24 semibold, label 13/18 dim: Tokens (input plus output), API calls, Est. cost. Sums every bot.
+- One grouped list of bot rows, in order of tokens (input plus output), most first; bots with no activity last, dimmed.
+- **Bot row**: min 64 (measured 78 with 3 lines), padding 10x16. Avatar disc 40 (the real sprite, `mix(color,.18)`). Line 1: name 17/22 semibold, est. cost 17/22 regular right, › 17 #5D626A. Line 2: `4.8M in · 912K out · 1,284 calls` 13/18 dim, one line, tabular figures. Line 3: top model `claude-opus-5-5 · Anthropic` 13/18 dim (top = most tokens in the period). Hairline inset 68. Tap opens the bot detail. Whole row is the target.
+- **No activity**: avatar in the sleeping mood, name and cost in #9298A0, cost shows "—", one line "No activity in 30 days" (the selected period). Still tappable (detail shows its empty state).
+- All bots are listed, including hidden ones (marked "Hidden" in 13 dim after the name). Group rooms are not bots and are not listed.
+- Desktop rows are 60 tall: avatar 36, name 15/20 semibold, one detail line `4.8M in · 912K out · 1,284 calls · claude-opus-5-5` 13/18, cost 15/20 medium, ›. Hover #1C1E22.
+
+### Bot detail
+- Navigation: the standard chat-style nav, back "‹ Usage", the avatar 32 and name 16/20 semibold with "Last 30 days" 12/16 dim. It is a bot context, so interactive color is that bot's color (back, the selected segment `mix(c,.30)`, chart bars, share bars). This follows the accent rule from fix 9.
+- Same 7/30/90 control at the top (starts on the period you came from; changing it here changes it everywhere).
+- Summary tiles, 3 across by 2: Input, Output, Cache, API calls, Tool calls, Est. cost. Tile 68 tall, radius 12, #1A1C20, 8 gap, 12 padding; value 20/24 semibold, label 13/18 dim. Desktop: one row of 6, tile 64, value 17/22.
+- **Tokens per day**: section header, then a card (radius 12, #1A1C20, padding 14 top, 12 right, 10 bottom, 16 left).
+  - One bar per day in the bot's color; value is input plus output (cache is left out; it would flatten the chart). Radius 2 on the top corners; 2 gap (30 days), 3 gap on desktop, 4 for 7 days, 1 for 90 days. Bar width fills the plot. Min 2 tall for any non-zero day; empty days draw nothing.
+  - Plot 132 tall (desktop 168), hairline gridlines at 0, 50% and 100% of a nice top value (1, 2 or 5 times a power of ten, so 426K draws against 500K). Gridline labels 12/16 dim in a 36 gutter to the right of the plot.
+  - Day labels 12/16 dim under the plot: first day, middle day, "Today" for 30 days; weekday letters for 7 days; month starts for 90 days.
+  - Selecting a day: tap or drag across the chart (the whole chart is the hit area, since bars are under 44 wide). The chosen bar stays full color, the rest go to `mix(c,.45)`. A callout (#22252A, hairline #343840, radius 10, 13/18, shadow 0 8 24 rgba(0,0,0,.45)) sits above the plot: "Tue, Nov 10 · 409K tokens". Desktop: the same on hover. Nothing is selected by default; no haptic.
+- **By model**: grouped list, one row per model, most tokens first. Row (12x16): model name 17/22 on the left, est. cost 17/22 semibold right. Provider 13/18 dim under the name. A 4 tall share bar (radius 2, track #2A2D33, fill bot color) of that model's share of the bot's tokens. Under it `3.5M in · 690K out · 980 calls · 74%` 13/18 dim. Local models show `$0.00`.
+- Footnote 13/18 dim: "Tokens are input plus output. Cache is counted on its own. Costs are Hermes estimates."
+- Empty (bot with no activity in the period): the tiles show 0 and "$0.00", the chart card shows "No activity in the last 30 days" 15/20 dim centered at 132 tall, By model is hidden.
+
+### Updated line and refresh
+- Pull to refresh on iPhone (native refresh control, tint dim #9298A0). Desktop: the ↻ button (spins while loading) and Ctrl+R in this view. A refresh fetches all providers and all bots' totals.
+- Updated line 13/18 dim under the title (iPhone), under "Usage" (desktop): "Updated just now" (under 1 min), "Updated 1 min ago", "Updated 12 min ago", "Updated 3 h ago", then "Updated Mon 9:41 AM". It re-renders every 30 s. While loading: spinner 12 plus "Updating…". After a failed refresh: "Couldn't update · Retry" (Retry in accent).
+- Opening the screen shows the cached numbers at once and refreshes in the background. Cache lives in memory only. No auto-refresh timer while the screen is closed; while it is open, refresh once at open and when the app returns to the foreground if the data is over 5 minutes old.
+
+### Empty, loading and error states (`25-usage-states--iphone`)
+- **First load**: the Updated line says "Updating…" with the spinner; one skeleton card (head: 32 disc, 90x14 and 140x11 blocks; one window: 120x14 and 34x14 blocks, an empty bar, a 180x11 block; skeleton color #22252A, radius 6). No shimmer animation (Reduce Motion safe), a slow 1.2 s opacity pulse .6 to 1 is allowed otherwise. The Bots section shows 3 bot-row skeletons.
+- **Refresh failed, data kept**: a banner above the cards (margin 16, radius 12, #24171A, 0.5 #4A2A2E, 13/18 #F0C7C9, warn icon 18 in #F06A6A, small Retry pill `mix(#F06A6A,.25)`): "Couldn't update. Showing data from 9:38 AM." Old numbers stay as they were.
+- **One provider fails** (its fetch errors): that card keeps its head and shows "Couldn't read Codex usage" 15/20 dim with a small Retry (30 tall, #22252A, 44 hit). Other cards are unaffected. This is different from "No usage data from Hermes" (Hermes answered, but it has none).
+- **Hermes unreachable with nothing cached**: centered 36 warn glyph in #9298A0, "Can't reach b-lab" 17/22 semibold, "Usage comes from Hermes. Check the connection and try again." 15/20 dim, one primary pill "Try again" (50 tall, accent #8B7CF6, #FFF text). No Subscriptions or Bots sections.
+- **No providers configured at all**: Subscriptions shows one row "No subscriptions found in Hermes"; Bots still shows.
+- **Quiet period**: Bots shows a single row "No bot activity in the last 7 days" 15/20 dim.
+- Pull to refresh while offline keeps the current screen and shows the banner above.
+
+### Header gauge (`25-header-gauge--iphone`, `--desktop`)
+- **What it shows**: the highest used percent across every window of every provider (not credits), with its ring. VoiceOver: "Claude, Current session, 29 percent used. Opens Usage." Desktop tooltip: "Claude · Current session · 29% used".
+- **Where**: iPhone bot list nav row, left side (the slot that is empty today), 16 from the screen edge. Pill 32 tall in a 44x44 hit area (hit slop). Desktop sidebar header, between the title and ⋯ (pill 32 tall, 13 semibold).
+- **Pill**: radius 16, padding 0 10 0 7, 6 gap, a ring 20 (stroke 3, round caps, track #2A2D33, arc starts at 12 o'clock and goes clockwise), then `29%` 15 semibold (iPhone) or 13 semibold (desktop), tabular figures.
+- **States**:
+  - Normal (under 70): fill #1A1C20, ring #4CC38A, text #ECEDEF.
+  - Warning (70-90): fill `mix(#F2A65A,.14)` = #2F251C, ring and text #F2A65A.
+  - Red (91+): fill `mix(#F06A6A,.18)` = #382022, ring and text #F06A6A.
+  - Pressed: fill #22252A (normal), or the state fill at +4% (warning, red). On desktop while Usage is open, the normal pill uses #22252A.
+- **Hidden** until the first successful load, when no provider reports a percent, and when nothing is cached after an error. It is never shown as 0%. It refreshes with the screen, plus once when the bot list opens if data is over 5 minutes old.
+- Tap goes to Usage; it never opens a menu.
+
+### Number formatting (LOCKED)
+- **Tokens**: under 1,000 exact (`812`). Then K, M, B with one decimal under 10K, under 100M and under 100B, else none, trailing `.0` dropped: `1.2K`, `9.9K`, `10K`, `340K`, `912K`, `1M` (never `1000K`), `1.2M`, `14.9M`, `120M`, `1.3B`. Rows label the unit with "in" and "out"; the totals card and tiles say "Tokens".
+- **API calls, tool calls**: full integer with thousands separators: `1,284`.
+- **Cost**: `$` plus 2 decimals with thousands separators: `$3.41`, `$0.00`, `$1,284.50`. Non-zero under half a cent: `<$0.01`. A bot with no activity: `—`. Always an estimate; the footnote and the "Est. cost" label say so, rows do not say "est.".
+- **Percent**: integer, `29%`, no space.
+- **Dates**: `Nov 10`, `Tue, Nov 10` (callout), `Sat 12:00 PM`. 12-hour in device locale.
+- Tabular figures on every number that can change.
+
+### Type and sizes (iPhone, pt)
+Large title 34/41 700. Updated 13/18. Section header 13/18 uppercase +0.3. Provider name 17/22 600, subtitle 13/18. Window label 17/22, percent 17/22 600. Reset line 13/18. Bot name 17/22 600, cost 17/22, detail lines 13/18. Summary value 20/24 600, label 13/18. Chart labels 12/16. Callout 13/18. Nothing under 12. Desktop (px): body 15/20, detail 13/18, section 12/16 uppercase, tile value 17/22.
+
+### Tokens used
+Existing: bg #0F1012, card #1A1C20, raised #22252A, hover #1C1E22, border #2A2D33, text #ECEDEF, dim #9298A0, faint #6B7078, accent #8B7CF6, ok #4CC38A, bad #F06A6A, error-bg/line #24171A/#4A2A2E, error-text #F0C7C9. New: warn #F2A65A (threshold only). Bot colors and `mix(c,t)` as in Tokens above.
+
+### Accessibility
+- Every window row is one element: "Current session, 29 percent used, resets in 1 hour 59 minutes at 7:00 PM". A warning row adds "Running low"; red adds "Almost out".
+- Bars are not separate focus stops. Segmented control: role tablist, selected state announced.
+- Bot row: "chief, 4.8 million tokens in, 912 thousand out, 1,284 calls, 18 dollars 42 cents estimated". Spell numbers out.
+- Chart: the whole chart is one element with the summary "Tokens per day, busiest day Tue, Nov 10, 409 thousand"; VoiceOver adjustable action steps through days.
+- Dynamic Type: sizes above are the default; at accessibility sizes the bot row detail lines may wrap to 2 lines and the tiles drop to 2 across.
+- Reduce Motion: no skeleton pulse, no spinner rotation changes beyond the system refresh control.
+
+### Done when
+- Usage is reachable from the app ⋯ menu and from the header gauge, on iPhone and desktop.
+- Each provider is a card with the label, rounded percent, 8 tall bar, reset countdown plus local reset time; Claude shows exactly what `hermes usage --json` gives.
+- 69% is green, 70% and 90% are #F2A65A, 91% and up are #F06A6A (unit-test the boundary on the rounded value).
+- Credits show as an amount only; providers without data show "No usage data from Hermes"; Ollama shows tokens only.
+- 7/30/90 changes the totals, the rows, the Ollama tokens and the detail together.
+- The bot detail shows the daily chart (with day selection) and by-model rows that sum to the bot's totals.
+- Pull to refresh works; the Updated line follows the copy above; every state in `25-usage-states--iphone` exists.
+- Numbers format exactly per the rules (unit-test `1000K`, `9999 -> 10K`, `999,950 -> 1M`, `<$0.01`).
+- Regular iPhones and the existing screens are pixel-identical apart from the gauge and the new menu item.
+
+### Open for Chief (my calls so far; Mobile can start)
+1. Hermes' credits shape is unconfirmed (only the Anthropic JSON is captured). I locked "amount only, no bar". If it returns used and total, I'll add a window-style row.
+2. Per-bot data (7/30/90 totals, by model, daily) is not in `hermes usage --json`, and I haven't captured its real source. Mobile or Schedules must confirm it (`hermes insights --days N` is the closest command I found) and the field names before building. The comps assume Hermes returns input, output and cache tokens, API calls, tool calls, estimated cost, by model and daily.
+3. No provider logos in v1 (generic glyph). Say so if Brennan wants real logos, and who supplies them.
+4. The gauge only counts percent windows; credits never drive it.
+
+---
+
 ## Group chat (card 8)
 
 These comps follow Hermes Bot Mode rooms (`hermes-agent/website/docs/user-guide/bot-mode.md` → Groups and group chats): 2-6 members, @-mentions scope a round and everyone answers when nobody is mentioned, bots may pass, `@user` raises Needs you, Stop holds members, and approvals answer on one click. Same tokens as above. The accent rule: rooms use accent #8B7CF6 for chrome, and each reply uses its bot's color for the name and mentions.
