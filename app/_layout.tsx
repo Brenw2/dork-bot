@@ -37,7 +37,7 @@ export default function RootLayout() {
 }
 
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'look/[bot]', 'connectors/[bot]', 'connector/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]', 'room-new']);
+const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'usage', 'usage/[bot]', 'look/[bot]', 'connectors/[bot]', 'connector/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]', 'room-new']);
 
 // The panel's own title; a bot's name goes under it (components/Overlay.tsx, components/Sheet.tsx).
 const TITLES: Record<string, string> = {
@@ -51,6 +51,7 @@ const TITLES: Record<string, string> = {
   'work/[bot]': 'Work',
   'work-session/[bot]': 'Work',
   'bot/[bot]': 'Bot settings',
+  'usage/[bot]': 'Usage',
 };
 
 /** The desktop panel (or, for the bot sheet, the popover under the chat title). */
@@ -111,6 +112,9 @@ function Screens(): ReactNode {
       <Stack.Screen name="work/[bot]" options={popup('Work')} />
       <Stack.Screen name="work-session/[bot]" options={popup('Work')} />
       <Stack.Screen name="notifications" options={popup('Notifications')} />
+      {/* Usage draws its own header (back, large title, Updated line) on the phone: a pushed screen, not a sheet. */}
+      <Stack.Screen name="usage" options={isDesktop ? popup('Usage') : { title: '', headerShown: false }} />
+      <Stack.Screen name="usage/[bot]" options={isDesktop ? popup('Usage') : { title: '', headerShown: false }} />
     </Stack>
   );
 }

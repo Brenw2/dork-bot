@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { NOTE_AT, ROUTINE_SCREENS } from './layout-routine.mjs';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
+import { USAGE_SCREENS } from './layout-usage.mjs';
 import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, checkErrorCard, checkErrorDetails, checkLook, checkNotSent, checkNotifications } from './layout-fixes-69.mjs';
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
 
@@ -49,7 +50,7 @@ export const POSTURES = {
     // crosses the fold, the same way every screen crosses it in open portrait.
     keepOut: [{ name: 'status rail', x: 867, y: 0, width: 84, height: 669 }],
   },
-  // A wide desktop window (two panes). Only the group chat screens (card 8, comps g1..g6 --desktop) and the routine cards (card 24) run here.
+  // A wide desktop window (two panes). Only the group chat screens (card 8, comps g1..g6 --desktop), the routine cards (card 24) and the usage screens (card 25) run here.
   desktop: { width: 1280, height: 800, insets: { top: 0, right: 0, bottom: 0, left: 0 }, keepOut: [], roomsOnly: true },
 };
 
@@ -287,6 +288,8 @@ const SCREENS = [
   { name: 'connector', paired: true, path: () => '/connector/assistant?name=trello', waitFor: 'Tools · 14', check: checkConnectorDetail },
   { name: 'look', path: () => '/look/assistant', waitFor: 'Style', check: checkLook },
   { name: 'notifications', paired: true, path: () => '/notifications', waitFor: 'Per bot', check: checkNotifications },
+  // Card 25: Usage screen, bot detail, header gauge (scripts/layout-usage.mjs).
+  ...USAGE_SCREENS,
 ];
 
 function chatPath(bot) {
@@ -932,7 +935,7 @@ async function main() {
     if (only && posture !== only) continue;
     for (const screen of SCREENS) {
       if (screen.postures && !screen.postures.includes(posture)) continue;
-      if (shape.roomsOnly && !screen.name.startsWith('room-') && !screen.name.startsWith('routine-')) continue;
+      if (shape.roomsOnly && !screen.name.startsWith('room-') && !screen.name.startsWith('routine-') && !screen.name.startsWith('usage')) continue;
       const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2, reducedMotion: screen.reducedMotion ? 'reduce' : 'no-preference' });
       const page = await context.newPage();
       const errors = [];
@@ -947,6 +950,7 @@ async function main() {
       if (screen.rooms) await page.addInitScript(roomsMock, { data: ROOM_DATA[screen.rooms] });
       await page.route(`${HERMES}/**`, fakeHermes);
       await page.route(`${ADMIN}/**`, fakeHermes);
+      if (screen.mock) await screen.mock(page); // after the defaults: a later route wins
       if (screen.clock) await page.clock.install(); // a run that has gone on for a while (fast-forwarded below)
       const path = screen.path(posture);
       let problems;

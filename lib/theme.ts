@@ -10,6 +10,7 @@ export const colors = {
   user: '#3B3470',
   ok: '#4CC38A',
   bad: '#F06A6A',
+  warn: '#F2A65A', // card 25: usage 70 to 90%
   // Card 19 tokens (docs/design/REVIEW.md)
   raised: '#22252A', // selected or pressed row, menus, popovers
   hover: '#1C1E22', // hovered row (desktop)

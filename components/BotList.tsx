@@ -16,10 +16,13 @@ import { liveRuns } from '@/components/liveRuns';
 import { fetch } from '@/components/net';
 import { syncNow } from '@/components/sync';
 import { useBotMood } from '@/components/useBotMood';
+import { useGaugeSnapshot } from '@/components/useUsage';
+import { UsageGauge } from '@/components/UsageParts';
 import { getConnection, listBots, onBotsChanged, type SavedBot } from '@/lib/bots';
 import { connectError, doingLine, errorLine, latestPreview, rowTime, sortRows, type BotPreview, type ConnectState } from '@/lib/botList';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { nameOf } from '@/lib/names';
+import type { UsageSnapshot } from '@/lib/usage';
 import { colors, mix } from '@/lib/theme';
 
 const REFRESH_MS = 15_000;
@@ -47,6 +50,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
   useBusyWatch();
   const approvals = useApprovalTick();
   const insets = useSafeAreaInsets();
+  const usage = useGaugeSnapshot();
   // Group rooms on Hermes (card 8): a row each, above the bots. None when Hermes has no rooms or isn't reachable.
   const { rows: rooms, supported: roomsSupported } = useRoomRows();
 
@@ -106,6 +110,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
     Menu.show(
       'Dork Bot',
       [
+        { text: 'Usage…', onPress: () => router.push('/usage') },
         { text: 'Notifications…', onPress: () => router.push('/notifications') },
         { text: 'Add with a code…', onPress: () => router.push('/add') },
         { text: 'Show hidden bots', onPress: () => router.push('/new') },
@@ -120,7 +125,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
       ? Menu.show('New', [{ text: 'New bot', onPress: () => router.push('/new') }, { text: 'New group chat', onPress: () => router.push('/room-new') }, { text: 'Cancel', style: 'cancel' }], anchor)
       : router.push('/new');
 
-  const header = <ListHeader compact={compact} top={insets.top} onMenu={appMenu} onCompose={compose} />;
+  const header = <ListHeader compact={compact} top={insets.top} usage={usage} onMenu={appMenu} onCompose={compose} />;
   if (bots === null) return <View style={styles.screen}>{header}</View>;
 
   const open = (b: SavedBot) => {
@@ -170,7 +175,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
   );
 }
 
-function ListHeader({ compact, top, onMenu, onCompose }: { compact: boolean; top: number; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
+function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boolean; top: number; usage: UsageSnapshot | null; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
@@ -189,19 +194,26 @@ function ListHeader({ compact, top, onMenu, onCompose }: { compact: boolean; top
       </Pressable>
     </View>
   );
+  const gauge = <UsageGauge snapshot={usage} onPress={() => router.push('/usage')} />;
   if (compact) {
     return (
       <View style={[styles.sidebarHeader, { paddingTop: top, height: 56 + top }]}>
         <Text style={styles.sidebarTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
           Dork Bot
         </Text>
-        {buttons}
+        <View style={styles.sidebarRight}>
+          {gauge}
+          {buttons}
+        </View>
       </View>
     );
   }
   return (
     <View style={{ paddingTop: top }}>
-      <View style={styles.largeButtons}>{buttons}</View>
+      <View style={styles.largeButtons}>
+        <View style={styles.gaugeSlot}>{gauge}</View>
+        {buttons}
+      </View>
       <Text style={styles.largeTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
         Dork Bot
       </Text>
@@ -328,7 +340,9 @@ const styles = StyleSheet.create({
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  largeButtons: { flexDirection: 'row', justifyContent: 'flex-end', height: 44, paddingRight: 8 },
+  largeButtons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, paddingLeft: 16, paddingRight: 8 },
+  gaugeSlot: { flexDirection: 'row', alignItems: 'center' },
+  sidebarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   largeTitle: { color: colors.text, fontSize: 34, lineHeight: 41, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
   sidebarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 18, paddingRight: isDesktop ? 12 : 4 },
   sidebarTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
