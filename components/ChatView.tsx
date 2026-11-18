@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetch } from '@/components/net';
 import { Menu } from '@/components/alert';
 import { chatName } from '@/lib/chats';
+import { isSendEnter } from '@/lib/enterKey';
 import { noteIndex } from '@/lib/routineNotes';
 import { focusPosition, focusStep, ROUTINE_FOCUS, ROUTINE_MOTION } from '@/lib/routineCard';
 import { focusKey, shouldFocus } from '@/lib/push';
@@ -596,8 +597,8 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
               // Desktop: Enter sends, Shift+Enter is a new line.
               {...(Platform.OS === 'web'
                 ? {
-                    onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean }; preventDefault: () => void }) => {
-                      if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                    onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean; isComposing?: boolean }; preventDefault: () => void }) => {
+                      if (isSendEnter(e)) {
                         e.preventDefault();
                         void send();
                       }

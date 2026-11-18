@@ -12,6 +12,7 @@ import { getSeen, memberLabels, newId, roomLink, sendStore, setSeen } from '@/co
 import { lookFor } from '@/components/useBotLook';
 import { loadManager } from '@/components/manager';
 import { listBots } from '@/lib/bots';
+import { isSendEnter } from '@/lib/enterKey';
 import { nameOf } from '@/lib/names';
 import {
   buildTranscript,
@@ -331,8 +332,15 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
     }
   };
 
-  const onKey = (e: { nativeEvent: { key: string }; preventDefault?: () => void }) => {
-    if (!sugg.length) return;
+  const onKey = (e: { nativeEvent: { key: string; shiftKey?: boolean; isComposing?: boolean }; preventDefault?: () => void }) => {
+    // Desktop: Enter sends, Shift+Enter is a new line (same as the one-to-one chat). A mention pick takes Enter first.
+    if (!sugg.length) {
+      if (Platform.OS === 'web' && isSendEnter(e)) {
+        e.preventDefault?.();
+        void send();
+      }
+      return;
+    }
     const k = e.nativeEvent.key;
     if (k === 'ArrowDown') setPick((p) => Math.min(p + 1, sugg.length - 1));
     else if (k === 'ArrowUp') setPick((p) => Math.max(p - 1, 0));
@@ -458,7 +466,6 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
               }}
               onSelectionChange={(e) => setCaret(e.nativeEvent.selection.end)}
               onKeyPress={onKey}
-              onSubmitEditing={Platform.OS === 'web' && !sugg.length ? () => void send() : undefined}
               placeholder={placeholder}
               placeholderTextColor={colors.faint}
               multiline
