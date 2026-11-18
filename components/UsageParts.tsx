@@ -27,6 +27,9 @@ import {
   providerOfModel,
   resetLine,
   shareOf,
+  spokenCallout,
+  spokenTokens,
+  stepPicked,
   stateWord,
   subtitle,
   totalsOf,
@@ -387,13 +390,6 @@ export function TotalsCard({ bots }: { bots: BotUsage[] }) {
   );
 }
 
-function spokenTokens(v: number): string {
-  if (v < 1000) return String(v);
-  const f = formatTokens(v);
-  const unit = { K: 'thousand', M: 'million', B: 'billion' }[f.slice(-1) as 'K' | 'M' | 'B'];
-  return `${f.slice(0, -1)} ${unit}`;
-}
-
 export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hidden: boolean; providers: ProviderUsage[]; onPress: () => void }) {
   const name = useBotName(u.bot);
   const active = hasActivity(u);
@@ -483,7 +479,14 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
     <View
       style={styles.chartCard}
       accessible
+      accessibilityRole="adjustable"
       accessibilityLabel={`Tokens per day, busiest day ${calloutText(series[busiest].day, series[busiest].tokens).replace(' tokens', '')}`}
+      accessibilityValue={{ text: point ? spokenCallout(point.day, point.tokens) : undefined }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(e) => {
+        const delta = e.nativeEvent.actionName === 'increment' ? 1 : e.nativeEvent.actionName === 'decrement' ? -1 : 0;
+        if (delta) setPicked((cur) => stepPicked(cur, delta, series.length));
+      }}
     >
       <View style={{ height: 30 }}>
         {point ? (

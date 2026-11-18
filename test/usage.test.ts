@@ -16,6 +16,9 @@ import {
   niceTop,
   providerOfModel,
   shareOf,
+  spokenCallout,
+  spokenTokens,
+  stepPicked,
   sortBots,
   stateWord,
   subtitle,
@@ -385,5 +388,28 @@ describe('dueResets (Reset due refetches once)', () => {
     expect(dueResets(list, at)).toEqual([`anthropic|Current session|${Date.parse('2026-11-18T11:59:00Z')}`, `openai-codex|5-hour|${at}`]);
     expect(dueResets(list, at - 120000)).toEqual([]);
     expect(dueResets(list, at)).toEqual(dueResets(list, at + 5000)); // same keys later: the screen has already refetched for them
+  });
+});
+
+describe('chart VoiceOver (adjustable)', () => {
+  it('steps one day at a time and clamps at both ends', () => {
+    expect(stepPicked(null, 1, 7)).toBe(0); // the first increment lands on the earliest day
+    expect(stepPicked(0, 1, 7)).toBe(1);
+    expect(stepPicked(5, 1, 7)).toBe(6);
+    expect(stepPicked(6, 1, 7)).toBe(6); // clamped at the latest
+    expect(stepPicked(3, -1, 7)).toBe(2);
+    expect(stepPicked(0, -1, 7)).toBe(0); // clamped at the earliest
+    expect(stepPicked(null, -1, 7)).toBeNull(); // nothing selected, nothing to step back from
+    expect(stepPicked(null, 1, 0)).toBeNull();
+    expect(stepPicked(2, 1, 0)).toBeNull();
+    let at: number | null = null;
+    for (let i = 0; i < 100; i++) at = stepPicked(at, 1, 30);
+    expect(at).toBe(29);
+  });
+  it('says the picked day the way the comp does', () => {
+    expect(spokenCallout('2026-11-10', 409000, 'en-US')).toBe('Tue, Nov 10, 409 thousand tokens');
+    expect(spokenCallout('2026-11-11', 812, 'en-US')).toBe('Wed, Nov 11, 812 tokens');
+    expect(spokenCallout('2026-11-12', 1234567, 'en-US')).toBe('Thu, Nov 12, 1.2 million tokens');
+    expect(spokenTokens(0)).toBe('0');
   });
 });

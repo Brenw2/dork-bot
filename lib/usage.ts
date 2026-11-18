@@ -467,3 +467,28 @@ export function dueResets(list: ProviderUsage[], now: number): string[] {
   }
   return keys;
 }
+
+/** "9 thousand", "409 thousand", "1.2 million", "812": a token count the way VoiceOver should say it. */
+export function spokenTokens(v: number): string {
+  if (v < 1000) return String(v);
+  const f = formatTokens(v);
+  const unit = { K: 'thousand', M: 'million', B: 'billion' }[f.slice(-1) as 'K' | 'M' | 'B'];
+  return `${f.slice(0, -1)} ${unit}`;
+}
+
+/** The chart's VoiceOver value for a picked day: "Tue, Nov 10, 409 thousand tokens". */
+export function spokenCallout(day: string, tokens: number, locale?: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+  return `${label}, ${spokenTokens(tokens)} tokens`;
+}
+
+/**
+ * The chart's increment/decrement (an "adjustable" element): moves the picked day by one and clamps to 0..length-1.
+ * The first increment from no selection lands on the earliest day; a decrement from no selection changes nothing.
+ */
+export function stepPicked(current: number | null, delta: 1 | -1, length: number): number | null {
+  if (length <= 0) return null;
+  if (current === null) return delta === 1 ? 0 : null;
+  return Math.max(0, Math.min(length - 1, current + delta));
+}
