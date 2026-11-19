@@ -1,11 +1,8 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { fetch } from '@/components/net';
-import { Menu } from '@/components/alert';
 import { chatName } from '@/lib/chats';
-import { isSendEnter } from '@/lib/enterKey';
 import { noteIndex } from '@/lib/routineNotes';
 import { focusPosition, focusStep, ROUTINE_FOCUS, ROUTINE_MOTION } from '@/lib/routineCard';
 import { focusKey, shouldFocus } from '@/lib/push';
@@ -14,7 +11,6 @@ import { RoutineCard } from '@/components/RoutineCard';
 import { BotSprite } from '@/components/BotSprite';
 import { Markdown, BODY_SIZE } from '@/components/Markdown';
 import { isDesktop } from '@/components/desktop';
-import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
 import { useHermesImage } from '@/components/useHermesImage';
 import { attachmentProblem, MAX_IMAGES, messageBody, type Attachment } from '@/lib/attachments';
 import { activity } from '@/lib/activity';
@@ -35,9 +31,9 @@ import { useChatModel } from '@/components/useChatModel';
 import { liveRuns, liveRunsReady } from '@/components/liveRuns';
 import { keepWorking } from '@/components/busyWatch';
 import { leaveAction } from '@/lib/busy';
-import { ArrowUpIcon, PlusIcon, StopIcon } from '@/components/ChatIcons';
-import { Activity, ApprovalCard, DecisionChip, TypingRow, useDesk } from '@/components/ChatStatus';
-import { colors, mix, mono, onColor } from '@/lib/theme';
+import { Composer } from '@/components/Composer';
+import { Activity, ApprovalCard, DecisionChip, TypingRow } from '@/components/ChatStatus';
+import { colors, mix, mono } from '@/lib/theme';
 
 export { Activity };
 
@@ -74,11 +70,9 @@ export function ChatView(props: ChatViewProps) {
 }
 
 function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusNonce }: ChatViewProps & { chat: string }) {
-  const insets = useSafeAreaInsets();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
-  const [focused, setFocused] = useState(false);
   const [attached, setAttached] = useState<Attachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const addImages = useCallback((more: Attachment[]) => {
@@ -428,46 +422,14 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
       listRef.current?.scrollToIndex({ index: at, animated: true, ...pos });
     }, ROUTINE_MOTION.expand + 80);
   }, [focusAt, key, rows, client, sessionId, reloadTick, bot]);
-  // Desktop (web): the message box starts at one line and grows with its text up to 40% of the chat pane, then scrolls.
-  // The field is 44 tall on the desktop, 36 on the phone (design fix 3); the textarea has no border or padding of its
-  // own beyond the text's, so its height is the field's height.
-  const desk = useDesk();
-  const fieldMin = desk ? 44 : 36;
-  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  // Desktop (web): the message box grows to 40% of the chat pane (Composer), so it needs the pane height.
   const [paneHeight, setPaneHeight] = useState(0);
-  const [inputHeight, setInputHeight] = useState<number | undefined>(undefined);
-  const inputCap = paneHeight ? Math.round(paneHeight * INPUT_PANE_SHARE) : undefined;
-  useLayoutEffect(() => {
-    if (!WEB) return;
-    const el = inputRef.current as unknown as HTMLTextAreaElement | null;
-    if (!el || !el.style) return;
-    const was = el.style.height; // React's own value; put it back so an unchanged height stays applied
-    el.style.height = '0px'; // measure the content on its own, so the box can shrink too
-    const border = el.offsetHeight - el.clientHeight; // scrollHeight leaves the border out
-    const h = el.scrollHeight < fieldMin + 10 ? fieldMin : el.scrollHeight + border;
-    el.style.height = was;
-    const next = Math.max(fieldMin, inputCap ? Math.min(h, inputCap) : h);
-    // No scrollbar until the text reaches the cap (a box under it never needs one).
-    el.style.overflowY = inputCap && h >= inputCap ? 'auto' : 'hidden';
-    setInputHeight(next);
-  }, [draft, inputCap, fieldMin]);
   const column = maxWidth ? { maxWidth, width: '100%' as const, alignSelf: 'center' as const } : null;
   const canSend = (!!draft.trim() || attached.length > 0) && !!client;
-  // Send/Stop: a 30 circle 3 in from the field's corner (desktop 32, 6 in); the field's own line is a hairline.
-  const roundSize = desk
-    ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
-    : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth };
   const disconnected = !client && !!state.failure && state.failure.status === undefined && !state.failure.raw.startsWith('No saved key');
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   const model = useChatModel(bot);
-  const onBot = onColor(color);
-  useImageDrop(addImages, !!client);
-  const attach = (source: PickSource) => void pickImages(source, attached.length).then(addImages).catch((e: Error) => setAttachError(e.message));
-  const openAttach = (anchor?: { x: number; y: number }) =>
-    PICK_SOURCES.length === 1
-      ? attach(PICK_SOURCES[0].source)
-      : Menu.show('Add a picture', [...PICK_SOURCES.map((p) => ({ text: p.label, onPress: () => attach(p.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
   const warming = useConnectorWarmup(bot);
   const retryIn = useRetryCountdown(!client && !!state.failure, attempt);
 
@@ -540,106 +502,31 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
           {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
         </Text>
       ) : null}
-      {attached.length ? (
-        <ScrollView horizontal style={[styles.attachRow, column]} contentContainerStyle={styles.attachRowBody} keyboardShouldPersistTaps="handled">
-          {attached.map((im, i) => (
-            <View key={i} style={styles.thumbWrap}>
-              <Image source={{ uri: im.dataUrl }} style={styles.thumb} accessibilityLabel={`Picture ${i + 1}`} />
-              <Pressable
-                style={styles.thumbRemove}
-                onPress={() =>
-                  setAttached((cur) => {
-                    const next = cur.filter((_, j) => j !== i);
-                    setAttachError(attachmentProblem(next));
-                    return next;
-                  })
-                }
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove picture ${i + 1}`}
-              >
-                <Text style={styles.thumbRemoveText}>✕</Text>
-              </Pressable>
-            </View>
-          ))}
-        </ScrollView>
-      ) : null}
-      {attachError ? <Text style={[styles.error, column]}>{attachError}</Text> : null}
-      <View style={[{ paddingTop: 8, paddingHorizontal: 12, paddingBottom: Math.max(insets.bottom, 8) }, column]}>
-        <View style={styles.composer}>
-          <Pressable
-            style={({ pressed }) => [styles.attach, { width: fieldMin, height: fieldMin, borderRadius: fieldMin / 2 }, pressed && { opacity: 0.6 }]}
-            onPress={(e) => openAttach({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
-            disabled={!client || attached.length >= MAX_IMAGES}
-            hitSlop={4}
-            accessibilityRole="button"
-            accessibilityLabel="Add a picture"
-          >
-            <PlusIcon size={18} color={colors.dim} />
-          </Pressable>
-          <View testID="composer-field" style={[styles.field, { minHeight: fieldMin, borderRadius: fieldMin / 2 }, disconnected && { opacity: 0.5 }]}>
-            <TextInput
-              ref={inputRef}
-              style={[
-                styles.input,
-                desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: 6 * 22 + 14 },
-                WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
-                WEB && ({ outlineStyle: 'none' } as object),
-              ]}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
-              placeholderTextColor={colors.faint}
-              accessibilityLabel={`Message ${name}`}
-              multiline
-              // Desktop: Enter sends, Shift+Enter is a new line.
-              {...(Platform.OS === 'web'
-                ? {
-                    onKeyPress: (e: { nativeEvent: { key: string; shiftKey?: boolean; isComposing?: boolean }; preventDefault: () => void }) => {
-                      if (isSendEnter(e)) {
-                        e.preventDefault();
-                        void send();
-                      }
-                    },
-                  }
-                : null)}
-              // The web build (layout tests, previews) draws a multiline box two rows tall; iOS starts at one.
-              {...(Platform.OS === 'web' ? { numberOfLines: 1 } : null)}
-              editable={!!client}
-            />
-            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, { borderRadius: fieldMin / 2 }]} />
-            {canSend ? (
-              <Pressable
-                testID="composer-send"
-                style={[styles.roundButton, roundSize, { backgroundColor: color }]}
-                onPress={send}
-                accessibilityRole="button"
-                accessibilityLabel="Send"
-              >
-                <ArrowUpIcon size={16} color={onBot} />
-              </Pressable>
-            ) : running && !remote ? (
-              <Pressable
-                testID="composer-stop"
-                style={[styles.roundButton, roundSize, { backgroundColor: colors.text }]}
-                onPress={stop}
-                disabled={!state.runId}
-                accessibilityRole="button"
-                accessibilityLabel="Stop"
-              >
-                <StopIcon color={colors.bg} />
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-        {desk && focused ? (
-          <Text style={styles.hintLine} accessibilityElementsHidden importantForAccessibility="no">
-            Enter to send · Shift+Enter for a new line
-          </Text>
-        ) : null}
-      </View>
+      <Composer
+        value={draft}
+        onChangeText={setDraft}
+        onSend={send}
+        canSend={canSend}
+        placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
+        label={`Message ${name}`}
+        color={color}
+        stop={running && !remote ? { onPress: stop, disabled: !state.runId } : undefined}
+        enabled={!!client}
+        dimmed={disconnected}
+        images={attached}
+        onImages={addImages}
+        onRemoveImage={(i) =>
+          setAttached((cur) => {
+            const next = cur.filter((_, j) => j !== i);
+            setAttachError(attachmentProblem(next));
+            return next;
+          })
+        }
+        attachError={attachError}
+        onAttachError={setAttachError}
+        paneHeight={paneHeight}
+        column={column}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -809,37 +696,6 @@ const styles = StyleSheet.create({
   pictureNote: { color: colors.dim, fontSize: 13 },
   viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   viewerImage: { width: '100%', height: '100%' },
-  attachRow: { flexGrow: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  attachRowBody: { gap: 8, paddingHorizontal: 12, paddingTop: 10 },
-  thumbWrap: { width: 64, height: 64 },
-  thumb: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.card },
-  thumbRemove: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#000',
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumbRemoveText: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  attach: { backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   text: { color: colors.text, fontSize: BODY_SIZE, lineHeight: 22 },
-  error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingBottom: 6 },
   warming: { color: colors.dim, fontSize: 13, paddingHorizontal: 16, paddingBottom: 6 },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end', // the plus stays level with the bottom line as the field grows
-    gap: 8,
-  },
-  // The field holds its Send/Stop circle (design fix 3), so they never change its width.
-  field: { flex: 1, backgroundColor: colors.card, justifyContent: 'center' },
-  fieldLine: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  input: { color: colors.text, paddingLeft: 14 },
-  roundButton: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  hintLine: { color: colors.faint, fontSize: 12, lineHeight: 16, marginTop: 6, marginLeft: 52 },
 });

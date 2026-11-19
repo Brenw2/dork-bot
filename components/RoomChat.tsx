@@ -1,9 +1,8 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Alert, Menu } from '@/components/alert';
-import { ArrowUpIcon, StopIcon } from '@/components/ChatIcons';
+import { Composer } from '@/components/Composer';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
 import { useOnScreenRoom } from '@/components/notifications';
@@ -12,7 +11,7 @@ import { getSeen, memberLabels, newId, roomLink, sendStore, setSeen } from '@/co
 import { lookFor } from '@/components/useBotLook';
 import { loadManager } from '@/components/manager';
 import { listBots } from '@/lib/bots';
-import { isSendEnter } from '@/lib/enterKey';
+import { keyboardOffset } from '@/lib/keyboardOffset';
 import { nameOf } from '@/lib/names';
 import {
   buildTranscript,
@@ -206,7 +205,9 @@ function stamp(at: number): { day: string; time: string } {
 
 export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidth?: number; inPane?: boolean }) {
   useOnScreenRoom(id);
-  const { bottom } = useSafeAreaInsets();
+  const kav = useRef<{ measureInWindow: (cb: (x: number, y: number) => void) => void }>(null);
+  const [top, setTop] = useState(0);
+  const [paneHeight, setPaneHeight] = useState(0);
   const room = useRoomInfo(id);
   const info = useMemberInfo();
   const [events, setEvents] = useState<RoomEvent[]>([]);
@@ -332,15 +333,10 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
     }
   };
 
+  // The @-mention picker takes the arrows, Enter and Tab first; with no picker open the composer's own
+  // Enter-to-send (desktop) runs, the same as the one-to-one chat.
   const onKey = (e: { nativeEvent: { key: string; shiftKey?: boolean; isComposing?: boolean }; preventDefault?: () => void }) => {
-    // Desktop: Enter sends, Shift+Enter is a new line (same as the one-to-one chat). A mention pick takes Enter first.
-    if (!sugg.length) {
-      if (Platform.OS === 'web' && isSendEnter(e)) {
-        e.preventDefault?.();
-        void send();
-      }
-      return;
-    }
+    if (!sugg.length) return false;
     const k = e.nativeEvent.key;
     if (k === 'ArrowDown') setPick((p) => Math.min(p + 1, sugg.length - 1));
     else if (k === 'ArrowUp') setPick((p) => Math.max(p - 1, 0));
@@ -348,6 +344,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
       e.preventDefault?.();
       choose(sugg[pick].handle);
     }
+    return true;
   };
 
   const column = maxWidth ? { width: '100%' as const, maxWidth, alignSelf: 'center' as const } : null;
@@ -367,7 +364,17 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView
+      ref={kav as never}
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={keyboardOffset(Platform.OS, inPane, top)}
+      onLayout={(e) => {
+        if (Platform.OS === 'web') setPaneHeight(e.nativeEvent.layout.height);
+        // Where this view starts on screen = the native header's height (see lib/keyboardOffset.ts).
+        if (Platform.OS === 'ios' && !inPane) kav.current?.measureInWindow((_x, y) => setTop(y));
+      }}
+    >
       {inPane ? (
         <View style={styles.paneHeader}>
           <RoomTitle room={room} />
@@ -377,7 +384,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
       ) : null}
       <ScrollView ref={scroll as never} style={{ flex: 1 }} contentContainerStyle={[styles.transcript, column]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {items.map((it, i) => (
-          <Row key={it.seq} it={it} prev={items[i - 1]} info={info} members={members} unanswered={it.type === 'member' && it.needsYou && it.seq > lastUserSeq} />
+          <Row key={it.seq} roomId={id} it={it} prev={items[i - 1]} info={info} members={members} unanswered={it.type === 'member' && it.needsYou && it.seq > lastUserSeq} />
         ))}
         {approvals.map((a, i) => (
           <ApprovalCard key={`${a.taskId}${i}`} a={a} member={members.find((m) => m.memberId === a.memberId) ?? null} room={room?.name ?? 'the group'} info={info} onAnswer={(c) => answer(a, c)} />
@@ -433,8 +440,14 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
         </Text>
       ) : null}
 
-      <View style={[styles.composerWrap, { paddingBottom: Math.max(bottom, 10) }, column]}>
-        {sugg.length ? (
+      <Composer
+        value={text}
+        onChangeText={(t) => {
+          // Typing at the end moves the caret with it (the selection event can lag a frame behind).
+          if (caret >= text.length) setCaret(t.length);
+          setText(t);
+        }}
+        above={sugg.length ? (
           <View style={[styles.popover, isDesktop && { width: 360, right: undefined }]} accessibilityRole="menu">
             {sugg.map((s, i) => (
               <View key={s.handle}>
@@ -455,42 +468,24 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
             ))}
           </View>
         ) : null}
-        <View style={styles.composer}>
-          <View style={[styles.fieldWrap, { minHeight: FIELD_MIN, borderRadius: FIELD_MIN / 2 }]}>
-            <TextInput
-              value={text}
-              onChangeText={(t) => {
-                // Typing at the end moves the caret with it (the selection event can lag a frame behind).
-                if (caret >= text.length) setCaret(t.length);
-                setText(t);
-              }}
-              onSelectionChange={(e) => setCaret(e.nativeEvent.selection.end)}
-              onKeyPress={onKey}
-              placeholder={placeholder}
-              placeholderTextColor={colors.faint}
-              multiline
-              style={[styles.input, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]}
-              accessibilityLabel={`Message ${room?.name ?? 'the group'}`}
-            />
-            {canSend ? (
-              <Pressable onPress={() => void send()} style={[styles.round, ROUND, { backgroundColor: colors.accent }]} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
-                <ArrowUpIcon size={16} color="#fff" />
-              </Pressable>
-            ) : busy ? (
-              <Pressable onPress={() => void stop()} style={[styles.round, ROUND, { backgroundColor: colors.text }]} accessibilityRole="button" accessibilityLabel="Stop the room" hitSlop={6}>
-                <StopIcon color={colors.bg} />
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-      </View>
+        onSend={() => void send()}
+        canSend={canSend}
+        placeholder={placeholder}
+        label={`Message ${room?.name ?? 'the group'}`}
+        color={colors.accent}
+        stop={busy ? { onPress: () => void stop(), label: 'Stop the room' } : undefined}
+        paneHeight={paneHeight}
+        column={column}
+        onKey={onKey}
+        onSelectionChange={setCaret}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 // ---------- rows ----------
 
-function Row({ it, prev, info, members, unanswered }: { it: Item; prev?: Item; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
+function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; it: Item; prev?: Item; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
   const sep = prev && 'at' in prev && 'at' in it && prev.at && it.at && it.at - prev.at > 1800 ? stamp(it.at) : !prev && 'at' in it && it.at ? stamp(it.at) : null;
   return (
     <>
@@ -508,13 +503,13 @@ function Row({ it, prev, info, members, unanswered }: { it: Item; prev?: Item; i
           </Text>
         </View>
       ) : (
-        <MemberMessage it={it} info={info} members={members} unanswered={unanswered} />
+        <MemberMessage roomId={roomId} it={it} info={info} members={members} unanswered={unanswered} />
       )}
     </>
   );
 }
 
-function MemberMessage({ it, info, members, unanswered }: { it: Extract<Item, { type: 'member' }>; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
+function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: string; it: Extract<Item, { type: 'member' }>; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
   const profile = it.member?.profile ?? it.actorId;
   const color = info.color(profile);
   return (
@@ -606,11 +601,6 @@ function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; m
 }
 
 const BODY = isDesktop ? 16 : 17;
-// The message box pill from card 19 fix 3 (same numbers as ChatView): Send/Stop sit inside the field.
-const FIELD_MIN = isDesktop ? 44 : 36;
-const ROUND = isDesktop
-  ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
-  : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
@@ -656,11 +646,6 @@ const styles = StyleSheet.create({
   chipText: { color: colors.dim, fontSize: 12, fontWeight: '500' },
   resume: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   error: { color: colors.bad, fontSize: 13, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 6 },
-  composerWrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  fieldWrap: { flex: 1, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, justifyContent: 'center' },
-  input: { color: colors.text, fontSize: BODY, lineHeight: isDesktop ? 24 : 22, maxHeight: 140, paddingLeft: 14, paddingRight: isDesktop ? 44 : 36, paddingVertical: isDesktop ? 10 : 7 },
-  round: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   popover: { position: 'absolute', left: 12, right: 12, bottom: '100%', marginBottom: 4, backgroundColor: colors.raised, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#343840', overflow: 'hidden' },
   popRow: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
   popLine: { height: StyleSheet.hairlineWidth, backgroundColor: '#343840', marginHorizontal: 12 },
