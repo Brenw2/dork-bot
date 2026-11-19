@@ -13,6 +13,7 @@ import { lookFor } from '@/components/useBotLook';
 import { loadManager } from '@/components/manager';
 import { listBots } from '@/lib/bots';
 import { isSendEnter } from '@/lib/enterKey';
+import { keyboardOffset } from '@/lib/keyboardOffset';
 import { nameOf } from '@/lib/names';
 import {
   buildTranscript,
@@ -207,6 +208,8 @@ function stamp(at: number): { day: string; time: string } {
 export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidth?: number; inPane?: boolean }) {
   useOnScreenRoom(id);
   const { bottom } = useSafeAreaInsets();
+  const kav = useRef<{ measureInWindow: (cb: (x: number, y: number) => void) => void }>(null);
+  const [top, setTop] = useState(0);
   const room = useRoomInfo(id);
   const info = useMemberInfo();
   const [events, setEvents] = useState<RoomEvent[]>([]);
@@ -367,7 +370,14 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView
+      ref={kav as never}
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={keyboardOffset(Platform.OS, inPane, top)}
+      // Where this view starts on screen = the native header's height (see lib/keyboardOffset.ts).
+      onLayout={Platform.OS === 'ios' && !inPane ? () => kav.current?.measureInWindow((_x, y) => setTop(y)) : undefined}
+    >
       {inPane ? (
         <View style={styles.paneHeader}>
           <RoomTitle room={room} />
