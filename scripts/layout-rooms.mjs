@@ -128,6 +128,32 @@ export const ROOM_SCREENS = [
   { ...common, name: 'room-new', rooms: 'none', path: () => '/room-new', waitFor: 'MEMBERS · 0 OF 6', clickAll: ['assistant', 'chief', 'coder'], fill: ['Group name', 'Ops room'] },
   { ...common, name: 'room-chat', rooms: 'chat', path: roomPath, waitFor: 'Holding.' },
   { ...common, name: 'room-mention', rooms: 'chat', path: roomPath, waitFor: 'Holding.', fill: ['Message Ops room', '@'], then: 'Everyone' },
+  // Card 28: a multi-line draft in a room. The box grows with its text, Send stays inside it (bottom-right), and
+  // Send never leaves the field. (The web harness has no keyboard to fake.)
+  {
+    ...common,
+    name: 'room-draft',
+    rooms: 'chat',
+    path: roomPath,
+    waitFor: 'Holding.',
+    fill: ['Message Ops room', Array.from({ length: 6 }, (_, i) => `Draft line ${i + 1}`).join('\n')],
+    check: async (page) =>
+      page.evaluate(() => {
+        const out = [];
+        const field = document.querySelector('[data-testid=composer-field]');
+        if (!field) return ["room composer isn't the shared one (no composer-field)"];
+        const r = field.getBoundingClientRect();
+        const min = r.width > 0 && getComputedStyle(field).minHeight;
+        if (!(r.height > parseFloat(min) + 40)) out.push(`a 6-line room draft should grow the box, got ${r.height} tall (min ${min})`);
+        if (r.bottom > innerHeight + 0.5) out.push(`the room box runs off the bottom (${r.bottom} > ${innerHeight})`);
+        const byLabel = (l) => [...document.querySelectorAll('[role=button]')].find((e) => e.getAttribute('aria-label') === l)?.getBoundingClientRect();
+        const send = byLabel('Send');
+        if (!send) out.push('no Send button inside the room box');
+        else if (send.right > r.right + 0.5 || send.bottom > r.bottom + 0.5 || send.left < r.left || send.top < r.top) out.push('Send should sit inside the box');
+        else if (r.bottom - send.bottom > 8 || r.right - send.right > 8) out.push(`Send should sit in the box's bottom-right corner (bottom ${r.bottom - send.bottom}, right ${r.right - send.right})`);
+        return out;
+      }),
+  },
   { ...common, name: 'room-needs-you', rooms: 'needs', path: roomPath, waitFor: 'Run this command?' },
   { ...common, name: 'room-held', rooms: 'held', path: roomPath, waitFor: 'Resume all' },
 ];
@@ -137,6 +163,7 @@ export const ROOM_FIXED = {
   'room-new': ['Cancel', 'Create'],
   'room-chat': ['Message Ops room', 'Stop the room'],
   'room-mention': ['Message Ops room'],
+  'room-draft': ['Message Ops room', 'Send'],
   'room-needs-you': ['Message Ops room'],
   'room-held': ['Message Ops room', 'Resume all'],
 };
