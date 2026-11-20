@@ -7,7 +7,6 @@ import { Icon } from '@/components/AppIcons';
 import { BotAvatar } from '@/components/BotSprite';
 import { isDesktop } from '@/components/desktop';
 import { useBotName } from '@/components/useBotName';
-import { colors, mix } from '@/lib/theme';
 import {
   DAY_CHOICES,
   axisLabels,
@@ -43,18 +42,22 @@ import {
   type UsageSnapshot,
   type UsageWindow,
 } from '@/lib/usage';
+import { makeStyles, useTheme } from '@/components/theme';
+import type { Colors } from '@/lib/themes';
 
-export const levelColor: Record<Level, string> = { ok: colors.ok, warn: colors.warn, bad: colors.bad };
+export const levelColor = (colors: Colors, level: Level): string => ({ ok: colors.ok, warn: colors.warn, bad: colors.bad })[level];
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
 // ---- subscriptions ----
 
 /** Bar 8 tall, radius 4, track #2A2D33; the fill is max(8px, pct%) when pct > 0. */
 export function ProgressBar({ percent, level }: { percent: number; level: Level }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const shown = Math.round(percent);
   return (
     <View style={styles.track} aria-hidden>
-      {shown > 0 ? <View style={[styles.fill, { width: `${shown}%`, minWidth: 8, backgroundColor: levelColor[level] }]} /> : null}
+      {shown > 0 ? <View style={[styles.fill, { width: `${shown}%`, minWidth: 8, backgroundColor: levelColor(colors, level) }]} /> : null}
     </View>
   );
 }
@@ -76,9 +79,11 @@ function spoken(w: UsageWindow, now: number): string {
 }
 
 export function WindowRow({ w, now }: { w: UsageWindow; now: number }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const level = levelFor(w.percent);
   const word = stateWord(w.percent);
-  const c = level === 'ok' ? colors.text : levelColor[level];
+  const c = level === 'ok' ? colors.text : levelColor(colors, level);
   const clock = w.resetsAt !== null && countdown(w.resetsAt, now) !== null ? ` · ${clockLabel(w.resetsAt, now)}` : '';
   return (
     <View style={styles.window} accessible accessibilityLabel={spoken(w, now)}>
@@ -97,7 +102,7 @@ export function WindowRow({ w, now }: { w: UsageWindow; now: number }) {
           {clock}
         </Text>
         {word ? (
-          <Text style={[styles.word, { color: levelColor[level] }]} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.word, { color: levelColor(colors, level) }]} maxFontSizeMultiplier={1.4}>
             {word}
           </Text>
         ) : null}
@@ -108,6 +113,7 @@ export function WindowRow({ w, now }: { w: UsageWindow; now: number }) {
 
 /** The generic chip glyph in the provider disc (v1 has no provider logos). */
 function ChipGlyph() {
+  const { colors } = useTheme();
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.dim} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
       <Rect x={6} y={6} width={12} height={12} rx={2} />
@@ -118,6 +124,7 @@ function ChipGlyph() {
 }
 
 function ProviderHead({ p }: { p: ProviderUsage }) {
+  const styles = useStyles();
   const sub = subtitle(p);
   return (
     <View style={styles.head} accessibilityRole="header">
@@ -138,9 +145,13 @@ function ProviderHead({ p }: { p: ProviderUsage }) {
   );
 }
 
-const Sep = () => <View style={styles.sep} />;
+const Sep = () => {
+const styles = useStyles();
+return <View style={styles.sep} />;
+};
 
 function AccountRows({ a, now }: { a: UsageAccount; now: number }) {
+  const styles = useStyles();
   return (
     <>
       <Sep />
@@ -169,6 +180,7 @@ function AccountRows({ a, now }: { a: UsageAccount; now: number }) {
 
 /** One grouped card per provider. `localTokens`/`days` feed the local-model row; Hermes sends no plan or detail, so none shows. */
 export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; now: number; localTokens: number | null; days: Days }) {
+  const styles = useStyles();
   return (
     <View style={styles.card} accessibilityLabel={`${displayName(p)} usage`}>
       <ProviderHead p={p} />
@@ -227,6 +239,8 @@ export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; 
 }
 
 export function SkeletonCard() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const block = (w: number, h: number) => <View style={[styles.skel, { width: w, height: h }]} />;
   return (
     <View style={styles.card} accessibilityLabel="Loading subscriptions">
@@ -251,6 +265,7 @@ export function SkeletonCard() {
 }
 
 export function SkeletonBotRows() {
+  const styles = useStyles();
   return (
     <View style={styles.group} accessibilityLabel="Loading bots">
       {[0, 1, 2].map((i) => (
@@ -273,6 +288,8 @@ export function SkeletonBotRows() {
 
 /** "Couldn't update. Showing data from 9:38 AM." above the cards, old numbers kept. */
 export function FailBanner({ since, onRetry }: { since: string; onRetry: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.banner} accessibilityRole="alert">
       <Icon name="warning" size={18} color={colors.bad} />
@@ -289,6 +306,8 @@ export function FailBanner({ since, onRetry }: { since: string; onRetry: () => v
 }
 
 export function Unreachable({ onRetry }: { onRetry: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.unreachable}>
       <Icon name="warning" size={36} color={colors.dim} />
@@ -309,6 +328,8 @@ export function Unreachable({ onRetry }: { onRetry: () => void }) {
 
 /** The Updated line: spinner + Updating…, Couldn't update · Retry, or the age. */
 export function UpdatedLine({ text, loading, failed, onRetry }: { text: string | null; loading: boolean; failed: boolean; onRetry: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   if (loading)
     return (
       <View style={styles.updated}>
@@ -343,7 +364,10 @@ export function UpdatedLine({ text, loading, failed, onRetry }: { text: string |
 // ---- bots ----
 
 /** 7 / 30 / 90 days. 36 tall, radius 10, padding 2; selected fill is mix(color, .30); each segment is a 44 tall target. */
-export function Segmented({ value, onChange, color = colors.accent }: { value: Days; onChange: (d: Days) => void; color?: string }) {
+export function Segmented({ value, onChange, color: given }: { value: Days; onChange: (d: Days) => void; color?: string }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
+  const color = given ?? colors.accent;
   return (
     <View style={styles.segmented} accessibilityRole="tablist">
       {DAY_CHOICES.map((d) => (
@@ -366,6 +390,7 @@ export function Segmented({ value, onChange, color = colors.accent }: { value: D
 }
 
 function Column3({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.col}>
       <Text style={[styles.colValue, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
@@ -380,6 +405,7 @@ function Column3({ label, value }: { label: string; value: string }) {
 
 /** Tokens, API calls, Est. cost across every bot. */
 export function TotalsCard({ bots }: { bots: BotUsage[] }) {
+  const styles = useStyles();
   const t = totalsOf(bots);
   return (
     <View style={styles.totals} accessible accessibilityLabel={`${formatTokens(t.tokens)} tokens, ${formatCount(t.apiCalls)} API calls, ${formatCost(t.cost)} estimated cost`}>
@@ -391,6 +417,8 @@ export function TotalsCard({ bots }: { bots: BotUsage[] }) {
 }
 
 export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hidden: boolean; providers: ProviderUsage[]; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const name = useBotName(u.bot);
   const active = hasActivity(u);
   const top = u.topModel ? [u.topModel, providerOfModel(u.topModel, providers)].filter(Boolean).join(' · ') : null;
@@ -442,6 +470,7 @@ export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hi
 // ---- bot detail ----
 
 export function Tile({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.tile} accessible accessibilityLabel={`${label}, ${value}`}>
       <Text style={[styles.colValue, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
@@ -461,6 +490,8 @@ const PLOT = isDesktop ? 168 : 132;
  * labels in a 36 gutter on the right. Tap or drag anywhere on the chart to pick a day; the rest dim to mix(c, .45).
  */
 export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now: number }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const [plotW, setPlotW] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const series = daySeries(u, now);
@@ -551,6 +582,7 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
 }
 
 export function EmptyChart({ days }: { days: number }) {
+  const styles = useStyles();
   return (
     <View style={[styles.chartCard, { height: PLOT + 24, alignItems: 'center', justifyContent: 'center' }]}>
       <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
@@ -561,6 +593,7 @@ export function EmptyChart({ days }: { days: number }) {
 }
 
 export function ModelRow({ m, u, providers, color }: { m: ModelUsage; u: BotUsage; providers: ProviderUsage[]; color: string }) {
+  const styles = useStyles();
   const share = shareOf(m, u);
   const provider = providerOfModel(m.model, providers);
   return (
@@ -595,8 +628,10 @@ export function ModelRow({ m, u, providers, color }: { m: ModelUsage; u: BotUsag
  * provider window. Normal #1A1C20 / green, warning mix(#F2A65A,.14), red mix(#F06A6A,.18). Hidden with no data.
  */
 export function GaugePill({ state, onPress, active = false }: { state: GaugeState; onPress: () => void; active?: boolean }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   if (state.kind === 'none') return null;
-  const c = levelColor[state.level];
+  const c = levelColor(colors, state.level);
   const r = 8.5;
   const circ = 2 * Math.PI * r;
   const fill = state.level === 'ok' ? colors.card : mix(c, state.level === 'warn' ? 0.14 : 0.18);
@@ -626,7 +661,7 @@ export function UsageGauge({ snapshot, onPress, active }: { snapshot: UsageSnaps
   return <GaugePill state={gaugeState(snapshot?.providers ?? null)} onPress={onPress} active={active} />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
   group: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
@@ -639,7 +674,7 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
   windowLabel: { color: colors.text, fontSize: 17, lineHeight: 22 },
   windowPercent: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden', marginTop: 8, marginBottom: 6 },
+  track: { height: 8, borderRadius: 4, backgroundColor: colors.track, overflow: 'hidden', marginTop: 8, marginBottom: 6 },
   fill: { height: 8, borderRadius: 4 },
   reset: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   word: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
@@ -687,4 +722,4 @@ const styles = StyleSheet.create({
   share: { height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 6, marginBottom: 6, overflow: 'hidden' },
   pill: { height: 32, borderRadius: 16, paddingLeft: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillText: { fontWeight: '600' },
-});
+}));

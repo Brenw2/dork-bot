@@ -17,12 +17,14 @@ import { rowTime } from '@/lib/botList';
 import { getConnection } from '@/lib/bots';
 import { chatName, cleanPreview, type ChatSummary } from '@/lib/chats';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // A bot's chats, newest first, the same on every device (they're Hermes sessions). Tap one to open
 // it, the compose button for a fresh one, press and hold (⋯ on hover on desktop) to rename or delete.
 // docs/design/REVIEW.md, fix 8.
 export default function Chats() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -151,6 +153,8 @@ export default function Chats() {
 
 /** "Work" row at the top of Chats: what the bot does outside the app, with how many are running now. */
 function WorkRowLink({ bot, botName, color }: { bot: string; botName: string; color: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { items } = useWork(bot);
   const running = items?.filter((i) => i.status === 'working').length ?? 0;
   const note = items === null ? '' : running ? `${running} working now` : items.length ? `${items.length} recent` : `Nothing from outside the app yet`;
@@ -172,7 +176,7 @@ function WorkRowLink({ bot, botName, color }: { bot: string; botName: string; co
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 16, paddingBottom: 32 },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, borderRadius: 10, paddingHorizontal: 10, backgroundColor: colors.card },
@@ -193,4 +197,4 @@ const styles = StyleSheet.create({
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, paddingHorizontal: 16, marginTop: -8 },
   empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 14, lineHeight: 22 },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 4 },
-});
+}));

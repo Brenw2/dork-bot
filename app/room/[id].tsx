@@ -4,7 +4,7 @@ import { RoomActions, RoomChat, RoomTitle, useRoomInfo } from '@/components/Room
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH } from '@/lib/layoutClass';
 import { headerSides } from '@/lib/headerItems';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/components/theme';
 
 export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,6 +27,7 @@ export default function RoomScreen() {
 }
 
 function BackToBots() {
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}

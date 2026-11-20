@@ -7,7 +7,7 @@ import { Icon } from '@/components/AppIcons';
 import { SmallButton } from '@/components/Buttons';
 import { CHROME_SCALE } from '@/components/ChatStatus';
 import { describeFailure, type Failure } from '@/lib/errors';
-import { colors, mix } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** Counts 5, 4, 3, 2, 1 and starts over: the load retries every 5 s. `restart` changes when a try happens. */
 export function useRetryCountdown(active: boolean, restart: number, every = 5): number {
@@ -23,6 +23,8 @@ export function useRetryCountdown(active: boolean, restart: number, every = 5): 
 
 /** Under the nav, styled like the model banner: warning icon, text 13/18, and one small button. */
 export function FailureBanner({ failure, name, secondsToRetry, onRetry, onPair }: { failure: Failure; name: string; secondsToRetry: number; onRetry: () => void; onPair: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const view = describeFailure(failure, name, secondsToRetry);
   if (view.place !== 'banner') return null;
   const pair = view.action === 'pair';
@@ -52,6 +54,8 @@ export function FailureBanner({ failure, name, secondsToRetry, onRetry, onPair }
  * Hermes's raw error, selectable, with Copy. Never paraphrases Hermes: its message is quoted after "Hermes said:".
  */
 export function FailureCard({ failure, bot, name, onAgain, onNewChat, onRetryUnsent }: { failure: Failure; bot: string; name: string; onAgain: () => void; onNewChat: () => void; onRetryUnsent: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const view = describeFailure(failure, name);
@@ -100,7 +104,7 @@ export function FailureCard({ failure, bot, name, onAgain, onNewChat, onRetryUns
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.errorBg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.errorLine },
   bannerText: { flex: 1, color: colors.errorText, fontSize: 13, lineHeight: 18 },
   bannerButton: { height: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
@@ -116,4 +120,4 @@ const styles = StyleSheet.create({
   bang: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
   bangText: { color: colors.bg, fontSize: 11, lineHeight: 13, fontWeight: '800' },
   unsentText: { color: colors.bad, fontSize: 12, lineHeight: 16 },
-});
+}));

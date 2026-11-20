@@ -10,7 +10,7 @@ import { isDesktop } from '@/components/desktop';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import { headerSides } from '@/lib/headerItems';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 export interface SheetAction {
   label: string;
@@ -57,6 +57,7 @@ export function Sheet({
   /** A form's commit ("Save", "Create"): semibold on the right of the header (a small primary button in a desktop panel). */
   commit?: { label: string; onPress: () => void; disabled?: boolean };
 }) {
+  const { colors } = useTheme();
   const { color: botColor } = useBotLook(bot ?? '');
   const color = bot ? botColor : colors.accent;
   const name = useBotName(bot ?? '');
@@ -99,6 +100,7 @@ export function Sheet({
 }
 
 function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.titleBlock} accessibilityRole="header">
       <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1.4}>{title}</Text>
@@ -108,6 +110,7 @@ function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
 }
 
 function TextButton({ label, color, bold, onPress = dismiss }: { label: string; color: string; bold: boolean; onPress?: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
       <Text style={[styles.textButtonText, { color }, bold && { fontWeight: '600' }]} maxFontSizeMultiplier={1.4}>{label}</Text>
@@ -117,6 +120,7 @@ function TextButton({ label, color, bold, onPress = dismiss }: { label: string; 
 
 /** A 44 x 44 icon button for a header. */
 export function HeaderIcon({ icon, label, color, onPress }: { icon: IconName; label: string; color: string; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.6 }]}>
       <Icon name={icon} size={24} color={color} />
@@ -124,11 +128,11 @@ export function HeaderIcon({ icon, label, color, onPress }: { icon: IconName; la
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   titleBlock: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
   title: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
   subtitle: { color: colors.dim, fontSize: 12, lineHeight: 15 },
   textButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   textButtonText: { fontSize: 17 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-});
+}));

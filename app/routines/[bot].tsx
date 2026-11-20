@@ -14,13 +14,16 @@ import { getConnection } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { notifyOn, setNotify, type PushDeps } from '@/lib/push';
 import { Routines, SCHEDULES, scheduleLabel, whenLabel, type Routine } from '@/lib/routines';
-import { colors, mix, onColor, switchProps } from '@/lib/theme';
+import { onColor } from '@/lib/theme';
 import { Button, SmallButton } from '@/components/Buttons';
 import { Group } from '@/components/Grouped';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // A bot's routines (Hermes cron jobs): what it does on a schedule by itself, like a morning
 // digest. Add, pause, run now, delete; each shows its next run and what its last run said.
 export default function RoutinesScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -121,6 +124,8 @@ interface NotifyMarks {
 
 /** "Notify me": the routine's result goes in the bot's chat and to the phone. Off unless switched on. */
 function NotifySwitch({ value, disabled, spacing, onChange }: { value: boolean; disabled: boolean; spacing: number; onChange: (on: boolean) => void }) {
+  const { switchProps } = useTheme();
+  const styles = useStyles();
   return (
     <View style={[styles.notifyRow, { marginVertical: spacing }]}>
       <View style={{ flex: 1, gap: 2 }}>
@@ -133,6 +138,8 @@ function NotifySwitch({ value, disabled, spacing, onChange }: { value: boolean; 
 }
 
 function NewRoutine({ bot, api, color, notify, onDone }: { bot: string; api: Routines; color: string; notify: NotifyMarks; onDone: (added: boolean) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const botName = useBotName(bot);
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -232,6 +239,8 @@ function NewRoutine({ bot, api, color, notify, onDone }: { bot: string; api: Rou
 }
 
 function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routine: Routine; bot: string; api: Routines; color: string; notify: NotifyMarks; onChanged: () => void }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const botName = useBotName(bot);
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<{ at: number; text: string } | null | undefined>(undefined);
@@ -314,7 +323,7 @@ function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routi
 }
 
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 12 },
   intro: { color: colors.dim, fontSize: 14, lineHeight: 20 },
@@ -337,4 +346,4 @@ const styles = StyleSheet.create({
   chipText: { color: colors.text, fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   formButtons: { flexDirection: 'row', gap: 10 },
-});
+}));

@@ -10,7 +10,8 @@ import { browser } from '@/components/connectorBrowser';
 import { loadManager } from '@/components/manager';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { Connectors, type CatalogEntry, type Connector } from '@/lib/connectors';
-import { colors, mono } from '@/lib/theme';
+import { mono } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 type Health = { state: 'checking' } | { state: 'ok'; tools: number } | { state: 'signin' } | { state: 'error'; message: string };
 
@@ -19,6 +20,8 @@ const healthText = (h: Health, working: string | null) =>
   (h.state === 'checking' ? 'Checking…' : h.state === 'ok' ? `${h.tools} tools` : h.state === 'signin' ? 'Needs you to sign in' : h.message);
 
 export default function ConnectorsScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -244,7 +247,7 @@ export default function ConnectorsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   body: { padding: 16, paddingBottom: 48 },
@@ -256,4 +259,4 @@ const styles = StyleSheet.create({
   error: { color: colors.bad, fontSize: 14, lineHeight: 20 },
   setup: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
   input: { color: colors.text, fontSize: 17, minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.card },
-});
+}));

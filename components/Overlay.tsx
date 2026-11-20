@@ -6,7 +6,8 @@ import { Icon } from '@/components/AppIcons';
 import { useSheetAction } from '@/components/Sheet';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
-import { colors, onColor } from '@/lib/theme';
+import { onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /**
  * Desktop app: a pop-up screen (Look, Model, Connectors, New bot…) as a panel over the dimmed app,
@@ -16,6 +17,8 @@ import { colors, onColor } from '@/lib/theme';
  * `popover`: the bot sheet, a 360 wide popover under the chat title instead of a centered panel.
  */
 export function Overlay({ title, bot, popover = false, children }: { title: string; bot?: string; popover?: boolean; children: ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { width, height } = useWindowDimensions();
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const action = useSheetAction();
@@ -85,7 +88,7 @@ export function Overlay({ title, bot, popover = false, children }: { title: stri
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
   panel: {
     backgroundColor: colors.bg,
@@ -121,4 +124,4 @@ const styles = StyleSheet.create({
   actionText: { fontSize: 14, fontWeight: '600' },
   close: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1 },
-});
+}));

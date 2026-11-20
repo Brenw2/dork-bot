@@ -11,13 +11,15 @@ import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { Connectors, type Connector, type Tool } from '@/lib/connectors';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 type State = { state: 'checking' } | { state: 'ok'; tools: Tool[] } | { state: 'signin' } | { state: 'error'; message: string };
 
 // One connector of a bot (opened from its row in Connectors): its status, its tools, Sign in when it needs it,
 // and Remove. Remove isn't a button on the row any more (design fix 9).
 export default function ConnectorDetail() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot, name } = useLocalSearchParams<{ bot: string; name: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -129,11 +131,11 @@ export default function ConnectorDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, paddingBottom: 48 },
   center: { alignItems: 'center', padding: 32 },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center' },
   error: { color: colors.bad, fontSize: 14, lineHeight: 20, marginHorizontal: 16, marginTop: 8 },
   signIn: { marginTop: 16 },
-});
+}));

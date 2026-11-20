@@ -35,7 +35,8 @@ import { keepWorking } from '@/components/busyWatch';
 import { leaveAction } from '@/lib/busy';
 import { Composer } from '@/components/Composer';
 import { Activity, ApprovalCard, DecisionChip, TypingRow } from '@/components/ChatStatus';
-import { colors, mix, mono } from '@/lib/theme';
+import { mono } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 export { Activity };
 
@@ -59,6 +60,7 @@ interface ChatViewProps {
  * (app/chat/[bot].tsx) and as the chat pane next to the bot list.
  */
 export function ChatView(props: ChatViewProps) {
+  const styles = useStyles();
   const chat = useCurrentChat(props.bot);
   useOnScreen(props.bot);
   if (!chat) {
@@ -72,6 +74,7 @@ export function ChatView(props: ChatViewProps) {
 }
 
 function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusNonce }: ChatViewProps & { chat: string }) {
+  const styles = useStyles();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
@@ -631,6 +634,7 @@ function RoutineNoteView({ note, bot, ctx }: { note: NonNullable<ChatMessage['ro
 
 /** A bot reply: formatted text across the chat's width. 1:1 chats show no name over it (a group room would). */
 export function Reply({ text, bot, streaming = false }: { text: string; bot: string; streaming?: boolean }) {
+  const styles = useStyles();
   const { color } = useBotLook(bot);
   return (
     <View style={styles.reply}>
@@ -641,6 +645,8 @@ export function Reply({ text, bot, streaming = false }: { text: string; bot: str
 
 /** What you sent: a bubble tinted with the bot's color, with any pictures above the text. */
 export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
+  const { mix } = useTheme();
+  const styles = useStyles();
   const { color } = useBotLook(bot);
   const local = message.localImages ?? [];
   const remote = local.length ? [] : (message.images ?? []);
@@ -668,6 +674,8 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
 }
 
 function HermesPicture({ bot, path, count }: { bot: string; path: string; count: number }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { uri, failed } = useHermesImage(bot, path);
   if (uri) return <Picture uri={uri} count={count} />;
   return (
@@ -686,6 +694,7 @@ const pictureSize = (count: number, aspect?: number) => {
 
 /** A sent picture; tap for full size. */
 function Picture({ uri, count }: { uri: string; count: number }) {
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [aspect, setAspect] = useState<number | undefined>();
   useEffect(() => {
@@ -706,7 +715,7 @@ function Picture({ uri, count }: { uri: string; count: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   listWrap: { flex: 1 },
   list: { flex: 1 },
@@ -727,4 +736,4 @@ const styles = StyleSheet.create({
   viewerImage: { width: '100%', height: '100%' },
   text: { color: colors.text, fontSize: BODY_SIZE, lineHeight: 22 },
   warming: { color: colors.dim, fontSize: 13, paddingHorizontal: 16, paddingBottom: 6 },
-});
+}));

@@ -7,11 +7,12 @@ import { useColumnStyle } from '@/components/Column';
 import { saveBot } from '@/lib/bots';
 import { HermesClient, normalizeUrl, type FetchLike } from '@/lib/hermes';
 import { connectionFromParams, validateConnection } from '@/lib/pairing';
-import { colors } from '@/lib/theme';
 import { Button } from '@/components/Buttons';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // Opened by hand, or by a dorkbot://add?url=…&bot=…&key=… pairing link.
 export default function AddBot() {
+  const styles = useStyles();
   const params = useLocalSearchParams();
   const fromLink = connectionFromParams(params);
   const [url, setUrl] = useState(fromLink.url ?? 'https://b-lab.tail7e27a7.ts.net');
@@ -52,6 +53,8 @@ export default function AddBot() {
 }
 
 function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { label, ...input } = props;
   return (
     <View style={{ gap: 6 }}>
@@ -61,7 +64,7 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 20, gap: 18 },
   note: { color: colors.ok, fontSize: 14 },
@@ -76,4 +79,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   error: { color: colors.bad, fontSize: 14 },
-});
+}));

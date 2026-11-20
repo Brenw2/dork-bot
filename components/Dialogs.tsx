@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Icon, type IconName } from '@/components/AppIcons';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 export interface DialogButton {
   text: string;
@@ -62,6 +62,8 @@ const MENU_WIDTH = 248;
 const ITEM_H = 32;
 
 function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>; close: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { width, height } = useWindowDimensions();
   useEscape(close);
   const items = spec.items.filter((i) => i.style !== 'cancel');
@@ -113,6 +115,8 @@ function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>
 }
 
 function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' }>; close: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [typed, setTyped] = useState('');
   const input = useRef<React.ComponentRef<typeof TextInput>>(null);
   useEscape(close);
@@ -177,7 +181,7 @@ function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   menu: {
     position: 'absolute',
     backgroundColor: colors.raised,
@@ -196,7 +200,7 @@ const styles = StyleSheet.create({
   dialog: {
     width: 420,
     maxWidth: '92%',
-    backgroundColor: '#1A1C21',
+    backgroundColor: colors.dialog,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
@@ -221,4 +225,4 @@ const styles = StyleSheet.create({
   cancel: { backgroundColor: 'transparent' },
   off: { backgroundColor: colors.card },
   buttonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-});
+}));

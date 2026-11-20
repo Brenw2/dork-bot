@@ -2,13 +2,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Sprite } from '@/components/BotSprite';
 import { Group, GroupHeader, GroupRow, LEADING_INSET } from '@/components/Grouped';
 import { BOT_COLORS, CHARACTER_IDS, CHARACTERS, lookName, looksOf, type Look } from '@/lib/sprites';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /**
  * Pick a bot's look: color, character, and which version of that character
  * (e.g. a square, round or tall robot). The picked one plays its happy animation.
  */
 export function LookPicker({ value, onChange }: { value: Look; onChange: (look: Look) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const looks = looksOf(value.character);
   return (
     <View style={{ gap: 14 }}>
@@ -75,7 +77,7 @@ export function LookPicker({ value, onChange }: { value: Look; onChange: (look: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   colors: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   swatchRing: { padding: 3, borderRadius: 18, borderWidth: 2, borderColor: 'transparent' },
   swatch: { width: 26, height: 26, borderRadius: 13 },
@@ -93,4 +95,4 @@ const styles = StyleSheet.create({
   heading: { color: colors.dim, fontSize: 13 },
   label: { color: colors.dim, fontSize: 12 },
   check: { fontSize: 22, fontWeight: '700' },
-});
+}));

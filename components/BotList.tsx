@@ -23,8 +23,6 @@ import { connectError, doingLine, errorLine, latestPreview, rowTime, sortRows, t
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { nameOf } from '@/lib/names';
 import type { UsageSnapshot } from '@/lib/usage';
-import { colors, mix } from '@/lib/theme';
-
 const REFRESH_MS = 15_000;
 // The last thing seen for each bot survives leaving and coming back to the list, so rows don't flash empty.
 const previewCache = new Map<string, BotPreview>();
@@ -37,13 +35,16 @@ function useApprovalTick(): number {
 }
 import { RoomListRow } from '@/components/RoomRow';
 import { useRoomRows } from '@/components/roomsClient';
-
+import { makeStyles, useTheme } from '@/components/theme';
+import { THEME_IDS } from '@/lib/themes';
 
 /**
  * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
  * compact: the sidebar next to a chat (desktop and the open Duo in landscape).
  */
 export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, ConnectState>>({});
   const [previews, setPreviews] = useState<Record<string, BotPreview>>(() => Object.fromEntries(previewCache));
@@ -112,6 +113,8 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
       [
         { text: 'Usage…', onPress: () => router.push('/usage') },
         { text: 'Notifications…', onPress: () => router.push('/notifications') },
+        // Only once there is a choice (Classic alone has nothing to pick).
+        ...(THEME_IDS.length > 1 ? [{ text: 'Appearance…', onPress: () => router.push('/appearance') }] : []),
         { text: 'Add with a code…', onPress: () => router.push('/add') },
         { text: 'Show hidden bots', onPress: () => router.push('/new') },
         { text: 'Cancel', style: 'cancel' },
@@ -176,6 +179,8 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
 }
 
 function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boolean; top: number; usage: UsageSnapshot | null; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
@@ -222,6 +227,8 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
 }
 
 function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: SavedBot; compact: boolean; selected: boolean; state: ConnectState | undefined; preview: BotPreview | undefined; onOpen: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const bot = saved.bot;
   const name = nameOf(bot, saved.displayName);
   const mood = useBotMood(bot);
@@ -328,7 +335,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { paddingBottom: 24 },
   listCompact: { paddingHorizontal: 8, paddingBottom: 12, gap: 2 },
@@ -358,7 +365,7 @@ const styles = StyleSheet.create({
   chevron: { color: colors.chevron, fontSize: 15, lineHeight: 20 },
   preview: { flex: 1, color: colors.dim, fontSize: 15, lineHeight: 20 },
   badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: '#1A0B0B', fontSize: 12, fontWeight: '700' },
+  badgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   // Sidebar rows: 64 tall, inset 8, radius 10, avatar 40
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 12, borderRadius: 10 },
   sideText: { flex: 1, gap: 1 },
@@ -367,4 +374,4 @@ const styles = StyleSheet.create({
   sidePreview: { flex: 1, color: colors.dim },
   rowMore: { width: 24, height: 20, alignItems: 'center', justifyContent: 'center' },
   rowMoreText: { color: colors.dim, fontSize: 16, lineHeight: 16, fontWeight: '700' },
-});
+}));

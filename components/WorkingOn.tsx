@@ -4,12 +4,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBotLook } from '@/components/useBotLook';
 import { useWorkingOn } from '@/components/workWatch';
 import { workingOnLine } from '@/lib/work';
+import { makeStyles } from '@/components/theme';
 
 /**
  * "Working on: <title>" under the bot's name while it is busy with work the app didn't start (a
  * terminal run, another bot…). Tap to read that work as it happens. Nothing when the bot is idle.
  */
 export function WorkingOn({ bot }: { bot: string }) {
+  const styles = useStyles();
   const { color } = useBotLook(bot);
   const work = useWorkingOn(bot);
   const { width } = useWindowDimensions();
@@ -33,6 +35,6 @@ export function WorkingOn({ bot }: { bot: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => StyleSheet.create({
   line: { fontSize: 13, lineHeight: 18 },
-});
+}));

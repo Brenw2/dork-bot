@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { isDesktop } from '@/components/desktop';
 import { MemberStack } from '@/components/RoomAvatar';
 import { timeLabel, type RoomRow as Row } from '@/lib/rooms';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /**
  * A room in the bot list (comp g1). Same geometry as the bot rows beside it (components/BotList.tsx BotRow):
@@ -23,6 +23,8 @@ export function RoomListRow({
   selected?: boolean;
   compact?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [hovered, setHovered] = useState(false);
   const big = !isDesktop;
   const working = row.status === 'working' && row.workingId ? `${label(row.workingId)} is working…` : null;
@@ -120,7 +122,7 @@ export function RoomListRow({
 }
 
 // Numbers copied from BotList.tsx so room rows and bot rows line up.
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   row: { flexDirection: 'row', minHeight: 76 },
   rowAvatar: { width: 80, paddingLeft: 16, paddingTop: 12 },
   rowBody: { flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
@@ -133,10 +135,10 @@ const styles = StyleSheet.create({
   chevron: { color: colors.chevron, fontSize: 15, lineHeight: 20 },
   preview: { flex: 1, color: colors.dim, fontSize: 15, lineHeight: 20 },
   badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: '#1A0B0B', fontSize: 12, fontWeight: '700' },
+  badgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 12, borderRadius: 10 },
   sideText: { flex: 1, gap: 1 },
   sideName: { flex: 1, color: colors.text, fontWeight: '600' },
   sideTime: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   sidePreview: { flex: 1, color: colors.dim },
-});
+}));

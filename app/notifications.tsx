@@ -9,13 +9,14 @@ import { listBots } from '@/lib/bots';
 import type { BotMeta } from '@/lib/manager';
 import { mutePatch } from '@/lib/push';
 import { sameHost } from '@/lib/sync';
-import { colors, switchProps } from '@/lib/theme';
 import { BotAvatar } from '@/components/BotSprite';
 import { Button } from '@/components/Buttons';
 import { Group, GroupFootnote, GroupHeader, GroupRow, LEADING_INSET } from '@/components/Grouped';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** The bot's display name (not its profile id), as a grouped-list row with its avatar disc and a switch. */
 function BotSwitchRow({ bot, value, onChange }: { bot: string; value: boolean; onChange: (v: boolean) => void }) {
+  const { switchProps } = useTheme();
   const name = useBotName(bot);
   return (
     <GroupRow
@@ -30,6 +31,7 @@ function BotSwitchRow({ bot, value, onChange }: { bot: string; value: boolean; o
 // (dork_bot.push.muted), so it applies to every phone; the Hermes plugin dork-bot-push does the
 // sending (hermes-plugin/dork-bot-push). A bot's pushes: its replies, approvals and routine results.
 export default function NotificationsScreen() {
+  const styles = useStyles();
   const column = useColumnStyle();
   const [on, setOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -119,9 +121,9 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 14 },
   intro: { color: colors.dim, fontSize: 14, lineHeight: 20 },
   message: { color: colors.text, fontSize: 14, lineHeight: 20 },
-});
+}));

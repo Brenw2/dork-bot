@@ -7,7 +7,8 @@ import { useDesk } from '@/components/ChatStatus';
 import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
 import { MAX_IMAGES, type Attachment } from '@/lib/attachments';
 import { isSendEnter } from '@/lib/enterKey';
-import { colors, onColor } from '@/lib/theme';
+import { onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 const WEB = Platform.OS === 'web';
 const INPUT_PANE_SHARE = 0.4; // desktop: the message box grows to this share of the chat pane's height
@@ -51,6 +52,8 @@ export interface ComposerProps {
  * Keyboard avoidance stays with the screen (KeyboardAvoidingView), since it depends on the header above.
  */
 export function Composer(p: ComposerProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const desk = useDesk();
   const fieldMin = desk ? 44 : 36;
@@ -180,7 +183,7 @@ export function Composer(p: ComposerProps) {
 }
 
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   attachRow: { flexGrow: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   attachRowBody: { gap: 8, paddingHorizontal: 12, paddingTop: 10 },
   thumbWrap: { width: 64, height: 64 },
@@ -200,4 +203,4 @@ const styles = StyleSheet.create({
   input: { color: colors.text, paddingLeft: 14 },
   roundButton: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   hintLine: { color: colors.faint, fontSize: 12, lineHeight: 16, marginTop: 6, marginLeft: 52 },
-});
+}));

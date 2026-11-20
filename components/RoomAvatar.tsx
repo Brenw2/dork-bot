@@ -2,10 +2,11 @@ import { StyleSheet, View } from 'react-native';
 import { Sprite } from '@/components/BotSprite';
 import { useBotLook } from '@/components/useBotLook';
 import type { Mood } from '@/lib/sprites';
-import { colors, mix } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** One bot as a disc: its sprite at 76% on mix(color, tint). The room's own animation state, not the 1:1 chat's. */
 export function MemberDisc({ bot, size, tint = 0.18, mood = 'idle', ring = false }: { bot: string; size: number; tint?: number; mood?: Mood; ring?: boolean }) {
+  const { colors, mix } = useTheme();
   const look = useBotLook(bot);
   const seed = [...bot].reduce((a, c) => a + c.charCodeAt(0), 0) % 11;
   return (
@@ -26,6 +27,7 @@ export function MemberDisc({ bot, size, tint = 0.18, mood = 'idle', ring = false
  * Other sizes scale from the 52 box (desktop uses 40).
  */
 export function MemberStack({ profiles, size = 52 }: { profiles: string[]; size?: number }) {
+  const styles = useStyles();
   const k = size / 52;
   const two = profiles.length === 2;
   const d = Math.round((two ? 33 : 29) * k);
@@ -41,4 +43,4 @@ export function MemberStack({ profiles, size = 52 }: { profiles: string[]; size?
   );
 }
 
-const styles = StyleSheet.create({ abs: { position: 'absolute' } });
+const useStyles = makeStyles(() => StyleSheet.create({ abs: { position: 'absolute' } }));

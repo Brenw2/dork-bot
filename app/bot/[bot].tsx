@@ -15,7 +15,7 @@ import { renameBot, useBotName } from '@/components/useBotName';
 import { useChatModel } from '@/components/useChatModel';
 import type { BotMeta } from '@/lib/manager';
 import { mutePatch } from '@/lib/push';
-import { colors, switchProps } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 type Path = '/look/[bot]' | '/chats/[bot]' | '/routines/[bot]' | '/connectors/[bot]' | '/model/[bot]' | '/routine-results/[bot]';
 
@@ -23,6 +23,8 @@ type Path = '/look/[bot]' | '/chats/[bot]' | '/routines/[bot]' | '/connectors/[b
 // tapping the chat's title, long-pressing a bot in the list, or "Bot settings" in the chat's ⋯.
 // iPhone and Duo: a sheet with Done. Desktop: a 360 wide popover under the title.
 export default function BotSheet() {
+  const { colors, switchProps } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const name = useBotName(bot);
   const { color } = useBotLook(bot);
@@ -112,7 +114,7 @@ export default function BotSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: isDesktop ? 'transparent' : colors.bg },
   body: { padding: 16, gap: 16, paddingBottom: 32 },
   hero: { alignItems: 'center', gap: 4, paddingTop: 4 },
@@ -122,4 +124,4 @@ const styles = StyleSheet.create({
   tile: { flex: 1, height: 68, borderRadius: 12, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', gap: 6 },
   tileLabel: { color: colors.text, fontSize: 13, fontWeight: '500' },
   message: { color: colors.bad, fontSize: 13, lineHeight: 18, paddingHorizontal: 16 },
-});
+}));
