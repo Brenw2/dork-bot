@@ -936,7 +936,7 @@ async function main() {
     for (const screen of SCREENS) {
       if (screen.postures && !screen.postures.includes(posture)) continue;
       if (shape.roomsOnly && !screen.name.startsWith('room-') && !screen.name.startsWith('routine-') && !screen.name.startsWith('usage')) continue;
-      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2, reducedMotion: screen.reducedMotion ? 'reduce' : 'no-preference' });
+      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2, hasTouch: !!screen.touch, reducedMotion: screen.reducedMotion ? 'reduce' : 'no-preference' });
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
