@@ -129,6 +129,13 @@ const STREAM_HISTORY = [
   { id: 2, role: 'assistant', content: STREAM_REPLY },
 ];
 const finished = new Set();
+// 'scroller': a long chat whose reply starts only when the test lets it (so the reader can scroll up first).
+const STREAM_LONG = Array.from({ length: 6 }, (_, i) => [
+  { id: 10 * i + 1, role: 'user', content: `plan my morning ${i + 1}` },
+  { id: 10 * i + 2, role: 'assistant', content: STREAM_REPLY },
+]).flat();
+let releaseScroller = () => {};
+let scrollerGate = new Promise((r) => (releaseScroller = r));
 const deltas = (text) => text.match(/[\s\S]{1,17}/g).map((d) => ['assistant.delta', { delta: d }]);
 
 const RICH_MESSAGES = [
@@ -274,6 +281,10 @@ const SCREENS = [
   { name: 'work-session-done', path: () => '/work-session/assistant?id=local-77be02', waitFor: 'Three themes' },
   // Streaming reply polish (card: stream bot replies): mid-fence, finished, and the same reply loaded from history.
   { name: 'chat-streaming', extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: (page) => sendIn(page, 'streamer', 'plan my morning', 'for (const step of') },
+  // The reader scrolls up, then the reply starts: the 'Jump to latest' pill shows (web: a normal list; the phone's
+  // inverted list is not covered here). The second screen taps it: back at the end, pill gone.
+  { name: 'chat-stream-pill', extraBots: ['scroller'], path: (p) => (resetScroller(), chatPath('scroller')(p)), waitFor: 'That is all.', act: scrollUpThenStream },
+  { name: 'chat-stream-pill-tap', extraBots: ['scroller'], path: (p) => (resetScroller(), chatPath('scroller')(p)), waitFor: 'That is all.', act: async (page) => { await scrollUpThenStream(page); await page.getByRole('button', { name: 'Jump to latest' }).click(); await page.waitForFunction(() => { const el = document.querySelector('[aria-label="Jump to latest"]'); for (let a = el; a; a = a.parentElement) if (getComputedStyle(a).opacity === '0') return true; return !el; }, null, { timeout: 5000 }); await page.waitForTimeout(400); } },
   { name: 'chat-streamed', extraBots: ['finisher'], path: (p) => (finished.delete('finisher'), chatPath('finisher')(p)), waitFor: 'Any time.', act: (page) => sendIn(page, 'finisher', 'plan my morning', 'That is all.') },
   { name: 'chat-streamed-history', extraBots: ['historian'], path: chatPath('historian'), waitFor: 'That is all.' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
@@ -311,6 +322,25 @@ function chatPath(bot) {
 }
 const typeIn = async (page, bot, text) => page.getByLabel(`Message ${bot}`).fill(text);
 // Send a message (Enter sends on the web) and wait for what the reply should show.
+function resetScroller() {
+  scrollerGate = new Promise((r) => (releaseScroller = r));
+}
+async function scrollUpThenStream(page) {
+  await typeIn(page, 'scroller', 'plan my morning');
+  await page.getByLabel('Message scroller').press('Enter');
+  // Scroll the transcript to the top (the web list is a normal list), then let the reply start.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('*')) {
+      const o = getComputedStyle(el).overflowY;
+      if ((o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 400) el.scrollTop = 0;
+    }
+  });
+  await page.waitForTimeout(400);
+  releaseScroller();
+  await page.getByRole('button', { name: 'Jump to latest' }).waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForTimeout(400); // the 150 ms fade
+}
+
 async function sendIn(page, bot, text, wait) {
   await typeIn(page, bot, text);
   await page.getByLabel(`Message ${bot}`).press('Enter');
@@ -333,6 +363,11 @@ async function fakeHermes(route) {
     if (bot === 'failer') return json(500, { error: 'model runner crashed' });
     answered.delete(`run-${bot}`);
     // streamer: the reply stops mid code fence and the stream drops. finisher: the same reply, to the end.
+    if (bot === 'scroller') {
+      await scrollerGate;
+      const ev = [['run.started', { run_id: 'run-scroller' }], ...deltas(STREAM_PARTIAL)];
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: ev.map(([e, d]) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`).join('') });
+    }
     if (bot === 'streamer' || bot === 'finisher') {
       const done = bot === 'finisher';
       if (done) finished.add(bot); // Hermes now has the reply in its history
@@ -368,7 +403,7 @@ async function fakeHermes(route) {
   if (/\/api\/jobs$/.test(p)) return json(200, { jobs: bot === 'assistant' ? JOBS : [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
   const sid = p.match(/\/api\/sessions\/([^/]+)/)?.[1];
-  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'historian' || finished.has(bot) ? STREAM_HISTORY : bot === 'coder' ? RICH_MESSAGES : bot === 'newsie' ? NOTE_MESSAGES : MESSAGES) });
+  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'scroller' ? STREAM_LONG : bot === 'historian' || finished.has(bot) ? STREAM_HISTORY : bot === 'coder' ? RICH_MESSAGES : bot === 'newsie' ? NOTE_MESSAGES : MESSAGES) });
   if (WORK_MESSAGES[sid] && /\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: WORK_SESSIONS.find((w) => w.id === sid) });
   if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
   // chief: moved to Anthropic while its chat still says gemma4:31b (what broke it on 2026-11-03).
