@@ -99,7 +99,8 @@ function Screens(): ReactNode {
       {/* The chat draws its own one-row header (components/ChatHeader.tsx). */}
       <Stack.Screen name="chat/[bot]" options={{ title: '', headerShown: false }} />
       <Stack.Screen name="bot/[bot]" options={popup('Bot settings')} />
-      <Stack.Screen name="room/[id]" options={{ title: 'Group' }} />
+      {/* The room draws its own one-row header too (RoomHeader in components/RoomChat.tsx). */}
+      <Stack.Screen name="room/[id]" options={{ title: '', headerShown: false }} />
       <Stack.Screen name="room-new" options={popup('New group chat')} />
       <Stack.Screen name="look/[bot]" options={popup('Look')} />
       <Stack.Screen name="gallery" options={{ title: 'Gallery' }} />

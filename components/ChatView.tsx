@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Image, Modal, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { fetch } from '@/components/net';
 import { chatName } from '@/lib/chats';
 import { distanceFromEnd, jumpVisible } from '@/lib/jumpPill';
@@ -11,6 +11,7 @@ import { whenLabel } from '@/lib/routines';
 import { RoutineCard } from '@/components/RoutineCard';
 import { BotSprite } from '@/components/BotSprite';
 import { JumpPill } from '@/components/JumpPill';
+import { ScreenFrame } from '@/components/ScreenFrame';
 import { Markdown, StreamingMarkdown, BODY_SIZE } from '@/components/Markdown';
 import { isDesktop } from '@/components/desktop';
 import { useHermesImage } from '@/components/useHermesImage';
@@ -456,13 +457,37 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
   const retryIn = useRetryCountdown(!client && !!state.failure, attempt);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
+    <ScreenFrame
       onLayout={WEB ? (e) => setPaneHeight(e.nativeEvent.layout.height) : undefined}
+      header={<ChatHeader bot={bot} pane={inPane} list={list} model={model} />}
+      composer={
+        <Composer
+          value={draft}
+          onChangeText={setDraft}
+          onSend={send}
+          canSend={canSend}
+          placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
+          label={`Message ${name}`}
+          color={color}
+          stop={running && !remote ? { onPress: stop, disabled: !state.runId } : undefined}
+          enabled={!!client}
+          dimmed={disconnected}
+          images={attached}
+          onImages={addImages}
+          onRemoveImage={(i) =>
+            setAttached((cur) => {
+              const next = cur.filter((_, j) => j !== i);
+              setAttachError(attachmentProblem(next));
+              return next;
+            })
+          }
+          attachError={attachError}
+          onAttachError={setAttachError}
+          paneHeight={paneHeight}
+          column={column}
+        />
+      }
     >
-      <ChatHeader bot={bot} pane={inPane} list={list} model={model} />
       {model.problem ? <ModelBanner bot={bot} problem={model.problem} /> : null}
       {state.failure && describeFailure(state.failure, name).place === 'banner' ? (
         <FailureBanner failure={state.failure} name={name} secondsToRetry={retryIn} onRetry={() => setAttempt((n) => n + 1)} onPair={() => router.push('/add')} />
@@ -530,32 +555,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
           {warming.map((w) => w.name).join(', ')} still connecting to {bot}, about {Math.max(...warming.map((w) => w.secondsLeft))} s
         </Text>
       ) : null}
-      <Composer
-        value={draft}
-        onChangeText={setDraft}
-        onSend={send}
-        canSend={canSend}
-        placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
-        label={`Message ${name}`}
-        color={color}
-        stop={running && !remote ? { onPress: stop, disabled: !state.runId } : undefined}
-        enabled={!!client}
-        dimmed={disconnected}
-        images={attached}
-        onImages={addImages}
-        onRemoveImage={(i) =>
-          setAttached((cur) => {
-            const next = cur.filter((_, j) => j !== i);
-            setAttachError(attachmentProblem(next));
-            return next;
-          })
-        }
-        attachError={attachError}
-        onAttachError={setAttachError}
-        paneHeight={paneHeight}
-        column={column}
-      />
-    </KeyboardAvoidingView>
+    </ScreenFrame>
   );
 }
 

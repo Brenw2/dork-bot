@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/AppIcons';
 import { Alert, Menu } from '@/components/alert';
 import { Composer } from '@/components/Composer';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
 import { useOnScreenRoom } from '@/components/notifications';
 import { MemberDisc, MemberStack } from '@/components/RoomAvatar';
+import { ScreenFrame } from '@/components/ScreenFrame';
 import { getSeen, memberLabels, newId, roomLink, sendStore, setSeen } from '@/components/roomsClient';
 import { lookFor } from '@/components/useBotLook';
 import { loadManager } from '@/components/manager';
 import { listBots } from '@/lib/bots';
-import { keyboardOffset } from '@/lib/keyboardOffset';
 import { nameOf } from '@/lib/names';
 import {
   buildTranscript,
@@ -165,25 +167,59 @@ export function RoomActions({ room }: { room: Room | null }) {
         },
       },
     ]);
-  const more = () =>
-    Menu.show(room.name, [
-      { text: 'Rename…', onPress: rename },
-      { text: 'Members', onPress: members },
-      { text: 'Disband…', style: 'destructive', onPress: disband },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const more = (anchor?: { x: number; y: number }) =>
+    Menu.show(
+      room.name,
+      [
+        { text: 'Members', onPress: members },
+        { text: 'Rename…', onPress: rename },
+        { text: 'Disband…', style: 'destructive', onPress: disband },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      anchor,
+    );
+  // The same ⋯ circle button as the 1:1 chat header (ChatHeader), on the phone and on desktop. No gear.
+  const big = !isDesktop;
+  const hit = big ? 44 : 32;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <HeaderButton label={isDesktop ? 'Group settings' : 'More'} glyph={isDesktop ? '⚙' : '⋯'} onPress={more} />
-    </View>
+    <Pressable
+      onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+      accessibilityRole="button"
+      accessibilityLabel={`More for ${room.name}`}
+      style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
+        { width: hit, height: hit, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+        (hovered || pressed) && !big && { backgroundColor: colors.raised },
+        pressed && big && { opacity: 0.6 },
+      ]}
+    >
+      <Icon name="ellipsis" size={big ? 24 : 19} color={colors.accent} />
+    </Pressable>
   );
 }
 
-function HeaderButton({ label, glyph, onPress }: { label: string; glyph: string; onPress: () => void }) {
+// The room's one-row header, built like ChatHeader (components/ChatHeader.tsx) and drawn by the screen, not the native
+// stack (app/_layout.tsx: room/[id] is headerShown: false). Phone: back "‹ Bots", the title block (member stack, name,
+// members; tap for Members) and ⋯. Two panes (desktop, open Duo landscape): no back, 56 tall with a hairline under it.
+export function RoomHeader({ room, pane }: { room: Room | null; pane: boolean }) {
+  const insets = useSafeAreaInsets();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={4} style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.6 }]}>
-      <Text style={{ color: colors.accent, fontSize: 20 }}>{glyph}</Text>
-    </Pressable>
+    <View style={[styles.headerBar, pane ? styles.paneHeader : { height: 52 + insets.top, paddingTop: insets.top, paddingHorizontal: 4 }]}>
+      {pane ? null : (
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the bots"
+          style={({ pressed }) => [styles.headerBack, pressed && { opacity: 0.6 }]}
+        >
+          <Icon name="back" size={31} color={colors.accent} stroke={2.6} />
+          <Text style={{ color: colors.accent, fontSize: 17 }} maxFontSizeMultiplier={1.4}>Bots</Text>
+        </Pressable>
+      )}
+      <View style={[styles.headerCenter, pane && { alignItems: 'flex-start' }]}>
+        <RoomTitle room={room} />
+      </View>
+      <RoomActions room={room} />
+    </View>
   );
 }
 
@@ -205,8 +241,6 @@ function stamp(at: number): { day: string; time: string } {
 
 export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidth?: number; inPane?: boolean }) {
   useOnScreenRoom(id);
-  const kav = useRef<{ measureInWindow: (cb: (x: number, y: number) => void) => void }>(null);
-  const [top, setTop] = useState(0);
   const [paneHeight, setPaneHeight] = useState(0);
   const room = useRoomInfo(id);
   const info = useMemberInfo();
@@ -364,24 +398,51 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
   }
 
   return (
-    <KeyboardAvoidingView
-      ref={kav as never}
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={keyboardOffset(Platform.OS, inPane, top)}
-      onLayout={(e) => {
-        if (Platform.OS === 'web') setPaneHeight(e.nativeEvent.layout.height);
-        // Where this view starts on screen = the native header's height (see lib/keyboardOffset.ts).
-        if (Platform.OS === 'ios' && !inPane) kav.current?.measureInWindow((_x, y) => setTop(y));
-      }}
+    <ScreenFrame
+      onLayout={(e) => Platform.OS === 'web' && setPaneHeight(e.nativeEvent.layout.height)}
+      header={<RoomHeader room={room} pane={inPane} />}
+      composer={
+        <Composer
+          value={text}
+          onChangeText={(t) => {
+            // Typing at the end moves the caret with it (the selection event can lag a frame behind).
+            if (caret >= text.length) setCaret(t.length);
+            setText(t);
+          }}
+          above={sugg.length ? (
+            <View style={[styles.popover, isDesktop && { width: 360, right: undefined }]} accessibilityRole="menu">
+              {sugg.map((s, i) => (
+                <View key={s.handle}>
+                  {s.kind === 'all' && i > 0 ? <View style={styles.popLine} /> : null}
+                  <Pressable onPress={() => choose(s.handle)} accessibilityRole="menuitem" style={[styles.popRow, isDesktop && { height: 40 }, i === pick && { backgroundColor: '#2E3238' }]}>
+                    {s.kind === 'all' ? (
+                      <View style={[styles.allDisc, isDesktop && { width: 26, height: 26 }]}>
+                        <Text style={{ color: colors.accent, fontSize: 13 }}>👥</Text>
+                      </View>
+                    ) : (
+                      <MemberDisc bot={members.find((m) => m.handle === s.handle)?.profile ?? s.handle} size={isDesktop ? 26 : 28} />
+                    )}
+                    <Text style={styles.popName}>{s.label}</Text>
+                    <Text style={styles.popHandle}>@{s.handle}</Text>
+                    <Text style={styles.popJob} numberOfLines={1}>{s.kind === 'all' ? `All ${members.length} members` : (s.job ?? '')}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          onSend={() => void send()}
+          canSend={canSend}
+          placeholder={placeholder}
+          label={`Message ${room?.name ?? 'the group'}`}
+          color={colors.accent}
+          stop={busy ? { onPress: () => void stop(), label: 'Stop the room' } : undefined}
+          paneHeight={paneHeight}
+          column={column}
+          onKey={onKey}
+          onSelectionChange={setCaret}
+        />
+      }
     >
-      {inPane ? (
-        <View style={styles.paneHeader}>
-          <RoomTitle room={room} />
-          <View style={{ flex: 1 }} />
-          <RoomActions room={room} />
-        </View>
-      ) : null}
       <ScrollView ref={scroll as never} style={{ flex: 1 }} contentContainerStyle={[styles.transcript, column]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {items.map((it, i) => (
           <Row key={it.seq} roomId={id} it={it} prev={items[i - 1]} info={info} members={members} unanswered={it.type === 'member' && it.needsYou && it.seq > lastUserSeq} />
@@ -439,47 +500,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
           {error}
         </Text>
       ) : null}
-
-      <Composer
-        value={text}
-        onChangeText={(t) => {
-          // Typing at the end moves the caret with it (the selection event can lag a frame behind).
-          if (caret >= text.length) setCaret(t.length);
-          setText(t);
-        }}
-        above={sugg.length ? (
-          <View style={[styles.popover, isDesktop && { width: 360, right: undefined }]} accessibilityRole="menu">
-            {sugg.map((s, i) => (
-              <View key={s.handle}>
-                {s.kind === 'all' && i > 0 ? <View style={styles.popLine} /> : null}
-                <Pressable onPress={() => choose(s.handle)} accessibilityRole="menuitem" style={[styles.popRow, isDesktop && { height: 40 }, i === pick && { backgroundColor: '#2E3238' }]}>
-                  {s.kind === 'all' ? (
-                    <View style={[styles.allDisc, isDesktop && { width: 26, height: 26 }]}>
-                      <Text style={{ color: colors.accent, fontSize: 13 }}>👥</Text>
-                    </View>
-                  ) : (
-                    <MemberDisc bot={members.find((m) => m.handle === s.handle)?.profile ?? s.handle} size={isDesktop ? 26 : 28} />
-                  )}
-                  <Text style={styles.popName}>{s.label}</Text>
-                  <Text style={styles.popHandle}>@{s.handle}</Text>
-                  <Text style={styles.popJob} numberOfLines={1}>{s.kind === 'all' ? `All ${members.length} members` : (s.job ?? '')}</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        onSend={() => void send()}
-        canSend={canSend}
-        placeholder={placeholder}
-        label={`Message ${room?.name ?? 'the group'}`}
-        color={colors.accent}
-        stop={busy ? { onPress: () => void stop(), label: 'Stop the room' } : undefined}
-        paneHeight={paneHeight}
-        column={column}
-        onKey={onKey}
-        onSelectionChange={setCaret}
-      />
-    </KeyboardAvoidingView>
+    </ScreenFrame>
   );
 }
 
@@ -608,8 +629,10 @@ const styles = StyleSheet.create({
   goneTitle: { color: colors.text, fontSize: 20, fontWeight: '600' },
   goneText: { color: colors.dim, fontSize: 15 },
   goneBtn: { marginTop: 8, height: 44, borderRadius: 22, paddingHorizontal: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  headerBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg },
+  headerBack: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 6 },
+  headerCenter: { flex: 1, alignItems: 'center', minWidth: 0 },
   paneHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 56, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  headerBtn: { width: 44, height: isDesktop ? 32 : 44, alignItems: 'center', justifyContent: 'center' },
   transcript: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
   empty: { color: colors.dim, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 48, paddingHorizontal: 24 },
   sep: { alignSelf: 'center', color: colors.dim, fontSize: 12, lineHeight: 16, fontWeight: '500', marginTop: 14 },
