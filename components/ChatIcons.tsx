@@ -24,6 +24,16 @@ export function ArrowUpIcon({ size, color, stroke = 2.6 }: IconProps) {
   );
 }
 
+/** Jump to latest: a small down arrow. */
+export function ArrowDownIcon({ size, color, stroke = 2 }: IconProps) {
+  return (
+    <Svg {...base(size, color, stroke)}>
+      <Path d="M12 4v15" />
+      <Path d="M5.5 12.5 12 19l6.5-6.5" />
+    </Svg>
+  );
+}
+
 /** The attach button's plus. */
 export function PlusIcon({ size, color, stroke = 2 }: IconProps) {
   return (

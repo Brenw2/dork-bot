@@ -121,6 +121,16 @@ const RICH_REPLY = [
   '- [ ] add a live test for the timeout',
 ].join('\n');
 const PICTURE = `data:image/png;base64,${readFileSync(join(ROOT, 'assets', 'icon.png')).toString('base64')}`;
+// A reply as it streams in (lib/streamBlocks.ts): a list, then a code fence. STREAM_PARTIAL stops inside the fence.
+const STREAM_REPLY = "Here is a quick plan.\n\nThree steps:\n\n1. Check the calendar\n2. Draft the note\n3. Send it\n\nA first version:\n\n```ts\nconst plan = ['check', 'draft', 'send'];\n\nfor (const step of plan) run(step);\n```\n\nThat is all.";
+const STREAM_PARTIAL = STREAM_REPLY.slice(0, STREAM_REPLY.indexOf('plan) run'));
+const STREAM_HISTORY = [
+  { id: 1, role: 'user', content: 'plan my morning' },
+  { id: 2, role: 'assistant', content: STREAM_REPLY },
+];
+const finished = new Set();
+const deltas = (text) => text.match(/[\s\S]{1,17}/g).map((d) => ['assistant.delta', { delta: d }]);
+
 const RICH_MESSAGES = [
   { id: 1, role: 'user', content: 'why does this test fail?\n\n[Image attached at: /home/b/.hermes/profiles/coder/cache/documents/native-inputs/aa/api_aa.png]\n[screenshot]' },
   { id: 2, role: 'assistant', content: RICH_REPLY },
@@ -262,6 +272,10 @@ const SCREENS = [
   { name: 'work', path: () => '/work/assistant', waitFor: 'Summarize this week' },
   { name: 'work-session', path: () => '/work-session/assistant?id=local-3f9a1c', waitFor: 'The test reads the clock' },
   { name: 'work-session-done', path: () => '/work-session/assistant?id=local-77be02', waitFor: 'Three themes' },
+  // Streaming reply polish (card: stream bot replies): mid-fence, finished, and the same reply loaded from history.
+  { name: 'chat-streaming', extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: (page) => sendIn(page, 'streamer', 'plan my morning', 'for (const step of') },
+  { name: 'chat-streamed', extraBots: ['finisher'], path: (p) => (finished.delete('finisher'), chatPath('finisher')(p)), waitFor: 'Any time.', act: (page) => sendIn(page, 'finisher', 'plan my morning', 'That is all.') },
+  { name: 'chat-streamed-history', extraBots: ['historian'], path: chatPath('historian'), waitFor: 'That is all.' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
@@ -318,6 +332,13 @@ async function fakeHermes(route) {
     if (bot === 'thinker') return new Promise(() => {});
     if (bot === 'failer') return json(500, { error: 'model runner crashed' });
     answered.delete(`run-${bot}`);
+    // streamer: the reply stops mid code fence and the stream drops. finisher: the same reply, to the end.
+    if (bot === 'streamer' || bot === 'finisher') {
+      const done = bot === 'finisher';
+      if (done) finished.add(bot); // Hermes now has the reply in its history
+      const ev = [['run.started', { run_id: `run-${bot}` }], ...deltas(done ? STREAM_REPLY : STREAM_PARTIAL), ...(done ? [['assistant.completed', { content: STREAM_REPLY }], ['run.completed', {}]] : [])];
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: ev.map(([e, d]) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`).join('') });
+    }
     const events = [
       ['run.started', { run_id: `run-${bot}` }],
       ['tool.started', { tool_name: 'terminal', preview: 'ls ~/notes' }],
@@ -347,7 +368,7 @@ async function fakeHermes(route) {
   if (/\/api\/jobs$/.test(p)) return json(200, { jobs: bot === 'assistant' ? JOBS : [] });
   if (/\/api\/sessions$/.test(p) && req.method() === 'POST') return json(409, { error: 'exists' });
   const sid = p.match(/\/api\/sessions\/([^/]+)/)?.[1];
-  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'coder' ? RICH_MESSAGES : bot === 'newsie' ? NOTE_MESSAGES : MESSAGES) });
+  if (/\/api\/sessions\/[^/]+\/messages$/.test(p)) return json(200, { data: WORK_MESSAGES[sid] ?? (bot === 'historian' || finished.has(bot) ? STREAM_HISTORY : bot === 'coder' ? RICH_MESSAGES : bot === 'newsie' ? NOTE_MESSAGES : MESSAGES) });
   if (WORK_MESSAGES[sid] && /\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: WORK_SESSIONS.find((w) => w.id === sid) });
   if (/\/api\/sessions\/[^/]+$/.test(p)) return json(200, { session: { id: 'dork-bot-assistant', model: 'gemma4:31b' } });
   // chief: moved to Anthropic while its chat still says gemma4:31b (what broke it on 2026-11-03).
