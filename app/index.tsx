@@ -86,7 +86,7 @@ export default function Home() {
       ) : null}
       <View style={styles.detail}>
         {selectedRoom && !selected ? (
-          <RoomChat key={selectedRoom} id={selectedRoom} inPane maxWidth={isDesktop ? DESKTOP_CHAT_MAX : CHAT_MAX_WIDTH} />
+          <RoomChat key={selectedRoom} id={selectedRoom} inPane maxWidth={isDesktop ? DESKTOP_CHAT_MAX : CHAT_MAX_WIDTH} list={{ hidden: !showList, toggle: () => setListHidden(showList) }} />
         ) : selected ? (
           <ChatView
             key={selected}
