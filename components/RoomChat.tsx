@@ -111,14 +111,14 @@ export function RoomTitle({ room }: { room: Room | null }) {
       accessibilityRole="button"
       accessibilityLabel="Members"
       hitSlop={{ top: 6, bottom: 6 }}
-      style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 8 }, pressed && { opacity: 0.6 }, isDesktop && ({ cursor: 'pointer' } as object)]}
+      style={({ pressed }) => [styles.titleBlock, pressed && { backgroundColor: colors.raised }, isDesktop && ({ cursor: 'pointer' } as object)]}
     >
       <MemberStack profiles={room.members.map((m) => m.profile)} size={32} />
       <View style={{ flexShrink: 1 }}>
-        <Text style={{ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }} numberOfLines={1}>
+        <Text style={{ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }} numberOfLines={1} maxFontSizeMultiplier={1.4}>
           {room.name}
         </Text>
-        <Text style={{ color: colors.dim, fontSize: 12, lineHeight: 16 }} numberOfLines={1}>
+        <Text style={{ color: colors.dim, fontSize: 12, lineHeight: 16 }} numberOfLines={1} maxFontSizeMultiplier={1.4}>
           {room.members.map((m) => info.name(m)).join(', ')}
         </Text>
       </View>
@@ -171,9 +171,9 @@ export function RoomActions({ room }: { room: Room | null }) {
     Menu.show(
       room.name,
       [
-        { text: 'Members', onPress: members },
-        { text: 'Rename…', onPress: rename },
-        { text: 'Disband…', style: 'destructive', onPress: disband },
+        { text: 'Members', icon: 'info', onPress: members },
+        { text: 'Rename…', icon: 'pencil', onPress: rename },
+        { text: 'Disband…', icon: 'trash', style: 'destructive', onPress: disband },
         { text: 'Cancel', style: 'cancel' },
       ],
       anchor,
@@ -200,11 +200,41 @@ export function RoomActions({ room }: { room: Room | null }) {
 // The room's one-row header, built like ChatHeader (components/ChatHeader.tsx) and drawn by the screen, not the native
 // stack (app/_layout.tsx: room/[id] is headerShown: false). Phone: back "‹ Bots", the title block (member stack, name,
 // members; tap for Members) and ⋯. Two panes (desktop, open Duo landscape): no back, 56 tall with a hairline under it.
-export function RoomHeader({ room, pane }: { room: Room | null; pane: boolean }) {
+export function RoomHeader({ room, pane, list }: { room: Room | null; pane: boolean; list?: { hidden: boolean; toggle: () => void } }) {
   const insets = useSafeAreaInsets();
+  const big = !isDesktop;
+  const hit = big ? 44 : 32;
+  // Desktop shortcut, as in ChatHeader: Ctrl+\ shows or hides the bot list.
+  useEffect(() => {
+    if (!isDesktop || !list) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.altKey && !e.metaKey && e.key === '\\') {
+        e.preventDefault();
+        list.toggle();
+      }
+    };
+    globalThis.addEventListener?.('keydown', onKey);
+    return () => globalThis.removeEventListener?.('keydown', onKey);
+  }, [list]);
   return (
-    <View style={[styles.headerBar, pane ? styles.paneHeader : { height: 52 + insets.top, paddingTop: insets.top, paddingHorizontal: 4 }]}>
-      {pane ? null : (
+    <View style={[styles.headerBar, pane ? styles.paneHeader : { height: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
+      {pane ? (
+        list ? (
+          <Pressable
+            onPress={list.toggle}
+            accessibilityRole="button"
+            accessibilityLabel={list.hidden ? 'Show the bot list' : 'Hide the bot list'}
+            style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
+              styles.headerIcon,
+              { width: hit, height: hit },
+              (hovered || pressed) && !big && { backgroundColor: colors.raised },
+              pressed && big && { opacity: 0.6 },
+            ]}
+          >
+            <Icon name="sidebar" size={big ? 24 : 19} color={colors.dim} />
+          </Pressable>
+        ) : null
+      ) : (
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
           accessibilityRole="button"
@@ -239,7 +269,7 @@ function stamp(at: number): { day: string; time: string } {
   return { day, time: clockTime(at) };
 }
 
-export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidth?: number; inPane?: boolean }) {
+export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; maxWidth?: number; inPane?: boolean; list?: { hidden: boolean; toggle: () => void } }) {
   useOnScreenRoom(id);
   const [paneHeight, setPaneHeight] = useState(0);
   const room = useRoomInfo(id);
@@ -400,7 +430,7 @@ export function RoomChat({ id, maxWidth, inPane = false }: { id: string; maxWidt
   return (
     <ScreenFrame
       onLayout={(e) => Platform.OS === 'web' && setPaneHeight(e.nativeEvent.layout.height)}
-      header={<RoomHeader room={room} pane={inPane} />}
+      header={<RoomHeader room={room} pane={inPane} list={list} />}
       composer={
         <Composer
           value={text}
@@ -630,9 +660,11 @@ const styles = StyleSheet.create({
   goneText: { color: colors.dim, fontSize: 15 },
   goneBtn: { marginTop: 8, height: 44, borderRadius: 22, paddingHorizontal: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   headerBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg },
+  titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, paddingVertical: 4, paddingHorizontal: 6, maxWidth: '100%' },
+  headerIcon: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   headerBack: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 6 },
   headerCenter: { flex: 1, alignItems: 'center', minWidth: 0 },
-  paneHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 56, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  paneHeader: { height: 56, paddingHorizontal: isDesktop ? 12 : 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   transcript: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
   empty: { color: colors.dim, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 48, paddingHorizontal: 24 },
   sep: { alignSelf: 'center', color: colors.dim, fontSize: 12, lineHeight: 16, fontWeight: '500', marginTop: 14 },
