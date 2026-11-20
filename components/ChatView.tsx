@@ -3,13 +3,15 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { ActivityIndicator, AppState, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { fetch } from '@/components/net';
 import { chatName } from '@/lib/chats';
+import { distanceFromEnd, jumpVisible } from '@/lib/jumpPill';
 import { noteIndex } from '@/lib/routineNotes';
 import { focusPosition, focusStep, ROUTINE_FOCUS, ROUTINE_MOTION } from '@/lib/routineCard';
 import { focusKey, shouldFocus } from '@/lib/push';
 import { whenLabel } from '@/lib/routines';
 import { RoutineCard } from '@/components/RoutineCard';
 import { BotSprite } from '@/components/BotSprite';
-import { Markdown, BODY_SIZE } from '@/components/Markdown';
+import { JumpPill } from '@/components/JumpPill';
+import { Markdown, StreamingMarkdown, BODY_SIZE } from '@/components/Markdown';
 import { isDesktop } from '@/components/desktop';
 import { useHermesImage } from '@/components/useHermesImage';
 import { attachmentProblem, MAX_IMAGES, messageBody, type Attachment } from '@/lib/attachments';
@@ -337,9 +339,29 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
   const rows = useMemo(() => (WEB ? chatRows(state, queuedText) : chatRows(state, queuedText).reverse()), [state, queuedText]);
   const listRef = useRef<FlatList<ChatRow>>(null);
   const pinned = useRef(true);
+  // "Jump to latest": the reader scrolled up while the reply kept coming (Design's streaming spec).
+  const viewport = useRef(0);
+  const distance = useRef(0);
+  const [unseen, setUnseen] = useState(false);
+  const [farUp, setFarUp] = useState(false);
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    pinned.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 80;
+    viewport.current = layoutMeasurement.height;
+    distance.current = distanceFromEnd({ inverted: !WEB, offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height });
+    pinned.current = distance.current < 80;
+    if (pinned.current) setUnseen(false);
+    setFarUp(distance.current > layoutMeasurement.height);
+  };
+  // New reply text while the reader is not at the end: remember it, so the pill can offer the way back.
+  const streamedLength = state.pending?.text.length ?? 0;
+  useEffect(() => {
+    if (streamedLength > 0 && !pinned.current) setUnseen(true);
+  }, [streamedLength]);
+  const jumpToLatest = () => {
+    pinned.current = true;
+    setUnseen(false);
+    setFarUp(false);
+    listRef.current?.scrollToOffset({ offset: WEB ? contentHeight.current : 0, animated: true });
   };
   // scrollToEnd does nothing here until the list has measured itself, so scroll to the height we're given.
   const contentHeight = useRef(0);
@@ -445,13 +467,17 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
       {state.failure && describeFailure(state.failure, name).place === 'banner' ? (
         <FailureBanner failure={state.failure} name={name} secondsToRetry={retryIn} onRetry={() => setAttempt((n) => n + 1)} onPair={() => router.push('/add')} />
       ) : null}
+      <View style={styles.listWrap}>
       <FlatList
         ref={listRef}
         inverted={!WEB}
+        onScroll={onScroll}
+        scrollEventThrottle={50}
+        // Phone (inverted list): keep what the reader is looking at in place while the newest row grows, unless
+        // they're at the end, where the list stays pinned to it.
+        {...(WEB ? null : { maintainVisibleContentPosition: { minIndexForVisible: 1, autoscrollToTopThreshold: 80 } })}
         {...(WEB
           ? {
-              onScroll,
-              scrollEventThrottle: 50,
               onContentSizeChange: (_w: number, h: number) => followBottom(h),
               onLayout: () => followBottom(),
               // Chats are short enough to draw whole; virtualizing from the top made the list jump
@@ -496,6 +522,8 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
           />
         )}
       />
+      <JumpPill visible={jumpVisible({ distanceFromEnd: farUp ? distance.current : 0, viewport: viewport.current, unseen })} onPress={jumpToLatest} />
+      </View>
       {/* connection and key problems are a banner under the nav (above); a failed turn is a card in the transcript */}
       {warming.length ? (
         <Text style={[styles.warming, column]} accessibilityLiveRegion="polite">
@@ -568,7 +596,7 @@ function RowBody({ row, bot, since, approval, routine }: { row: ChatRow; bot: st
     case 'activity':
       return <Activity tools={row.tools} live={row.live} />;
     case 'pending':
-      return row.text ? <Reply text={row.text} bot={bot} /> : <TypingRow bot={bot} since={since} />;
+      return row.text ? <Reply text={row.text} bot={bot} streaming /> : <TypingRow bot={bot} since={since} />;
     case 'approval':
       return <ApprovalCard request={row.request} bot={bot} busy={approval.busy} onAnswer={approval.onAnswer} />;
     case 'failure':
@@ -602,11 +630,11 @@ function RoutineNoteView({ note, bot, ctx }: { note: NonNullable<ChatMessage['ro
 }
 
 /** A bot reply: formatted text across the chat's width. 1:1 chats show no name over it (a group room would). */
-export function Reply({ text, bot }: { text: string; bot: string }) {
+export function Reply({ text, bot, streaming = false }: { text: string; bot: string; streaming?: boolean }) {
   const { color } = useBotLook(bot);
   return (
     <View style={styles.reply}>
-      <Markdown text={text} accent={color} />
+      {streaming ? <StreamingMarkdown text={text} accent={color} /> : <Markdown text={text} accent={color} />}
     </View>
   );
 }
@@ -680,6 +708,7 @@ function Picture({ uri, count }: { uri: string; count: number }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  listWrap: { flex: 1 },
   list: { flex: 1 },
   // No list gap: each row carries its own space above it (rowGap).
   listBody: { flexGrow: 1, padding: 14 },

@@ -11,6 +11,7 @@ import { colors, mono } from '@/lib/theme';
 import { isDesktop } from '@/components/desktop';
 import { isBareLink, shortUrl } from '@/lib/shortUrl';
 import { CopyIcon } from '@/components/icons';
+import { splitStreaming } from '@/lib/streamBlocks';
 
 // Code shows the exact characters: no ligatures (">=" must not turn into "≥"), and a real
 // programming font where the desktop has one.
@@ -21,6 +22,22 @@ const CODE_BG = '#0B0C0E';
 
 /** Reply text size: 17 on the phone, 16 on the desktop (design fix 7). Lines are 24 on both. */
 export const BODY_SIZE = isDesktop ? 16 : 17;
+
+/**
+ * A reply that is still arriving: finished blocks are formatted, the last open block is plain text (an open code
+ * fence is plain monospace inside its box), so half-written markdown doesn't flicker or reflow what's on screen.
+ * When the reply ends the whole text is formatted at once: the same result as a reply loaded from history.
+ */
+export function StreamingMarkdown({ text, accent }: { text: string; accent: string }) {
+  const { done, open, fence } = useMemo(() => splitStreaming(text), [text]);
+  return (
+    <View style={styles.doc}>
+      {done.trim() ? <Markdown text={done} accent={accent} /> : null}
+      {open.trim() ? <Text style={styles.p}>{open.replace(/\s+$/, '')}</Text> : null}
+      {fence ? <CodeBlock code={fence.code} lang={fence.lang} plain /> : null}
+    </View>
+  );
+}
 
 export const Markdown = memo(function Markdown({ text, accent }: { text: string; accent: string }) {
   const tokens = useMemo(() => {
@@ -203,9 +220,10 @@ function decode(s: string): string {
   return s.replace(/&(amp|lt|gt|quot|#39|#x27);/g, (_, e: string) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'" })[e] ?? _);
 }
 
-export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+/** `plain`: no colouring (a fence still being written: colours would flicker as the code grows). */
+export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: string; plain?: boolean }) {
   const [copied, setCopied] = useState(false);
-  const lines = useMemo(() => highlight(code.replace(/\n$/, ''), lang), [code, lang]);
+  const lines = useMemo(() => highlight(code.replace(/\n$/, ''), plain ? undefined : lang), [code, lang, plain]);
   const label = languageFor(lang) ?? (lang?.trim() || 'text');
   const copy = async () => {
     await Clipboard.setStringAsync(code);
