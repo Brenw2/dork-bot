@@ -9,6 +9,10 @@ export const NOTE_AT = new Date(Date.now() - 36e5).toISOString();
 export const ROUTINE_SCREENS = [
   { name: 'routine-collapsed', paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}` : `/chat/${NOTE_BOT}`), waitFor: 'Three stories today.', check: (page, posture) => checkRoutine(page, posture, 'collapsed') },
   { name: 'routine-expanded', paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}` : `/chat/${NOTE_BOT}`), waitFor: 'Three stories today.', act: (page) => page.getByLabel('Routine daily_digest', { exact: false }).first().click(), check: (page, posture) => checkRoutine(page, posture, 'expanded') },
+  // Card 24 follow-up: the same, but with real touch taps (a finger, not a mouse click). One tap expands to the full
+  // output, a second tap collapses it again; the expanded and collapsed looks are the locked ones.
+  { name: 'routine-touch-expanded', touch: true, paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}` : `/chat/${NOTE_BOT}`), waitFor: 'Three stories today.', act: (page) => page.getByLabel('Routine daily_digest', { exact: false }).first().tap(), check: (page, posture) => checkRoutine(page, posture, 'expanded') },
+  { name: 'routine-touch-collapsed', touch: true, paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}` : `/chat/${NOTE_BOT}`), waitFor: 'Three stories today.', act: tapTwice, check: (page, posture) => checkRoutine(page, posture, 'collapsed') },
   // Opened from a notification: the chat opens, the card is expanded and flashing. Run with Reduce Motion on: the colours
   // hold for a full second with no fade (Fix 11), so they can be read exactly; the fade itself is a timing, not a layout.
   { name: 'routine-notified', paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}&at=${encodeURIComponent(NOTE_AT)}` : `/chat/${NOTE_BOT}?at=${encodeURIComponent(NOTE_AT)}`), waitFor: 'Three stories today.', reducedMotion: true, settle: 100, check: (page, posture) => checkRoutine(page, posture, 'notified') },
@@ -16,6 +20,16 @@ export const ROUTINE_SCREENS = [
   // route changes, and the card must expand and flash again.
   { name: 'routine-retap', paired: true, extraBots: [NOTE_BOT], path: (p) => (p === 'duo-open-landscape' || p === 'desktop' ? `/?bot=${NOTE_BOT}&at=${encodeURIComponent(NOTE_AT)}&n=1` : `/chat/${NOTE_BOT}?at=${encodeURIComponent(NOTE_AT)}&n=1`), waitFor: 'Three stories today.', reducedMotion: true, settle: 100, act: retap, check: (page, posture) => checkRoutine(page, posture, 'notified') },
 ];
+
+async function tapTwice(page) {
+  const head = page.getByLabel('Routine daily_digest', { exact: false }).first();
+  await head.tap();
+  await page.waitForSelector('[aria-expanded=true][aria-label^="Routine daily_digest"]', { timeout: 5000 });
+  await page.waitForTimeout(500); // the open animation
+  await head.tap();
+  await page.waitForSelector('[aria-expanded=false][aria-label^="Routine daily_digest"]', { timeout: 5000 });
+  await page.waitForTimeout(500);
+}
 
 async function retap(page) {
   const head = page.getByLabel('Routine daily_digest', { exact: false }).first();

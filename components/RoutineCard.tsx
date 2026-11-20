@@ -43,60 +43,33 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
   const still = useReduceMotion();
   const body = routineHasBody(text);
 
-  // open: 0 = collapsed, 1 = expanded (chevron, body fade); `height` animates the body's box.
+  // open: 0 = collapsed, 1 = expanded (the chevron turns, the body fades). The body is always drawn at its natural
+  // height: it never waits for a measurement, so opening can't get stuck at height 0 on a phone (Design's ruling).
   const open = useRef(new Animated.Value(expanded ? 1 : 0)).current;
-  const height = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(expanded ? 1 : 0)).current; // the body's opacity
-  const bodyH = useRef(0);
   const [mounted, setMounted] = useState(expanded); // the body is in the tree
-  const [settled, setSettled] = useState(expanded); // fully open: height is natural, not animated
   const first = useRef(true);
 
   const run = (to: 'open' | 'closed') => {
     const opening = to === 'open';
     const dur = still ? 0 : opening ? ROUTINE_MOTION.expand : ROUTINE_MOTION.collapse;
     const ease = opening ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic);
-    const finish = () => {
-      if (opening) {
-        setMounted(true);
-        setSettled(true);
-      } else setMounted(false);
-    };
+    if (opening) setMounted(true); // in the tree straight away, at full height
     if (dur === 0) {
       open.setValue(opening ? 1 : 0);
       fade.setValue(opening ? 1 : 0);
-      finish();
+      if (!opening) setMounted(false);
       return;
     }
-    if (opening) {
-      // Wait for the body to measure itself, then grow to its height.
-      setMounted(true);
-      setSettled(false);
-      height.setValue(0);
-      const start = () =>
-        Animated.parallel([
-          Animated.timing(height, { toValue: bodyH.current, duration: dur, easing: ease, useNativeDriver: false }),
-          Animated.timing(open, { toValue: 1, duration: dur, easing: ease, useNativeDriver: false }),
-          Animated.timing(fade, { toValue: 1, duration: ROUTINE_MOTION.fade, easing: ease, useNativeDriver: false }),
-        ]).start(({ finished }) => finished && finish());
-      fade.setValue(0);
-      pendingStart.current = start;
-      if (bodyH.current > 0) {
-        pendingStart.current = null;
-        start();
-      }
-    } else {
-      pendingStart.current = null;
-      height.setValue(bodyH.current);
-      setSettled(false);
-      Animated.parallel([
-        Animated.timing(height, { toValue: 0, duration: dur, easing: ease, useNativeDriver: false }),
-        Animated.timing(open, { toValue: 0, duration: dur, easing: ease, useNativeDriver: false }),
-        Animated.timing(fade, { toValue: 0, duration: dur, easing: ease, useNativeDriver: false }),
-      ]).start(({ finished }) => finished && finish());
-    }
+    if (opening) fade.setValue(0);
+    Animated.parallel([
+      Animated.timing(open, { toValue: opening ? 1 : 0, duration: dur, easing: ease, useNativeDriver: false }),
+      Animated.timing(fade, { toValue: opening ? 1 : 0, duration: opening ? ROUTINE_MOTION.fade : dur, easing: ease, useNativeDriver: false }),
+    ]).start(({ finished }) => {
+      // Closing: the body leaves the tree once it has faded. Whatever happens to the animation, the state wins.
+      if (!opening && finished) setMounted(false);
+    });
   };
-  const pendingStart = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (first.current) {
@@ -174,21 +147,10 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
         ) : null}
       </Pressable>
       {body && mounted ? (
-        <Animated.View style={[styles.bodyClip, !settled && { height }, { opacity: settled ? 1 : fade }]}>
-          <View
-            onLayout={(e) => {
-              bodyH.current = e.nativeEvent.layout.height;
-              const go = pendingStart.current;
-              if (go && bodyH.current > 0) {
-                pendingStart.current = null;
-                go();
-              }
-            }}
-          >
-            <View style={[styles.divider, { backgroundColor: tint.border }]} />
-            <View style={styles.body}>
-              <Markdown text={text} accent={color} />
-            </View>
+        <Animated.View style={{ opacity: fade }}>
+          <View style={[styles.divider, { backgroundColor: tint.border }]} />
+          <View style={styles.body}>
+            <Markdown text={text} accent={color} />
           </View>
         </Animated.View>
       ) : null}
@@ -207,7 +169,6 @@ const styles = StyleSheet.create({
   when: { color: colors.dim, fontSize: 13, lineHeight: 18, marginLeft: 8, flexShrink: 0 },
   preview: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   chevronBox: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginVertical: -10 },
-  bodyClip: { overflow: 'hidden' },
   divider: { height: 0.5 },
   body: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 14 },
   ring: { borderWidth: 1, borderRadius: 16 },
