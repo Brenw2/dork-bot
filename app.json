@@ -11,7 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.brenw2.dorkbot",
       "appleTeamId": "C7Z2H37BVG",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
