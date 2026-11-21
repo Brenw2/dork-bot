@@ -292,7 +292,7 @@ const SCREENS = [
   { name: 'chat-streaming', extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: (page) => sendIn(page, 'streamer', 'plan my morning', 'for (const step of') },
   // Switching the theme with a reply on screen and a half-typed draft: nothing remounts (the same DOM nodes), the text
   // and the draft stay. Opens the sheet from the sidebar menu and taps the theme that isn't selected.
-  { name: 'theme-switch-midstream', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: switchThemeKeepsChat, anyTheme: true },
+  { name: 'theme-switch-midstream', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: (page) => switchThemeKeepsChat(page), anyTheme: true },
   // The same, switching to Arcade (from Classic, or from whichever theme the run is in), and checking that Arcade's
   // font files arrive and its look is applied: the page background becomes Arcade's #120F24 with the stream intact.
   { name: 'theme-switch-midstream-arcade', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: (page) => switchThemeKeepsChat(page, /^Arcade/), anyTheme: true },
@@ -393,7 +393,7 @@ async function switchThemeKeepsChat(page, to) {
     ({ draft }) => {
       const box = document.querySelector('textarea');
       const text = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && (e.textContent || '').includes('for (const step of'));
-      return { boxKept: !!box?.__kept, value: box?.value, textKept: !!text?.__kept, text: !!text, bg: getComputedStyle(document.body).backgroundColor, draft };
+      return { boxKept: !!box?.__kept, value: box?.value, textKept: !!text?.__kept, text: !!text, bg: (() => { const all = []; for (let e = box; e; e = e.parentElement) all.push(getComputedStyle(e).backgroundColor); return all.join('; '); })(), draft };
     },
     { draft: DRAFT },
   );
@@ -401,7 +401,7 @@ async function switchThemeKeepsChat(page, to) {
   if (after.value !== DRAFT) problems.push(`the draft changed: ${JSON.stringify(after.value)}`);
   if (!after.text) problems.push('the streaming text is gone after the switch');
   else if (!after.textKept) problems.push('the streaming text was remounted by the theme switch');
-  if (to && /Arcade/.test(String(to)) && after.bg !== 'rgb(18, 15, 36)') problems.push(`Arcade's background didn't apply: ${after.bg}`);
+  if (to && /Arcade/.test(String(to)) && !after.bg.includes('rgb(18, 15, 36)')) problems.push(`Arcade's background didn't apply: ${after.bg}`);
   await page.getByRole('button', { name: 'Done' }).first().click().catch(() => undefined);
   await page.waitForTimeout(300);
   return problems;
