@@ -10,6 +10,7 @@ import { approvalOrder, useDesk } from '@/components/ChatStatus';
 import { Composer } from '@/components/Composer';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
+import { MessageMenu, WEB_SELECT } from '@/components/MessageMenu';
 import { useOnScreenRoom } from '@/components/notifications';
 import { MemberDisc, MemberStack } from '@/components/RoomAvatar';
 import { ScreenFrame } from '@/components/ScreenFrame';
@@ -559,11 +560,11 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
       {it.type === 'system' ? (
         <Text style={styles.system}>{it.text}</Text>
       ) : it.type === 'user' ? (
-        <View style={styles.bubble}>
-          <Text style={styles.bubbleText} selectable>
+        <MessageMenu text={it.text} raw style={styles.bubble}>
+          <Text style={styles.bubbleText} selectable={WEB_SELECT}>
             <Mentions text={it.text} members={members} info={info} />
           </Text>
-        </View>
+        </MessageMenu>
       ) : (
         <MemberMessage roomId={roomId} it={it} info={info} members={members} unanswered={unanswered} />
       )}
@@ -591,13 +592,15 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
             ) : null}
           </View>
         )}
-        {MD.test(it.text) ? (
-          <Markdown text={it.text} accent={color} />
-        ) : (
-          <Text style={styles.body} selectable>
-            <Mentions text={it.text} members={members} info={info} />
-          </Text>
-        )}
+        <MessageMenu text={it.text} raw={!MD.test(it.text)}>
+          {MD.test(it.text) ? (
+            <Markdown text={it.text} accent={color} />
+          ) : (
+            <Text style={styles.body} selectable={WEB_SELECT}>
+              <Mentions text={it.text} members={members} info={info} />
+            </Text>
+          )}
+        </MessageMenu>
       </View>
     </View>
   );

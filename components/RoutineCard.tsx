@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/AppIcons';
 import { Markdown } from '@/components/Markdown';
+import { MessageMenu } from '@/components/MessageMenu';
 import { ROUTINE_MOTION, routineHasBody, routineHint, routineLabel, routinePreview, routineTints } from '@/lib/routineCard';
 import { makeStyles, useTheme } from '@/components/theme';
 
@@ -149,7 +150,9 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
         <Animated.View style={{ opacity: fade }}>
           <View style={[styles.divider, { backgroundColor: tint.border }]} />
           <View style={styles.body}>
-            <Markdown text={text} accent={color} />
+            <MessageMenu text={text}>
+              <Markdown text={text} accent={color} />
+            </MessageMenu>
           </View>
         </Animated.View>
       ) : null}

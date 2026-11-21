@@ -4,6 +4,7 @@ import { ActivityIndicator, AppState, RefreshControl, ScrollView, type ScrollVie
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
+import { MessageMenu } from '@/components/MessageMenu';
 import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { fetch } from '@/components/net';
@@ -76,7 +77,9 @@ export default function RoutineResultsScreen() {
               <Text style={[styles.name, { color }]} numberOfLines={1}>{r.name}</Text>
               <Text style={styles.when}>{whenLabel(new Date(r.at * 1000).toISOString())}</Text>
             </View>
-            <Markdown text={r.text} accent={color} />
+            <MessageMenu text={r.text} bot={bot}>
+              <Markdown text={r.text} accent={color} />
+            </MessageMenu>
           </View>
         ))}
       </ScrollView>
