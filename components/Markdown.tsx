@@ -11,6 +11,7 @@ import { colors, mono } from '@/lib/theme';
 import { isDesktop } from '@/components/desktop';
 import { isBareLink, shortUrl } from '@/lib/shortUrl';
 import { CopyIcon } from '@/components/icons';
+import { decodeEntities } from '@/lib/plainText';
 import { splitStreaming } from '@/lib/streamBlocks';
 
 // Code shows the exact characters: no ligatures (">=" must not turn into "≥"), and a real
@@ -19,6 +20,10 @@ const CODE_FONT = Platform.OS === 'web' ? 'ui-monospace, "JetBrains Mono", "Fira
 const NO_LIGATURES = Platform.OS === 'web' ? ({ fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' } as object) : null;
 
 const CODE_BG = '#0B0C0E';
+
+// Web and desktop: drag-select any part of a reply with the mouse. Phone: not selectable here, because iOS can only copy
+// the whole block and the touch is taken from the long press; <MessageMenu> offers Copy and Select Text instead.
+const SELECTABLE = Platform.OS === 'web';
 
 /** Reply text size: 17 on the phone, 16 on the desktop (design fix 7). Lines are 24 on both. */
 export const BODY_SIZE = isDesktop ? 16 : 17;
@@ -60,7 +65,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
         break;
       case 'paragraph':
         out.push(
-          <Text key={key} style={styles.p} selectable>
+          <Text key={key} style={styles.p} selectable={SELECTABLE}>
             {inline((t as Tokens.Paragraph).tokens, accent)}
           </Text>,
         );
@@ -69,7 +74,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
         // Tight list items hold their text as a "text" token with inline children.
         const tt = t as Tokens.Text;
         out.push(
-          <Text key={key} style={styles.p} selectable>
+          <Text key={key} style={styles.p} selectable={SELECTABLE}>
             {tt.tokens ? inline(tt.tokens, accent) : tt.text}
           </Text>,
         );
@@ -78,7 +83,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
       case 'heading': {
         const h = t as Tokens.Heading;
         out.push(
-          <Text key={key} style={[styles.h, HEADING[Math.min(h.depth, 4) - 1]]} selectable accessibilityRole="header">
+          <Text key={key} style={[styles.h, HEADING[Math.min(h.depth, 4) - 1]]} selectable={SELECTABLE} accessibilityRole="header">
             {inline(h.tokens, accent)}
           </Text>,
         );
@@ -128,7 +133,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
         break;
       case 'html':
         out.push(
-          <Text key={key} style={styles.p} selectable>
+          <Text key={key} style={styles.p} selectable={SELECTABLE}>
             {(t as Tokens.HTML).text.trim()}
           </Text>,
         );
@@ -136,7 +141,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
       default:
         if ('text' in t && typeof t.text === 'string') {
           out.push(
-            <Text key={key} style={styles.p} selectable>
+            <Text key={key} style={styles.p} selectable={SELECTABLE}>
               {t.text}
             </Text>,
           );
@@ -215,10 +220,7 @@ function inline(tokens: Token[] | undefined, accent: string): ReactNode[] {
   });
 }
 
-/** marked leaves HTML entities in inline text (&amp;, &#39;…); show the characters. */
-function decode(s: string): string {
-  return s.replace(/&(amp|lt|gt|quot|#39|#x27);/g, (_, e: string) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'" })[e] ?? _);
-}
+const decode = decodeEntities;
 
 /** `plain`: no colouring (a fence still being written: colours would flicker as the code grows). */
 export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: string; plain?: boolean }) {
@@ -240,7 +242,7 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
         </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.codeScroll}>
-        <Text style={styles.codeText} selectable>
+        <Text style={styles.codeText} selectable={SELECTABLE}>
           {lines.map((line, i) => (
             <Text key={i}>
               {line.map((tok, j) =>
@@ -273,7 +275,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
       <View style={styles.table}>
         <View style={[styles.tr, styles.thead]}>
           {table.header.map((h, c) => (
-            <Text key={c} style={[styles.th, align(c), { width: widths[c] }]} selectable>
+            <Text key={c} style={[styles.th, align(c), { width: widths[c] }]} selectable={SELECTABLE}>
               {inline(h.tokens, accent)}
             </Text>
           ))}
@@ -281,7 +283,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
         {table.rows.map((r, i) => (
           <View key={i} style={[styles.tr, i % 2 === 1 && styles.zebra]}>
             {r.map((cell, c) => (
-              <Text key={c} style={[styles.td, align(c), { width: widths[c] }]} selectable>
+              <Text key={c} style={[styles.td, align(c), { width: widths[c] }]} selectable={SELECTABLE}>
                 {inline(cell.tokens, accent)}
               </Text>
             ))}

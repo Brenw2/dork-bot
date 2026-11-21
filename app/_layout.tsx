@@ -37,7 +37,7 @@ export default function RootLayout() {
 }
 
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'usage', 'usage/[bot]', 'look/[bot]', 'connectors/[bot]', 'connector/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]', 'room-new']);
+const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'usage', 'usage/[bot]', 'look/[bot]', 'connectors/[bot]', 'connector/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]', 'room-new', 'select-text']);
 
 // The panel's own title; a bot's name goes under it (components/Overlay.tsx, components/Sheet.tsx).
 const TITLES: Record<string, string> = {
@@ -102,6 +102,7 @@ function Screens(): ReactNode {
       {/* The room draws its own one-row header too (RoomHeader in components/RoomChat.tsx). */}
       <Stack.Screen name="room/[id]" options={{ title: '', headerShown: false }} />
       <Stack.Screen name="room-new" options={popup('New group chat')} />
+      <Stack.Screen name="select-text" options={popup('Select Text')} />
       <Stack.Screen name="look/[bot]" options={popup('Look')} />
       <Stack.Screen name="gallery" options={{ title: 'Gallery' }} />
       <Stack.Screen name="connectors/[bot]" options={popup('Connectors')} />

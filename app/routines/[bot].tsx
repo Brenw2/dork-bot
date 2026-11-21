@@ -8,6 +8,7 @@ import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { loadManager } from '@/components/manager';
 import { Markdown } from '@/components/Markdown';
+import { MessageMenu } from '@/components/MessageMenu';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
 import { getConnection } from '@/lib/bots';
@@ -300,7 +301,7 @@ function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routi
           <NotifySwitch value={notify.isOn(r.id)} disabled={!notify.ready || busy !== null} spacing={10} onChange={(on) => void flipNotify(on)} />
           <View style={[styles.result, { borderColor: mix(color, 0.4) }]}>
             <Text style={styles.label}>{result ? `Last result · ${whenLabel(new Date(result.at * 1000).toISOString())}` : 'Last result'}</Text>
-            {result === undefined ? <ActivityIndicator /> : result?.text ? <Markdown text={result.text} accent={color} /> : <Text style={styles.sub}>Nothing yet.</Text>}
+            {result === undefined ? <ActivityIndicator /> : result?.text ? <MessageMenu text={result.text} bot={bot}><Markdown text={result.text} accent={color} /></MessageMenu> : <Text style={styles.sub}>Nothing yet.</Text>}
           </View>
           <View style={styles.row}>
             <SmallButton label="Run now" bot={bot} tone="tint" busy={busy === 'Run now'} onPress={() => void act('Run now', () => api.runNow(r.id)).then(() => setResult(undefined))} />

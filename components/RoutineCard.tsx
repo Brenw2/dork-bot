@@ -6,6 +6,7 @@ import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View 
 import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/components/AppIcons';
 import { Markdown } from '@/components/Markdown';
+import { MessageMenu } from '@/components/MessageMenu';
 import { colors } from '@/lib/theme';
 import { ROUTINE_MOTION, routineHasBody, routineHint, routineLabel, routinePreview, routineTints } from '@/lib/routineCard';
 
@@ -150,7 +151,9 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
         <Animated.View style={{ opacity: fade }}>
           <View style={[styles.divider, { backgroundColor: tint.border }]} />
           <View style={styles.body}>
-            <Markdown text={text} accent={color} />
+            <MessageMenu text={text}>
+              <Markdown text={text} accent={color} />
+            </MessageMenu>
           </View>
         </Animated.View>
       ) : null}

@@ -13,6 +13,7 @@ import { BotSprite } from '@/components/BotSprite';
 import { JumpPill } from '@/components/JumpPill';
 import { ScreenFrame } from '@/components/ScreenFrame';
 import { Markdown, StreamingMarkdown, BODY_SIZE } from '@/components/Markdown';
+import { MessageMenu, WEB_SELECT } from '@/components/MessageMenu';
 import { isDesktop } from '@/components/desktop';
 import { useHermesImage } from '@/components/useHermesImage';
 import { attachmentProblem, MAX_IMAGES, messageBody, type Attachment } from '@/lib/attachments';
@@ -634,7 +635,9 @@ export function Reply({ text, bot, streaming = false }: { text: string; bot: str
   const { color } = useBotLook(bot);
   return (
     <View style={styles.reply}>
-      {streaming ? <StreamingMarkdown text={text} accent={color} /> : <Markdown text={text} accent={color} />}
+      <MessageMenu text={text} bot={bot}>
+        {streaming ? <StreamingMarkdown text={text} accent={color} /> : <Markdown text={text} accent={color} />}
+      </MessageMenu>
     </View>
   );
 }
@@ -657,11 +660,11 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
         </View>
       ) : null}
       {message.content ? (
-        <View style={[styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
-          <Text style={styles.text} selectable>
+        <MessageMenu text={message.content} bot={bot} raw style={[styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
+          <Text style={styles.text} selectable={WEB_SELECT}>
             {message.content}
           </Text>
-        </View>
+        </MessageMenu>
       ) : null}
     </View>
   );

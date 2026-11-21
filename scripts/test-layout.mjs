@@ -288,6 +288,8 @@ const SCREENS = [
   { name: 'chat-streamed', extraBots: ['finisher'], path: (p) => (finished.delete('finisher'), chatPath('finisher')(p)), waitFor: 'Any time.', act: (page) => sendIn(page, 'finisher', 'plan my morning', 'That is all.') },
   { name: 'chat-streamed-history', extraBots: ['historian'], path: chatPath('historian'), waitFor: 'That is all.' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
+  // Card 32: the Select Text sheet (phone): the rich reply as plain text, code in its own monospace box, Copy All.
+  { name: 'select-text', extraBots: ['coder'], path: () => `/select-text?bot=coder&text=${encodeURIComponent(RICH_REPLY)}`, waitFor: 'Copy All', check: checkSelectSheet },
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
   // Card 24: the routine card collapsed, expanded, and opened from a notification (scripts/layout-routine.mjs).
@@ -568,7 +570,31 @@ function measureChats() {
   return c === 'rgb(93, 98, 106)' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
 }
 
-const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-error': ['Message failer'], 'chat-not-sent': ['Message unsender'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
+// Card 32: the Select Text sheet. The message is plain text in read-only boxes (values, not DOM text), each as tall as its text.
+async function checkSelectSheet(page) {
+  await page.waitForTimeout(300); // the boxes measure their text, then set their height
+  return page.evaluate(() => {
+    const out = [];
+    const boxes = [...document.querySelectorAll('textarea')];
+    if (boxes.length < 2) out.push(`expected a prose box and a code box, found ${boxes.length}`);
+    for (const t of boxes) {
+      if (!t.readOnly) out.push('a text box is editable; it must be read-only');
+      if (t.scrollHeight > t.clientHeight + 1) out.push(`a text box scrolls inside the page (${t.scrollHeight} > ${t.clientHeight}): its text is cut off`);
+      const r = t.getBoundingClientRect();
+      if (r.width < 100) out.push(`a text box is only ${r.width} wide`);
+    }
+    const all = boxes.map((t) => t.value).join('\n---\n');
+    if (!all.includes('The race is in waitForBot: it polls before the key is set.')) out.push('the message text is missing or still has markdown marks');
+    const code = boxes.find((t) => t.value.startsWith('export async function'));
+    const prose = boxes.filter((t) => t !== code).map((t) => t.value).join('\n');
+    if (/\*\*|`|^#+ /m.test(prose)) out.push('markdown marks (**, `, ##) leaked into the plain text');
+    if (!code) out.push('the code block is not in its own box');
+    else if (!/mono|Menlo|Consolas|Courier/i.test(getComputedStyle(code).fontFamily)) out.push(`code must be monospaced, got ${getComputedStyle(code).fontFamily}`);
+    return out;
+  });
+}
+
+const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'select-text': ['Copy All', 'Done'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-error': ['Message failer'], 'chat-not-sent': ['Message unsender'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'chat-approval': ['Run this command?', 'Hermes flagged it'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 Object.assign(FIXED, ROOM_FIXED);
@@ -599,9 +625,124 @@ function chromiumPath() {
   return undefined; // playwright-core's own download (npx playwright-core install chromium)
 }
 
+// Card 32: on the desktop (and web), any part of a reply selects with the mouse and copies with Ctrl+C, across
+// paragraphs and inside code blocks. Nothing between the text and the pointer may capture the drag or set user-select: none.
+const WORD_RECT = ({ word, within, scroll }) => {
+  // The box of the first whole word `word` in one text node (inside the element with `within` text, if given).
+  // `scroll`: bring it to the middle of the window first (the chat opens at its newest message).
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const i = n.data.search(new RegExp(`(^|\\W)${word}(\\W|$)`));
+    if (i < 0) continue;
+    if (within && !(n.parentElement?.closest('div')?.parentElement?.textContent ?? '').includes(within)) continue;
+    if (scroll) n.parentElement.scrollIntoView({ block: 'center' });
+    const at = n.data.indexOf(word, i);
+    const r = document.createRange();
+    r.setStart(n, at);
+    r.setEnd(n, at + word.length);
+    const b = r.getBoundingClientRect();
+    return { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
+  }
+  return null;
+};
+
+async function selectTextTest(browser, base) {
+  const problems = [];
+  const check = (ok, msg) => ok || problems.push(msg);
+  const context = await browser.newContext({ viewport: DESKTOP, deviceScaleFactor: 1, permissions: ['clipboard-read', 'clipboard-write'] });
+  const page = await context.newPage();
+  page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+  await page.addInitScript(({ store }) => { for (const [k, v] of Object.entries(store)) localStorage.setItem(`dorkbot.${k}`, v); }, { store: seedFor({ extraBots: ['coder'] }) });
+  await page.route(`${HERMES}/**`, fakeHermes);
+  try {
+    await page.goto(`${base}/?bot=coder`);
+    await page.getByText('Ping me if', { exact: false }).first().waitFor({ timeout: 15_000 });
+    const drag = async (from, to) => {
+      await page.mouse.move(from.left + 1, (from.top + from.bottom) / 2);
+      await page.mouse.down();
+      await page.mouse.move((from.left + to.right) / 2, (to.top + to.bottom) / 2, { steps: 6 });
+      await page.mouse.move(to.right - 1, (to.top + to.bottom) / 2, { steps: 6 });
+      await page.mouse.up();
+    };
+    const selected = () => page.evaluate(() => getSelection()?.toString() ?? '');
+    const copied = async () => {
+      await page.keyboard.press('Control+C');
+      return page.evaluate(() => navigator.clipboard.readText());
+    };
+    const norm = (s) => s.replace(/\s+/g, ' ').trim();
+
+    // 1. Partway through the first paragraph to partway through the first list item: two blocks, only that text.
+    const from = await page.evaluate(WORD_RECT, { word: 'polls', scroll: true });
+    const to = await page.evaluate(WORD_RECT, { word: 'Set', within: 'Set the key first' });
+    check(from && to, `can't find the words to drag between (${JSON.stringify({ from, to })})`);
+    if (from && to) {
+      await drag(from, to);
+      const sel = norm(await selected());
+      if (!sel) {
+        // Say what is under the pointer, so a blocked drag names its cause.
+        const why = await page.evaluate(({ x, y }) => {
+          const chain = [];
+          for (let el = document.elementFromPoint(x, y); el && chain.length < 12; el = el.parentElement) {
+            const cs = getComputedStyle(el);
+            chain.push(`${el.tagName.toLowerCase()}[${el.getAttribute('role') ?? ''}] us=${cs.userSelect} pe=${cs.pointerEvents} ta=${cs.touchAction}`);
+          }
+          return chain.join(' < ');
+        }, { x: from.left + 1, y: (from.top + from.bottom) / 2 });
+        problems.push(`empty selection; under the pointer: ${why}`);
+      }
+      check(sel.startsWith('polls before the key is set.'), `the selection must start at "polls", got "${sel.slice(0, 60)}"`);
+      check(sel.includes('Two changes:') && sel.endsWith('Set'), `the selection must run to the end of "Set", got "…${sel.slice(-40)}"`);
+      check(!sel.includes('The race is in') && !sel.includes('Fix for the flaky') && !sel.includes('the key first'), `the selection took text outside the drag: "${sel}"`);
+      const clip = norm(await copied());
+      check(clip === sel, `Ctrl+C must copy exactly the selection ("${sel}"), got "${clip}"`);
+      await page.screenshot({ path: join(OUT, 'desktop--select-across-paragraphs.png') });
+    }
+
+    // 2. Inside a code block: a few words of one line.
+    await page.mouse.click(5, 5); // clear
+    const c1 = await page.evaluate(WORD_RECT, { word: 'timeoutMs', scroll: true });
+    const c2 = await page.evaluate(WORD_RECT, { word: 'intervalMs' });
+    check(c1 && c2, `can't find the code words (${JSON.stringify({ c1, c2 })})`);
+    if (c1 && c2) {
+      await drag(c1, c2);
+      const sel = await selected();
+      check(sel === 'timeoutMs = 30_000, intervalMs', `a drag inside code must select exactly that text, got "${sel}"`);
+      const clip = await copied();
+      check(clip === sel, `Ctrl+C in code must copy exactly the selection, got "${clip}"`);
+    }
+
+    // 3. From a paragraph, down through the code block, to the text after it.
+    await page.mouse.click(5, 5);
+    const p1 = await page.evaluate(WORD_RECT, { word: 'waitForBot', scroll: true });
+    const p2 = await page.evaluate(WORD_RECT, { word: 'Ping' });
+    if (p1 && p2) {
+      await drag(p1, p2);
+      const sel = await selected();
+      check(sel.includes('timeoutMs') && sel.includes('Ping') && !sel.includes('Fix for the flaky'), `a drag across a code block must take the code with it, got ${sel.length} chars`);
+    }
+
+    // 4. Nothing may switch selection off on the way (user-select) or capture the pointer.
+    const blocked = await page.evaluate(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('[dir=auto], div, span')) {
+        if (!el.textContent?.trim() || el.children.length) continue;
+        if (!el.closest('[data-testid], body')) continue;
+        const us = getComputedStyle(el).userSelect;
+        if (us === 'none' && /waitForBot|timeoutMs|Set the key|Ping me/.test(el.textContent)) out.push(`${el.textContent.slice(0, 30)}: user-select ${us}`);
+      }
+      return out;
+    });
+    check(blocked.length === 0, `text has user-select: none: ${blocked.join('; ')}`);
+  } catch (e) {
+    problems.push(`didn't run: ${e.message.split('\n')[0]}`);
+  }
+  await context.close();
+  return problems;
+}
+
+const DESKTOP = { width: 1280, height: 800 };
 // Desktop window: the message box starts at one line, grows with its text, stops at 40% of the chat pane
 // (then scrolls), keeps Send level with its bottom, keeps the newest message in view, and shrinks after Send.
-const DESKTOP = { width: 1280, height: 800 };
 async function composerTest(browser, base) {
   const problems = [];
   const context = await browser.newContext({ viewport: DESKTOP, deviceScaleFactor: 1 });
@@ -1045,6 +1186,13 @@ async function main() {
     const composer = await composerTest(browser, base);
     failed += composer.length ? 1 : 0;
     report.push({ posture: 'desktop', screen: 'composer', path: "/?bot=assistant", problems: composer });
+  }
+  if (!only || only === 'select') {
+    const select = await selectTextTest(browser, base);
+    console.log(`${select.length ? 'FAIL' : 'ok  '} desktop              select-text (drag across paragraphs, code, Ctrl+C)`);
+    for (const p of select) console.log(`       - ${p}`);
+    failed += select.length ? 1 : 0;
+    report.push({ posture: 'desktop', screen: 'select-text', path: '/?bot=coder', problems: select });
   }
   if (!only || only === 'ui') {
     const ui = await uiPolishTests(browser, base);
