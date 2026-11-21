@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
+import { Icon } from '@/components/AppIcons';
 import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
@@ -287,7 +288,7 @@ function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routi
           <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
             {r.name}
           </Text>
-          <Text style={styles.toggle}>{open ? '▾' : '▸'}</Text>
+          <Icon name={open ? 'chevron-down' : 'chevron'} size={14} color={colors.dim} stroke={2.4} />
         </View>
         <Text style={styles.sub}>
           {scheduleLabel(r.schedule)} · {status}{notify.isOn(r.id) ? ' · Notify me' : ''}

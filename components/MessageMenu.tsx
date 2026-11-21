@@ -17,8 +17,8 @@ export function MessageMenu({ text, bot, raw = false, children, style }: { text:
   if (WEB_SELECT) return <View style={style}>{children}</View>;
   const open = () =>
     Menu.show('Message', [
-      { text: 'Copy', onPress: () => void Clipboard.setStringAsync(raw ? text : plainText(text)) },
-      { text: 'Select Text', onPress: () => router.push({ pathname: '/select-text', params: { text, ...(bot ? { bot } : null), ...(raw ? { raw: '1' } : null) } }) },
+      { text: 'Copy', icon: 'copy', onPress: () => void Clipboard.setStringAsync(raw ? text : plainText(text)) },
+      { text: 'Select Text', icon: 'search', onPress: () => router.push({ pathname: '/select-text', params: { text, ...(bot ? { bot } : null), ...(raw ? { raw: '1' } : null) } }) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   // accessible={false}: the message's own links and Copy buttons stay reachable by VoiceOver.

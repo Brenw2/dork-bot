@@ -3,6 +3,7 @@
 // 13/18 uppercase dim. Used by the bot sheet, Chats, Connectors, Model, Notifications, Look and New bot.
 import { Children, isValidElement, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Icon } from '@/components/AppIcons';
 import { colors } from '@/lib/theme';
 
 /** The separator inset for rows that have a leading icon or avatar. */
@@ -82,7 +83,7 @@ export function GroupRow({
         </Text>
       ) : null}
       {right}
-      {chevron ? <Text style={styles.chevron}>›</Text> : null}
+      {chevron ? <Icon name="chevron" size={16} color={colors.disclosure} stroke={2.4} /> : null}
     </>
   );
   if (!onPress) return <View style={styles.row}>{body}</View>;

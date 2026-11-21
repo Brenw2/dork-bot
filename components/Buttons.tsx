@@ -19,6 +19,7 @@ export function Button({
   label,
   onPress,
   bot,
+  color,
   kind = 'primary',
   disabled,
   busy,
@@ -28,13 +29,16 @@ export function Button({
   label: string;
   onPress: () => void;
   bot?: string;
+  /** Overrides the tint: `colors.bad` for a destructive primary, a dialog's accent. */
+  color?: string;
   kind?: 'primary' | 'secondary';
   disabled?: boolean;
   busy?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 }) {
-  const tint = useTint(bot);
+  const botTint = useTint(bot);
+  const tint = color ?? botTint;
   const desk = useDesk();
   const off = disabled || busy;
   const fill = off ? colors.card : kind === 'primary' ? tint : mix(tint, 0.2);

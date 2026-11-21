@@ -2,8 +2,11 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ApprovalButtons } from '@/components/ApprovalButtons';
 import { Icon } from '@/components/AppIcons';
 import { Alert, Menu } from '@/components/alert';
+import { Button } from '@/components/Buttons';
+import { approvalOrder, useDesk } from '@/components/ChatStatus';
 import { Composer } from '@/components/Composer';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
@@ -33,6 +36,7 @@ import {
   type RoomMember,
   type RoomState,
 } from '@/lib/rooms';
+import type { ApprovalChoice } from '@/lib/hermes';
 import { colors, mix, mono, onColor } from '@/lib/theme';
 
 // ---------- who is who ----------
@@ -172,9 +176,9 @@ export function RoomActions({ room }: { room: Room | null }) {
     Menu.show(
       room.name,
       [
-        { text: 'Members', icon: 'info', onPress: members },
         { text: 'Rename…', icon: 'pencil', onPress: rename },
-        { text: 'Disband…', icon: 'trash', style: 'destructive', onPress: disband },
+        { text: 'Members', icon: 'info', sepBefore: true, onPress: members },
+        { text: 'Disband…', icon: 'trash', sepBefore: true, style: 'destructive', onPress: disband },
         { text: 'Cancel', style: 'cancel' },
       ],
       anchor,
@@ -421,9 +425,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
       <View style={[styles.screen, styles.center]}>
         <Text style={styles.goneTitle}>This group is gone</Text>
         <Text style={styles.goneText}>It was disbanded on Hermes.</Text>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.goneBtn} accessibilityRole="button">
-          <Text style={{ color: '#fff', fontWeight: '600' }}>Back to bots</Text>
-        </Pressable>
+        <Button label="Back to bots" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ marginTop: 8 }} />
       </View>
     );
   }
@@ -618,6 +620,7 @@ function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; m
   const color = info.color(profile);
   const choices = a.choices.length ? a.choices : ['once', 'deny'];
   const [done, setDone] = useState(false);
+  const desk = useDesk();
   return (
     <View style={[styles.approval, { borderColor: mix(color, 0.55) }]} accessibilityLiveRegion="polite">
       <View style={styles.apHead}>
@@ -633,22 +636,7 @@ function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; m
         </ScrollView>
       ) : null}
       {a.description ? <Text style={styles.apWhy}>Hermes flagged it: {a.description}</Text> : null}
-      <View style={styles.apButtons}>
-        {choices.map((c) => (
-          <Pressable
-            key={c}
-            disabled={done}
-            onPress={() => {
-              setDone(true);
-              onAnswer(c);
-            }}
-            accessibilityRole="button"
-            style={[styles.apBtn, c === 'once' ? { backgroundColor: color } : c === 'deny' ? { borderWidth: 1.5, borderColor: colors.bad } : { backgroundColor: mix(color, 0.2) }, done && { opacity: 0.5 }]}
-          >
-            <Text style={[styles.apBtnText, { color: c === 'once' ? onColor(color) : c === 'deny' ? colors.bad : colors.text }]}>{CHOICE[c] ?? c}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <ApprovalButtons choices={approvalOrder(choices as ApprovalChoice[], desk)} labels={CHOICE} color={color} desk={desk} disabled={done} dim={done} onAnswer={(c) => { setDone(true); onAnswer(c); }} />
       <Text style={styles.apNote}>Answers right away. No answer counts as Deny.</Text>
     </View>
   );
@@ -661,7 +649,6 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   goneTitle: { color: colors.text, fontSize: 20, fontWeight: '600' },
   goneText: { color: colors.dim, fontSize: 15 },
-  goneBtn: { marginTop: 8, height: 44, borderRadius: 22, paddingHorizontal: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   headerBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg },
   titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, paddingVertical: 4, paddingHorizontal: 6, maxWidth: '100%' },
   headerIcon: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
@@ -690,9 +677,6 @@ const styles = StyleSheet.create({
   apCode: { flexGrow: 0, borderRadius: 8, backgroundColor: '#0B0C0E' },
   apCommand: { color: colors.text, fontFamily: mono, fontSize: 13, lineHeight: 20 },
   apWhy: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  apButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  apBtn: { flexGrow: 1, flexBasis: '45%', height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  apBtnText: { fontSize: 15, fontWeight: '600' },
   apNote: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   strip: { flexDirection: 'row', alignItems: 'center', minHeight: 36, paddingHorizontal: 16, gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   stripLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
