@@ -349,7 +349,7 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   },
   codeLang: { color: colors.dim, fontSize: 12, fontFamily: CODE_FONT, textTransform: 'lowercase' },
   // 36 tall inside the header; hitSlop on the Pressable makes the touch area 44.
-  copy: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36 },
+  copy: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36 - StyleSheet.hairlineWidth },
   copyText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   codeScroll: { paddingVertical: 10, paddingHorizontal: 12 },
   codeText: { fontFamily: CODE_FONT, fontSize: 13, lineHeight: 20, color: colors.codeText, ...NO_LIGATURES },
