@@ -8,12 +8,14 @@ import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useWork } from '@/components/workWatch';
 import { whenLabel } from '@/lib/routines';
-import { colors } from '@/lib/theme';
 import { statusLabel, type WorkItem } from '@/lib/work';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // A bot's Work: what it does that the app didn't start (terminal runs, other bots, other apps),
 // newest first, live while this screen is up. Tap one to read it. Routines have Routine results.
 export default function WorkScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -43,13 +45,15 @@ export default function WorkScreen() {
 }
 
 function WorkRow({ item, bot, color }: { item: WorkItem; bot: string; color: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const when = whenLabel(new Date(item.startedAt * 1000).toISOString());
   const meta = [item.startedBy, when].filter(Boolean).join(' · ');
   const tone = item.status === 'working' ? color : item.status === 'failed' ? colors.bad : colors.dim;
   const label = statusLabel(item.status);
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: '#22252A' }]}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.raised }]}
       onPress={() => router.push({ pathname: '/work-session/[bot]', params: { bot, id: item.id } })}
       accessibilityRole="button"
       accessibilityLabel={`${item.title}, ${label}${item.startedBy ? `, started by ${item.startedBy}` : ''}, ${when}`}
@@ -73,7 +77,7 @@ function WorkRow({ item, bot, color }: { item: WorkItem; bot: string; color: str
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
   list: { padding: 16, gap: 8 },
@@ -85,4 +89,4 @@ const styles = StyleSheet.create({
   meta: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 30, lineHeight: 22, paddingHorizontal: 16 },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingTop: 10 },
-});
+}));

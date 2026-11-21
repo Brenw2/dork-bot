@@ -37,7 +37,8 @@ import {
   type RoomState,
 } from '@/lib/rooms';
 import type { ApprovalChoice } from '@/lib/hermes';
-import { colors, mix, mono, onColor } from '@/lib/theme';
+import { mono, onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // ---------- who is who ----------
 
@@ -108,6 +109,8 @@ function showMembers(room: Room, info: ReturnType<typeof useMemberInfo>) {
 
 // Tapping the title opens Members (there is no dedicated button).
 export function RoomTitle({ room }: { room: Room | null }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const info = useMemberInfo();
   if (!room) return <View style={{ height: 32 }} />;
   return (
@@ -132,6 +135,7 @@ export function RoomTitle({ room }: { room: Room | null }) {
 }
 
 export function RoomActions({ room }: { room: Room | null }) {
+  const { colors } = useTheme();
   const info = useMemberInfo();
   if (!room) return null;
   const members = () => showMembers(room, info);
@@ -206,6 +210,8 @@ export function RoomActions({ room }: { room: Room | null }) {
 // stack (app/_layout.tsx: room/[id] is headerShown: false). Phone: back "‹ Bots", the title block (member stack, name,
 // members; tap for Members) and ⋯. Two panes (desktop, open Duo landscape): no back, 56 tall with a hairline under it.
 export function RoomHeader({ room, pane, list }: { room: Room | null; pane: boolean; list?: { hidden: boolean; toggle: () => void } }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const big = !isDesktop;
   const hit = big ? 44 : 32;
@@ -275,6 +281,8 @@ function stamp(at: number): { day: string; time: string } {
 }
 
 export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; maxWidth?: number; inPane?: boolean; list?: { hidden: boolean; toggle: () => void } }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   useOnScreenRoom(id);
   const [paneHeight, setPaneHeight] = useState(0);
   const room = useRoomInfo(id);
@@ -540,6 +548,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
 // ---------- rows ----------
 
 function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; it: Item; prev?: Item; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
+  const styles = useStyles();
   const sep = prev && 'at' in prev && 'at' in it && prev.at && it.at && it.at - prev.at > 1800 ? stamp(it.at) : !prev && 'at' in it && it.at ? stamp(it.at) : null;
   return (
     <>
@@ -564,6 +573,7 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
 }
 
 function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: string; it: Extract<Item, { type: 'member' }>; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
+  const styles = useStyles();
   const profile = it.member?.profile ?? it.actorId;
   const color = info.color(profile);
   return (
@@ -598,6 +608,7 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
 
 /** Text with each known @mention in its bot's color (semibold). @all/@everyone and @user in accent. Unknown @words stay plain. */
 function Mentions({ text, members, info }: { text: string; members: RoomMember[]; info: MemberInfo }) {
+  const { colors } = useTheme();
   return (
     <>
       {tokenizeMentions(text, members).map((s, i) =>
@@ -616,6 +627,8 @@ function Mentions({ text, members, info }: { text: string; members: RoomMember[]
 const CHOICE: Record<string, string> = { once: 'Allow once', session: 'Allow in this chat', always: 'Always allow', deny: 'Deny' };
 
 function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; member: RoomMember | null; room: string; info: MemberInfo; onAnswer: (c: string) => void }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const profile = member?.profile ?? a.memberId;
   const color = info.color(profile);
   const choices = a.choices.length ? a.choices : ['once', 'deny'];
@@ -644,7 +657,7 @@ function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; m
 
 const BODY = isDesktop ? 16 : 17;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   goneTitle: { color: colors.text, fontSize: 20, fontWeight: '600' },
@@ -659,7 +672,7 @@ const styles = StyleSheet.create({
   empty: { color: colors.dim, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 48, paddingHorizontal: 24 },
   sep: { alignSelf: 'center', color: colors.dim, fontSize: 12, lineHeight: 16, fontWeight: '500', marginTop: 14 },
   system: { alignSelf: 'center', color: colors.dim, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
-  bubble: { alignSelf: 'flex-end', maxWidth: '82%', marginTop: 14, backgroundColor: mix('#8B7CF6', 0.3), borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  bubble: { alignSelf: 'flex-end', maxWidth: '82%', marginTop: 14, backgroundColor: mix(colors.accent, 0.3), borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
   bubbleText: { color: colors.text, fontSize: BODY, lineHeight: isDesktop ? 24 : 22 },
   msg: { flexDirection: 'row', gap: 8 },
   gutter: { width: 28 },
@@ -668,13 +681,13 @@ const styles = StyleSheet.create({
   speaker: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
   time: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   needsBadge: { height: 18, borderRadius: 9, paddingHorizontal: 8, backgroundColor: colors.bad, justifyContent: 'center' },
-  needsText: { color: '#1A0B0B', fontSize: 11, fontWeight: '700' },
+  needsText: { color: colors.badgeText, fontSize: 11, fontWeight: '700' },
   body: { color: colors.text, fontSize: BODY, lineHeight: 24 },
   approval: { marginTop: 12, marginLeft: 36, padding: 12, gap: 10, borderRadius: 16, borderWidth: 1.5, backgroundColor: colors.card },
   apHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   apTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
   apSub: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  apCode: { flexGrow: 0, borderRadius: 8, backgroundColor: '#0B0C0E' },
+  apCode: { flexGrow: 0, borderRadius: 8, backgroundColor: colors.code },
   apCommand: { color: colors.text, fontFamily: mono, fontSize: 13, lineHeight: 20 },
   apWhy: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   apNote: { color: colors.dim, fontSize: 13, lineHeight: 18 },
@@ -690,9 +703,9 @@ const styles = StyleSheet.create({
   error: { color: colors.bad, fontSize: 13, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 6 },
   popover: { position: 'absolute', left: 12, right: 12, bottom: '100%', marginBottom: 4, backgroundColor: colors.raised, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#343840', overflow: 'hidden' },
   popRow: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
-  popLine: { height: StyleSheet.hairlineWidth, backgroundColor: '#343840', marginHorizontal: 12 },
+  popLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.menuBorder, marginHorizontal: 12 },
   popName: { color: colors.text, fontSize: 15, fontWeight: '600' },
   popHandle: { color: colors.dim, fontSize: 13 },
   popJob: { flex: 1, textAlign: 'right', color: colors.faint, fontSize: 12 },
-  allDisc: { width: 28, height: 28, borderRadius: 14, backgroundColor: mix('#8B7CF6', 0.25), alignItems: 'center', justifyContent: 'center' },
-});
+  allDisc: { width: 28, height: 28, borderRadius: 14, backgroundColor: mix(colors.accent, 0.25), alignItems: 'center', justifyContent: 'center' },
+}));

@@ -10,7 +10,8 @@ import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import { activityLine, APPROVAL_TIMEOUT_S, countdown, stillWorking, type Decision, type ToolCall } from '@/lib/chatState';
 import type { ApprovalChoice, ApprovalRequest } from '@/lib/hermes';
-import { colors, mix, mono, onColor } from '@/lib/theme';
+import { mono, onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** Chrome text (chips, buttons, badges) grows with Dynamic Type up to this much, so it doesn't break (REVIEW.md HIG check). */
 export const CHROME_SCALE = 1.4;
@@ -37,6 +38,7 @@ function useReduceMotion(): boolean {
 
 /** The three dots pulse in sequence over 1.2 s; with Reduce Motion they hold still. */
 function Dots() {
+  const styles = useStyles();
   const still = useReduceMotion();
   const t = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -62,6 +64,7 @@ function Dots() {
  * time when it was picked up from another device, so it reads "2 min" there).
  */
 export function TypingRow({ bot, since }: { bot: string; since: number }) {
+  const styles = useStyles();
   const [now, setNow] = useState(() => Date.now());
   const start = useRef(since || Date.now()).current;
   useEffect(() => {
@@ -88,6 +91,7 @@ export function TypingRow({ bot, since }: { bot: string; since: number }) {
 
 /** A 12 px spinner. */
 function Spinner() {
+  const styles = useStyles();
   const still = useReduceMotion();
   const t = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -105,6 +109,8 @@ function Spinner() {
  * "✓ Used Trello, Web search · 4 steps ›" when it's done. Tap it for the steps, tap a step for what it ran.
  */
 export function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [openStep, setOpenStep] = useState<number | null>(null);
   const failed = tools.some((t) => t.status === 'failed');
@@ -180,6 +186,8 @@ function useSecondsLeft(): number {
  * bot's next step would be, and scrolls with the chat. One tap answers; while it's in flight the buttons dim.
  */
 export function ApprovalCard({ request, bot, busy, onAnswer }: { request: ApprovalRequest; bot: string; busy: boolean; onAnswer: (choice: ApprovalChoice) => void }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   const desk = useDesk();
@@ -219,6 +227,8 @@ export function ApprovalCard({ request, bot, busy, onAnswer }: { request: Approv
 
 /** An answered approval, collapsed to one line: "✓ Allowed once · rm -rf ~/notes". */
 export function DecisionChip({ decision, bot }: { decision: Decision; bot: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { color } = useBotLook(bot);
   const denied = decision.choice === 'deny';
   return (
@@ -232,7 +242,7 @@ export function DecisionChip({ decision, bot }: { decision: Decision; bot: strin
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
   typingBubble: { height: 36, borderRadius: 18, backgroundColor: colors.card, paddingHorizontal: 16, justifyContent: 'center' },
   dots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -256,4 +266,4 @@ const styles = StyleSheet.create({
   approvalWhy: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   approvalFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   approvalNote: { color: colors.dim, fontSize: 12, lineHeight: 16 },
-});
+}));

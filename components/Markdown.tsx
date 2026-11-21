@@ -7,19 +7,19 @@ import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View, type 
 import { marked, type Token, type Tokens } from 'marked';
 import { colorFor, highlight, languageFor } from '@/lib/highlight';
 import { onColor } from '@/lib/color';
-import { colors, mono } from '@/lib/theme';
+import { mono } from '@/lib/theme';
 import { isDesktop } from '@/components/desktop';
 import { isBareLink, shortUrl } from '@/lib/shortUrl';
 import { Icon } from '@/components/AppIcons';
-import { decodeEntities } from '@/lib/plainText';
 import { splitStreaming } from '@/lib/streamBlocks';
+import { decodeEntities } from '@/lib/plainText';
+import { makeStyles, useTheme } from '@/components/theme';
+import type { Colors } from '@/lib/themes';
 
 // Code shows the exact characters: no ligatures (">=" must not turn into "≥"), and a real
 // programming font where the desktop has one.
 const CODE_FONT = Platform.OS === 'web' ? 'ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Mono", Menlo, Consolas, monospace' : mono;
 export const NO_LIGATURES = Platform.OS === 'web' ? ({ fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' } as object) : null;
-
-const CODE_BG = '#0B0C0E';
 
 // Web and desktop: drag-select any part of a reply with the mouse. Phone: not selectable here, because iOS can only copy
 // the whole block and the touch is taken from the long press; <MessageMenu> offers Copy and Select Text instead.
@@ -34,6 +34,7 @@ export const BODY_SIZE = isDesktop ? 16 : 17;
  * When the reply ends the whole text is formatted at once: the same result as a reply loaded from history.
  */
 export function StreamingMarkdown({ text, accent }: { text: string; accent: string }) {
+  const styles = useStyles();
   const { done, open, fence } = useMemo(() => splitStreaming(text), [text]);
   return (
     <View style={styles.doc}>
@@ -45,6 +46,8 @@ export function StreamingMarkdown({ text, accent }: { text: string; accent: stri
 }
 
 export const Markdown = memo(function Markdown({ text, accent }: { text: string; accent: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const tokens = useMemo(() => {
     try {
       return marked.lexer(text, { gfm: true, breaks: false });
@@ -53,10 +56,11 @@ export const Markdown = memo(function Markdown({ text, accent }: { text: string;
     }
   }, [text]);
   if (!tokens) return <Text style={styles.p}>{text}</Text>;
-  return <View style={styles.doc}>{blocks(tokens, accent)}</View>;
+  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors })}</View>;
 });
 
-function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
+function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): ReactNode[] {
+  const { colors, styles } = look;
   const out: ReactNode[] = [];
   tokens.forEach((t, i) => {
     const key = `${keyPrefix}${i}`;
@@ -66,7 +70,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
       case 'paragraph':
         out.push(
           <Text key={key} style={styles.p} selectable={SELECTABLE}>
-            {inline((t as Tokens.Paragraph).tokens, accent)}
+            {inline((t as Tokens.Paragraph).tokens, accent, look)}
           </Text>,
         );
         break;
@@ -75,7 +79,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
         const tt = t as Tokens.Text;
         out.push(
           <Text key={key} style={styles.p} selectable={SELECTABLE}>
-            {tt.tokens ? inline(tt.tokens, accent) : tt.text}
+            {tt.tokens ? inline(tt.tokens, accent, look) : tt.text}
           </Text>,
         );
         break;
@@ -83,8 +87,8 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
       case 'heading': {
         const h = t as Tokens.Heading;
         out.push(
-          <Text key={key} style={[styles.h, HEADING[Math.min(h.depth, 4) - 1]]} selectable={SELECTABLE} accessibilityRole="header">
-            {inline(h.tokens, accent)}
+          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1]]} selectable={SELECTABLE} accessibilityRole="header">
+            {inline(h.tokens, accent, look)}
           </Text>,
         );
         break;
@@ -97,7 +101,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
       case 'blockquote':
         out.push(
           <View key={key} style={[styles.quote, { borderLeftColor: accent }]}>
-            {blocks((t as Tokens.Blockquote).tokens, accent, `${key}.`)}
+            {blocks((t as Tokens.Blockquote).tokens, accent, look, `${key}.`)}
           </View>,
         );
         break;
@@ -118,7 +122,7 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
                 ) : (
                   <Text style={[styles.marker, l.ordered ? styles.number : { color: accent }]}>{l.ordered ? `${start + j}.` : '•'}</Text>
                 )}
-                <View style={styles.itemBody}>{blocks(item.tokens, accent, `${key}.${j}.`)}</View>
+                <View style={styles.itemBody}>{blocks(item.tokens, accent, look, `${key}.${j}.`)}</View>
               </View>
             ))}
           </View>,
@@ -151,26 +155,27 @@ function blocks(tokens: Token[], accent: string, keyPrefix = ''): ReactNode[] {
   return out;
 }
 
-function inline(tokens: Token[] | undefined, accent: string): ReactNode[] {
+function inline(tokens: Token[] | undefined, accent: string, look: Look): ReactNode[] {
+  const { styles } = look;
   if (!tokens) return [];
   return tokens.map((t, i) => {
     switch (t.type) {
       case 'strong':
         return (
           <Text key={i} style={styles.strong}>
-            {inline((t as Tokens.Strong).tokens, accent)}
+            {inline((t as Tokens.Strong).tokens, accent, look)}
           </Text>
         );
       case 'em':
         return (
           <Text key={i} style={styles.em}>
-            {inline((t as Tokens.Em).tokens, accent)}
+            {inline((t as Tokens.Em).tokens, accent, look)}
           </Text>
         );
       case 'del':
         return (
           <Text key={i} style={styles.del}>
-            {inline((t as Tokens.Del).tokens, accent)}
+            {inline((t as Tokens.Del).tokens, accent, look)}
           </Text>
         );
       case 'codespan':
@@ -194,7 +199,7 @@ function inline(tokens: Token[] | undefined, accent: string): ReactNode[] {
             accessibilityRole="link"
             accessibilityHint={bare ? 'Opens the link. Press and hold to copy it.' : undefined}
           >
-            {bare ? shortUrl(l.href) : inline(l.tokens, accent)}
+            {bare ? shortUrl(l.href) : inline(l.tokens, accent, look)}
           </Text>
         );
       }
@@ -210,7 +215,7 @@ function inline(tokens: Token[] | undefined, accent: string): ReactNode[] {
         return '\n';
       case 'text': {
         const tt = t as Tokens.Text;
-        return tt.tokens ? <Text key={i}>{inline(tt.tokens, accent)}</Text> : decode(tt.text);
+        return tt.tokens ? <Text key={i}>{inline(tt.tokens, accent, look)}</Text> : decode(tt.text);
       }
       case 'escape':
         return decode((t as Tokens.Escape).text);
@@ -224,6 +229,8 @@ const decode = decodeEntities;
 
 /** `plain`: no colouring (a fence still being written: colours would flicker as the code grows). */
 export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: string; plain?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [copied, setCopied] = useState(false);
   const lines = useMemo(() => highlight(code.replace(/\n$/, ''), plain ? undefined : lang), [code, lang, plain]);
   const label = languageFor(lang) ?? (lang?.trim() || 'text');
@@ -264,6 +271,9 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
 }
 
 function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const look = { styles, colors };
   // Column width from its longest cell, within limits, so wide tables scroll sideways.
   const widths = table.header.map((h, c) => {
     const longest = Math.max(h.text.length, ...table.rows.map((r) => r[c]?.text.length ?? 0));
@@ -276,7 +286,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
         <View style={[styles.tr, styles.thead]}>
           {table.header.map((h, c) => (
             <Text key={c} style={[styles.th, align(c), { width: widths[c] }]} selectable={SELECTABLE}>
-              {inline(h.tokens, accent)}
+              {inline(h.tokens, accent, look)}
             </Text>
           ))}
         </View>
@@ -284,7 +294,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
           <View key={i} style={[styles.tr, i % 2 === 1 && styles.zebra]}>
             {r.map((cell, c) => (
               <Text key={c} style={[styles.td, align(c), { width: widths[c] }]} selectable={SELECTABLE}>
-                {inline(cell.tokens, accent)}
+                {inline(cell.tokens, accent, look)}
               </Text>
             ))}
           </View>
@@ -294,15 +304,16 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
   );
 }
 
+type Look = { styles: ReturnType<typeof useStyles>; colors: Colors };
 const BODY = BODY_SIZE;
-const HEADING: TextStyle[] = [
+const heading = (colors: Colors): TextStyle[] => [
   { fontSize: 22, marginTop: 6 },
   { fontSize: 19, marginTop: 4 },
   { fontSize: 17 },
   { fontSize: 16, color: colors.dim },
 ];
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   doc: { gap: 10 },
   p: { color: colors.text, fontSize: BODY, lineHeight: 24 },
   h: { color: colors.text, fontWeight: '700', lineHeight: 28 },
@@ -314,8 +325,8 @@ const styles = StyleSheet.create({
     fontFamily: CODE_FONT,
     ...NO_LIGATURES,
     fontSize: BODY - 2,
-    backgroundColor: '#24272D',
-    color: '#E7E9EC',
+    backgroundColor: colors.inlineCode,
+    color: colors.codeText,
     ...(Platform.OS === 'web' ? { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5 } : null),
   },
   quote: { borderLeftWidth: 3, paddingLeft: 12, gap: 8, opacity: 0.9 },
@@ -325,7 +336,7 @@ const styles = StyleSheet.create({
   number: { minWidth: 22, fontVariant: ['tabular-nums'] },
   itemBody: { flex: 1, gap: 6 },
   hr: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 6 },
-  code: { backgroundColor: CODE_BG, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
+  code: { backgroundColor: colors.code, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
   codeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -341,7 +352,7 @@ const styles = StyleSheet.create({
   copy: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36 },
   copyText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   codeScroll: { paddingVertical: 10, paddingHorizontal: 12 },
-  codeText: { fontFamily: CODE_FONT, fontSize: 13, lineHeight: 20, color: '#E7E9EC', ...NO_LIGATURES },
+  codeText: { fontFamily: CODE_FONT, fontSize: 13, lineHeight: 20, color: colors.codeText, ...NO_LIGATURES },
   // Hugs the table, and scrolls sideways when it's wider than the chat.
   tableWrap: { alignSelf: 'flex-start', maxWidth: '100%', borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   tableBody: { flexGrow: 0 },
@@ -353,4 +364,4 @@ const styles = StyleSheet.create({
   zebra: { backgroundColor: 'transparent' },
   th: { color: colors.dim, fontWeight: '600', fontSize: 13, lineHeight: 18, paddingHorizontal: 12, paddingVertical: 8 },
   td: { color: colors.text, fontSize: 15, lineHeight: 20, paddingHorizontal: 12, paddingVertical: 8 },
-});
+}));

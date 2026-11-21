@@ -9,7 +9,7 @@ import { isDesktop } from '@/components/desktop';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { setListHidden, useListHidden } from '@/components/useListHidden';
 import { CHAT_MAX_WIDTH, DESKTOP_SIDEBAR_WIDTH, foldNavFor, SIDEBAR_WIDTH } from '@/lib/layoutClass';
-import { colors } from '@/lib/theme';
+import { makeStyles } from '@/components/theme';
 
 // Phones, the folded Duo and the open Duo in portrait: the bot list, and a tap pushes the chat.
 // Open Duo in landscape and a wide desktop window: a slim bot list on the left, the chat in the
@@ -18,6 +18,7 @@ const DESKTOP_TWO_PANE = 720;
 const DESKTOP_CHAT_MAX = 820;
 
 export default function Home() {
+  const styles = useStyles();
   const { width } = useWindowDimensions();
   const cls = useLayoutClass();
   const params = useLocalSearchParams<{ bot?: string; chat?: string; at?: string; n?: string; room?: string }>();
@@ -107,10 +108,10 @@ export default function Home() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   row: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
   sidebar: { width: isDesktop ? DESKTOP_SIDEBAR_WIDTH : SIDEBAR_WIDTH, backgroundColor: colors.sidebar, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
   detail: { flex: 1 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: colors.dim, fontSize: 15 },
-});
+}));

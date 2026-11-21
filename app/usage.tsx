@@ -7,19 +7,24 @@ import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { BotUsageRow, FailBanner, ProviderCard, Segmented, SkeletonBotRows, SkeletonCard, TotalsCard, Unreachable, UpdatedLine } from '@/components/UsageParts';
 import { useBotsUsage, useDays, useUsageSnapshot } from '@/components/useUsage';
-import { colors } from '@/lib/theme';
 import { clockLabel, dueResets, hasActivity, localTokens, sortBots, updatedLine } from '@/lib/usage';
+import { makeStyles, useTheme } from '@/components/theme';
 
-const Header = ({ children }: { children: string }) => (
+const Header = ({ children }: { children: string }) => {
+const styles = useStyles();
+return (
   <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
     {children}
   </Text>
 );
+};
 
 // Usage (card 25, docs/design/REVIEW.md Fix 12): the AI subscriptions (Hermes's account limits), then what each bot
 // used. Everything comes from `hermes serve` (lib/usage.ts); nothing is stored. Refreshes once on open, on pull (↻ on
 // desktop), on returning to the app after 5 minutes, and once for each window that shows "Reset due". No timer.
 export default function UsageScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const column = useColumnStyle();
   const insets = useSafeAreaInsets();
   const [days, setDays] = useDays();
@@ -173,7 +178,7 @@ export default function UsageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { paddingHorizontal: 16, paddingBottom: 40 },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'transparent' },
@@ -195,4 +200,4 @@ const styles = StyleSheet.create({
   plainText: { color: colors.dim, fontSize: 15, lineHeight: 20 },
   error: { color: colors.bad, fontSize: 13, lineHeight: 18 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginHorizontal: 16, marginTop: 12 },
-});
+}));

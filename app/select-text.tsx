@@ -7,8 +7,9 @@ import { useTint } from '@/components/Buttons';
 import { useColumnStyle } from '@/components/Column';
 import { NO_LIGATURES } from '@/components/Markdown';
 import { Sheet, type SheetAction } from '@/components/Sheet';
+import { makeStyles } from '@/components/theme';
 import { plainSegments, plainText } from '@/lib/plainText';
-import { colors, mono } from '@/lib/theme';
+import { mono } from '@/lib/theme';
 
 // "Select Text" (card 32): one message as plain text in read-only TextInputs, so the phone's own selection works:
 // handles to pick part of it, then Copy, Look Up, Share and Translate. A TextInput is used because selectable <Text>
@@ -17,6 +18,7 @@ import { colors, mono } from '@/lib/theme';
 export default function SelectTextScreen() {
   const { text = '', bot, raw } = useLocalSearchParams<{ text?: string; bot?: string; raw?: string }>();
   const column = useColumnStyle();
+  const styles = useStyles();
   const tint = useTint(bot || undefined);
   const { bottom } = useSafeAreaInsets();
   const segments = useMemo(() => (raw ? (text ? [{ kind: 'text' as const, text }] : []) : plainSegments(text)), [text, raw]);
@@ -55,6 +57,7 @@ const CODE_LINE = 20;
  * height; padding sits on the wrapper so it is never counted twice), and the page scrolls.
  */
 function ReadOnlyBox({ text, code, tint }: { text: string; code: boolean; tint: string }) {
+  const styles = useStyles();
   const [height, setHeight] = useState<number | undefined>();
   const [epoch, setEpoch] = useState(0);
   const width = useRef<number | undefined>(undefined);
@@ -90,11 +93,11 @@ function ReadOnlyBox({ text, code, tint }: { text: string; code: boolean; tint: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   body: { padding: 16, gap: 12 },
   text: { color: colors.text, fontSize: 17, lineHeight: TEXT_LINE, padding: 0 },
   codeBox: { backgroundColor: colors.code, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 },
-  code: { color: colors.text, fontFamily: mono, fontSize: 13, lineHeight: CODE_LINE, padding: 0, ...NO_LIGATURES },
-});
+  code: { color: colors.codeText, fontFamily: mono, fontSize: 13, lineHeight: CODE_LINE, padding: 0, ...NO_LIGATURES },
+}));

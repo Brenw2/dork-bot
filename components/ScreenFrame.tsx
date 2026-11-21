@@ -5,11 +5,12 @@
 // (iOS 26, Duo) that put the message box under the keyboard (card 29).
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, type LayoutChangeEvent } from 'react-native';
-import { colors } from '@/lib/theme';
+import { makeStyles } from '@/components/theme';
 
 export const KEYBOARD_OFFSET = 0;
 
 export function ScreenFrame({ header, composer, onLayout, children }: { header: ReactNode; composer: ReactNode; onLayout?: (e: LayoutChangeEvent) => void; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -24,6 +25,6 @@ export function ScreenFrame({ header, composer, onLayout, children }: { header: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-});
+}));

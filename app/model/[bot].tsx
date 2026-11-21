@@ -14,10 +14,12 @@ import { setModelChoice } from '@/lib/bots';
 import { useCurrentChat } from '@/components/currentChat';
 import { firstChatId } from '@/lib/chats';
 import { filterCatalog, switchModel, type ModelChoice } from '@/lib/models';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // Switch a bot's model (tap the model line at the top of the chat). Applies from the next message.
 export default function PickModel() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -114,7 +116,7 @@ export default function PickModel() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
   search: { margin: 16, marginBottom: 0, color: colors.text, fontSize: 17, height: 36, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.card },
@@ -129,4 +131,4 @@ const styles = StyleSheet.create({
   tag: { color: colors.dim, fontSize: 13 },
   check: { fontSize: 22, fontWeight: '700' },
   note: { color: colors.dim, fontSize: 13, lineHeight: 18, marginHorizontal: 16, marginTop: 14 },
-});
+}));

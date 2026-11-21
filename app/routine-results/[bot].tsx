@@ -13,11 +13,13 @@ import { getConnection } from '@/lib/bots';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { RoutineResults, type RoutineResult } from '@/lib/routineResults';
 import { whenLabel } from '@/lib/routines';
-import { colors, mix } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // A bot's Routine results: every routine run's full output, newest at the bottom, each labeled with
 // the routine's name and when it ran. Separate from the bot's normal chats; read-only.
 export default function RoutineResultsScreen() {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -85,7 +87,7 @@ export default function RoutineResultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 12 },
   entry: { padding: 14, gap: 8, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1 },
@@ -94,4 +96,4 @@ const styles = StyleSheet.create({
   when: { color: colors.dim, fontSize: 13 },
   empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 30, lineHeight: 22 },
   error: { color: colors.bad, fontSize: 14 },
-});
+}));

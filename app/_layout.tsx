@@ -10,7 +10,7 @@ import { NotificationRoutes } from '@/components/notifications';
 import { Overlay } from '@/components/Overlay';
 import { TestInsets } from '@/components/TestInsets';
 import { applyInitialOrientation, OrientationController } from '@/components/useLayoutClass';
-import { colors } from '@/lib/theme';
+import { ThemeProvider, useTheme } from '@/components/theme';
 
 // A screen that throws shows expo-router's error page with a Retry button, instead of blanking
 // the whole window (the desktop app went black on one bad render).
@@ -25,19 +25,26 @@ applyInitialOrientation();
 
 export default function RootLayout() {
   return (
-    <TestInsets>
-      <StatusBar style="light" />
-      <OrientationController />
-      <Screens />
-      <NotificationRoutes />
-      <AvatarExport />
-      <DialogHost />
-    </TestInsets>
+    <ThemeProvider>
+      <TestInsets>
+        <ThemedStatusBar />
+        <OrientationController />
+        <Screens />
+        <NotificationRoutes />
+        <AvatarExport />
+        <DialogHost />
+      </TestInsets>
+    </ThemeProvider>
   );
 }
 
+function ThemedStatusBar() {
+  const { theme } = useTheme();
+  return <StatusBar style={theme.statusBar} />;
+}
+
 // Screens that pop up over the app: a sheet on the phone, a panel over the dimmed app on desktop.
-const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'usage', 'usage/[bot]', 'look/[bot]', 'connectors/[bot]', 'connector/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]', 'room-new', 'select-text']);
+const POPUPS = new Set(['new', 'add', 'connect', 'notifications', 'appearance', 'usage', 'usage/[bot]', 'look/[bot]', 'connectors/[bot]', 'connector/[bot]', 'model/[bot]', 'chats/[bot]', 'routines/[bot]', 'routine-results/[bot]', 'work/[bot]', 'work-session/[bot]', 'bot/[bot]', 'room-new', 'select-text']);
 
 // The panel's own title; a bot's name goes under it (components/Overlay.tsx, components/Sheet.tsx).
 const TITLES: Record<string, string> = {
@@ -65,6 +72,7 @@ function PopupOverlay({ route, title, children }: { route: { name: string; param
 }
 
 function Screens(): ReactNode {
+  const { colors } = useTheme();
   // The iPhone Duo has an 84 pt status rail on one side (right when closed, either side when open in
   // landscape). The header avoids it by itself; screen content doesn't, so every screen is inset here.
   const { left, right } = useSafeAreaInsets();
@@ -114,6 +122,7 @@ function Screens(): ReactNode {
       <Stack.Screen name="work/[bot]" options={popup('Work')} />
       <Stack.Screen name="work-session/[bot]" options={popup('Work')} />
       <Stack.Screen name="notifications" options={popup('Notifications')} />
+      <Stack.Screen name="appearance" options={popup('Appearance')} />
       {/* Usage draws its own header (back, large title, Updated line) on the phone: a pushed screen, not a sheet. */}
       <Stack.Screen name="usage" options={isDesktop ? popup('Usage') : { title: '', headerShown: false }} />
       <Stack.Screen name="usage/[bot]" options={isDesktop ? popup('Usage') : { title: '', headerShown: false }} />

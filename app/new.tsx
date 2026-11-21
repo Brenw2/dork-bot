@@ -11,13 +11,15 @@ import { pushMeta } from '@/components/sync';
 import { listBots, saveBot } from '@/lib/bots';
 import { TEMPLATE_PROFILE, type HermesManager, type Profile } from '@/lib/manager';
 import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
-import { colors, mono } from '@/lib/theme';
+import { mono } from '@/lib/theme';
 import { Button, SmallButton } from '@/components/Buttons';
 import { Group, GroupHeader, GroupRow } from '@/components/Grouped';
 import { Sheet } from '@/components/Sheet';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // Create a bot (a new Hermes profile, on any model), or connect one that's already on Hermes.
 export default function NewBot() {
+  const styles = useStyles();
   const [manager, setManager] = useState<HermesManager | null | undefined>(undefined);
   const [name, setName] = useState('');
   const [job, setJob] = useState('');
@@ -159,6 +161,8 @@ export default function NewBot() {
 }
 
 function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { label, ...input } = props;
   return (
     <View style={{ gap: 6 }}>
@@ -168,7 +172,7 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   body: { padding: 20, gap: 18 },
@@ -201,4 +205,4 @@ const styles = StyleSheet.create({
   sub: { color: colors.dim, fontSize: 13, marginTop: 2 },
   addText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
   link: { color: colors.dim, fontSize: 14, textAlign: 'center', marginTop: 8, textDecorationLine: 'underline' },
-});
+}));

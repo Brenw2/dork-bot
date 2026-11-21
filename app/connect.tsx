@@ -9,11 +9,13 @@ import { saveManagerAuth } from '@/lib/bots';
 import type { FetchLike } from '@/lib/hermes';
 import { HermesManager } from '@/lib/manager';
 import { managerFromParams } from '@/lib/pairing';
-import { colors } from '@/lib/theme';
 import { Button } from '@/components/Buttons';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // Opened by a dorkbot://connect?admin=…&chat=…&rt=… code from scripts/pair-hermes.sh.
 export default function Connect() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const params = useLocalSearchParams();
   const link = managerFromParams(params);
   const [state, setState] = useState<'checking' | 'ok' | string>('checking');
@@ -61,11 +63,11 @@ export default function Connect() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.bg },
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
   title: { color: colors.text, fontSize: 20, fontWeight: '600' },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center' },
   error: { color: colors.bad, fontSize: 15, textAlign: 'center' },
   button: { marginTop: 10, paddingHorizontal: 28 },
-});
+}));
