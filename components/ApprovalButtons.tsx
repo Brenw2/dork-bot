@@ -4,6 +4,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { onColor } from '@/lib/theme';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 export function ApprovalButtons({
   choices,
@@ -45,9 +46,9 @@ export function ApprovalButtons({
               accessibilityRole="button"
               accessibilityLabel={labels[c] ?? c}
               testID={`approval-${c}`}
-              style={({ pressed }) => [styles.button, { height }, fill(c), (pressed || dim) && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.button, { minHeight: height }, fill(c), (pressed || dim) && { opacity: 0.6 }]}
             >
-              <Text style={[styles.text, { color: text(c) }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+              <Text style={[styles.text, { color: text(c) }]} numberOfLines={2} maxFontSizeMultiplier={maxScale.chrome}>
                 {labels[c] ?? c}
               </Text>
             </Pressable>

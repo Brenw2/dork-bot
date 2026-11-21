@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/AppIcons';
 import { SmallButton } from '@/components/Buttons';
-import { CHROME_SCALE } from '@/components/ChatStatus';
+import { maxScale } from '@/lib/type';
 import { describeFailure, type Failure } from '@/lib/errors';
 import { ErrorBanner } from '@/components/States';
 import { makeStyles, useTheme } from '@/components/theme';
@@ -57,7 +57,7 @@ export function FailureCard({ failure, bot, name, onAgain, onNewChat, onRetryUns
     <View style={styles.card} accessibilityLiveRegion="polite" testID="failure-card">
       <View style={styles.cardTitle}>
         <Icon name="warning" size={18} color={colors.bad} />
-        <Text style={styles.title} maxFontSizeMultiplier={CHROME_SCALE}>
+        <Text style={styles.title} maxFontSizeMultiplier={maxScale.chrome}>
           {view.title}
         </Text>
       </View>

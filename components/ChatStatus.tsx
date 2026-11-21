@@ -13,9 +13,7 @@ import { activityLine, APPROVAL_TIMEOUT_S, countdown, stillWorking, type Decisio
 import type { ApprovalChoice, ApprovalRequest } from '@/lib/hermes';
 import { mono, onColor } from '@/lib/theme';
 import { makeStyles, useTheme } from '@/components/theme';
-
-/** Chrome text (chips, buttons, badges) grows with Dynamic Type up to this much, so it doesn't break (REVIEW.md HIG check). */
-export const CHROME_SCALE = 1.4;
+import { maxScale } from '@/lib/type';
 
 /** The desktop app, and the web build in a desktop-sized window: desktop sizes instead of the phone's. */
 export function useDesk(): boolean {
@@ -82,7 +80,7 @@ export function TypingRow({ bot, since }: { bot: string; since: number }) {
         </View>
       </View>
       {note ? (
-        <Text style={styles.still} maxFontSizeMultiplier={CHROME_SCALE}>
+        <Text style={styles.still} maxFontSizeMultiplier={maxScale.chrome}>
           {note}
         </Text>
       ) : null}
@@ -194,10 +192,10 @@ export function ApprovalCard({ request, bot, busy, onAnswer }: { request: Approv
       <View style={styles.approvalHead}>
         <BotSprite bot={bot} size={24} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.approvalTitle} maxFontSizeMultiplier={CHROME_SCALE}>
+          <Text style={styles.approvalTitle} maxFontSizeMultiplier={maxScale.chrome}>
             Run this command?
           </Text>
-          <Text style={styles.approvalSub} maxFontSizeMultiplier={CHROME_SCALE} numberOfLines={1}>
+          <Text style={styles.approvalSub} maxFontSizeMultiplier={maxScale.chrome} numberOfLines={1}>
             {name} needs your OK
           </Text>
         </View>

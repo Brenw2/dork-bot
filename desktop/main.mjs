@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { nextZoom, zoomAction } from './zoom.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB = join(HERE, 'web');
@@ -72,6 +73,14 @@ function createWindow(start) {
     webPreferences: { preload: join(HERE, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   win.removeMenu();
+  // Ctrl + / Ctrl - / Ctrl 0 and Ctrl + wheel: zoom shortcuts live in the menu we just removed, so they are handled here.
+  win.webContents.on('before-input-event', (e, input) => {
+    const action = zoomAction(input);
+    if (!action) return;
+    e.preventDefault();
+    win?.webContents.setZoomLevel(nextZoom(win.webContents.getZoomLevel(), action));
+  });
+  win.webContents.on('zoom-changed', (_e, direction) => win?.webContents.setZoomLevel(nextZoom(win.webContents.getZoomLevel(), direction)));
   // Dark scrollbars and form controls (nativeTheme alone doesn't reach the page on Linux).
   win.webContents.on('dom-ready', () => void win?.webContents.insertCSS(':root { color-scheme: dark; }'));
   // Links in replies open in the normal browser, never inside the app.
