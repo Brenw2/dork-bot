@@ -16,6 +16,7 @@ import { skinStyle, PROMPT } from '@/lib/themeSkin';
 const DESCRIPTION: Record<ThemeId, string> = {
   classic: 'Today’s look. Dark, purple accent, Messages-style.',
   terminal: 'Near-black console. Mint highlights, one mono font, square corners.',
+  paper: 'Light and calm. Warm white, black bubbles, serif titles.',
 };
 
 // The preview is drawn in its own theme, so it is made with that theme's skin (its font, its corners). Until the

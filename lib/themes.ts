@@ -1,7 +1,7 @@
 // The app's themes (Appearance setting, docs: design-comps/dork-bot-redesign-2026-11-19/THEMES.md). Plain TypeScript, no
 // React Native, so tests can import it. Classic equals the app as it was before themes: every value here is the old
 // lib/theme.ts value. Terminal, Paper and Arcade are added by their own cards, each after Design's PASS.
-export type ThemeId = 'classic' | 'terminal';
+export type ThemeId = 'classic' | 'terminal' | 'paper';
 
 export interface Colors {
   bg: string;
@@ -48,6 +48,8 @@ export interface Fonts {
   bold: string;
   /** Code blocks and inline code. */
   mono: string;
+  /** Paper: the serif for the large title and reply headings. Other themes have none. */
+  display?: string;
 }
 
 /**
@@ -62,6 +64,18 @@ export interface Shape {
   userRule: boolean;
   brackets: boolean;
   dashed: boolean;
+  // Paper (optional: Classic and Terminal leave these out, so their styles are used exactly as written):
+  /** Corner radii by Classic's value (12 -> 22): cards, groups and sheets are rounder. Applied to every radius with that exact value. */
+  radii?: Record<number, number>;
+  /** Your bubble is the theme's `user` color (not the bot's), and its bottom-right corner is `tail`. */
+  solidBubble?: boolean;
+  tail?: number;
+  /** Bot avatars get a ring in the text color of this width. */
+  ring?: number;
+  /** The bot list sits in one rounded card (phone and desktop list). */
+  listCard?: boolean;
+  /** Header icon buttons sit in a circle: white with a hairline, and the primary one (+) in the accent. */
+  circleButtons?: boolean;
 }
 
 export interface Theme {
@@ -163,6 +177,51 @@ export const THEMES: Record<ThemeId, Theme> = {
     fonts: { regular: 'JetBrainsMono-Regular', semibold: 'JetBrainsMono-SemiBold', bold: 'JetBrainsMono-Bold', mono: 'JetBrainsMono-Regular' },
     shape: { square: true, lowercase: true, userRule: true, brackets: true, dashed: true },
   },
+  // Paper (kit-paper.png, b1/b2): light and calm. Warm off-white, white cards, black bubbles and buttons, Instrument
+  // Serif titles, Inter UI, JetBrains Mono code. Values from themes.proposed.ts; `track` and the scrollbar (not in the
+  // proposal) are the border family, one step darker for the thumb.
+  paper: {
+    id: 'paper',
+    name: 'Paper',
+    statusBar: 'dark',
+    mixBase: '#FFFFFF',
+    colors: {
+      bg: '#F4F4F1',
+      card: '#FFFFFF',
+      border: '#E3E3DD',
+      text: '#141414',
+      dim: '#6E6E68',
+      accent: '#141414',
+      user: '#141414',
+      ok: '#2F9E6A',
+      bad: '#D63A2F',
+      warn: '#C2610C',
+      raised: '#EEEEEA',
+      hover: '#F7F7F4',
+      faint: '#A3A39C',
+      sidebar: '#EDEDE8',
+      chevron: '#C9C9C2',
+      disclosure: '#A3A39C',
+      code: '#FFFFFF',
+      menuBorder: '#E3E3DD',
+      menuHover: '#F0F0EB',
+      errorBg: '#FBEAE8',
+      errorLine: '#F1C7C2',
+      errorText: '#8A1F17',
+      errorDetail: '#A5524B',
+      badgeText: '#FFFFFF',
+      dialog: '#FFFFFF',
+      inlineCode: '#EAEAE4',
+      codeText: '#141414',
+      track: '#E3E3DD',
+      scrollThumb: '#D3D3CC',
+      scrollThumbHover: '#C0C0B8',
+      userText: '#FFFFFF',
+      send: 'accent',
+    },
+    fonts: { regular: 'Inter-Regular', semibold: 'Inter-SemiBold', bold: 'Inter-Bold', mono: 'JetBrainsMono-Regular', display: 'InstrumentSerif-Regular' },
+    shape: { square: false, lowercase: false, userRule: false, brackets: false, dashed: false, radii: { 12: 22, 14: 22, 16: 22, 18: 20 }, solidBubble: true, tail: 6, ring: 1.5, listCard: true, circleButtons: true },
+  },
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
@@ -170,7 +229,7 @@ export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
  * The themes the Appearance picker offers, in order. A theme joins this list only after Design's PASS on it
  * (THEMES.md); until then it is built but not offered. Terminal: the card is merged on Design's PASS.
  */
-export const PICKER_THEMES: ThemeId[] = ['classic', 'terminal'];
+export const PICKER_THEMES: ThemeId[] = ['classic', 'terminal', 'paper'];
 export const DEFAULT_THEME: ThemeId = 'classic';
 
 /** A stored value as a theme id; anything unknown (a theme from a newer build, junk) is the default. */

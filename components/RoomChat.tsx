@@ -537,7 +537,7 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
       {it.type === 'system' ? (
         <Text style={styles.system}>{it.text}</Text>
       ) : it.type === 'user' ? (
-        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : styles.bubble}>
+        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : theme.shape.solidBubble ? [styles.bubble, styles.bubbleSolid] : styles.bubble}>
           {rule ? (
             <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no">
               {PROMPT}
@@ -646,6 +646,8 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   system: { alignSelf: 'center', color: colors.dim, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
   bubble: { alignSelf: 'flex-end', maxWidth: '82%', marginTop: 14, backgroundColor: mix(colors.accent, 0.3), borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
   bubbleText: { color: colors.text, fontSize: BODY, lineHeight: isDesktop ? 24 : 22 },
+  // Paper: your bubble is the theme's ink with a 6 tail corner at the bottom right.
+  bubbleSolid: { backgroundColor: colors.user, borderBottomRightRadius: 6 },
   ruleRow: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 14, backgroundColor: colors.card, borderLeftWidth: 2, borderLeftColor: colors.accent, paddingHorizontal: 12, paddingVertical: 9 },
   prompt: { color: colors.accent, fontSize: BODY, lineHeight: isDesktop ? 24 : 22, fontWeight: '700' },
   msg: { flexDirection: 'row', gap: 8 },

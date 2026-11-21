@@ -658,6 +658,9 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
   const local = message.localImages ?? [];
   const remote = local.length ? [] : (message.images ?? []);
   const rule = theme.shape.userRule;
+  // Paper: your bubble is the theme's ink (not the bot's color) with a small tail corner at the bottom right.
+  const solid = !!theme.shape.solidBubble;
+  const tail = theme.shape.tail ?? 18;
   return (
     <View style={[styles.mine, rule ? styles.mineRule : { maxWidth: isDesktop ? '70%' : '78%' }]}>
       {local.length || remote.length ? (
@@ -672,7 +675,7 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
       ) : null}
       {message.content ? (
         // Terminal: your message is a full-width row with a rule at the left and a prompt mark, not a bubble.
-        <MessageMenu text={message.content} bot={bot} raw style={rule ? styles.ruleRow : [styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
+        <MessageMenu text={message.content} bot={bot} raw style={rule ? styles.ruleRow : [styles.bubble, { backgroundColor: solid ? colors.user : mix(color, 0.3) }, solid && { borderBottomRightRadius: tail }]}>
           {rule ? (
             <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no" maxFontSizeMultiplier={maxScale.mono}>
               {PROMPT}

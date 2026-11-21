@@ -39,6 +39,7 @@ function useApprovalTick(): number {
 import { RoomListRow } from '@/components/RoomRow';
 import { useRoomRows } from '@/components/roomsClient';
 import { makeStyles, useTheme } from '@/components/theme';
+import { onColor } from '@/lib/theme';
 import { PICKER_THEMES } from '@/lib/themes';
 
 /**
@@ -46,7 +47,8 @@ import { PICKER_THEMES } from '@/lib/themes';
  * compact: the sidebar next to a chat (desktop and the open Duo in landscape).
  */
 export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
-  const { colors, label } = useTheme();
+  const { colors, label, theme } = useTheme();
+  const card = !!theme.shape.listCard;
   const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, ConnectState>>({});
@@ -163,7 +165,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
             </View>
           ) : undefined
         }
-        contentContainerStyle={rows.length ? (compact ? styles.listCompact : styles.list) : styles.emptyWrap}
+        contentContainerStyle={rows.length ? (compact ? styles.listCompact : card ? styles.listCard : styles.list) : styles.emptyWrap}
         ListEmptyComponent={
           <EmptyState
             style={{ marginTop: 0 }}
@@ -172,8 +174,8 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
             body={label("Tap New bot to make one, or to add a bot that's already on Hermes.")}
           />
         }
-        renderItem={({ item }) => (
-          <BotRow saved={item.saved} compact={compact} selected={item.bot === selected} state={status[item.bot]} preview={previews[item.bot]} onOpen={() => open(item.saved)} />
+        renderItem={({ item, index }) => (
+          <BotRow saved={item.saved} compact={compact} selected={item.bot === selected} state={status[item.bot]} preview={previews[item.bot]} onOpen={() => open(item.saved)} last={card && index === rows.length - 1} />
         )}
       />
     </View>
@@ -186,6 +188,9 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const term = theme.shape.brackets;
+  // Paper: the large title is Instrument Serif at 46 (b1 comp); only the phone's large title, not the sidebar's.
+  const serif = theme.fonts?.display;
+  const circles = !!theme.shape.circleButtons;
   // Terminal: each header action is text (see textButton), so there is no icon box to size.
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
     styles.headerButton,
@@ -214,10 +219,22 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   ) : (
     <View style={styles.headerButtons}>
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
-        <Icon name="ellipsis" size={icon} color={colors.accent} />
+        {circles ? (
+          <View style={[styles.circle, { width: hit - 4, height: hit - 4, borderRadius: (hit - 4) / 2, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }]}>
+            <Icon name="ellipsis" size={icon - 6} color={colors.text} />
+          </View>
+        ) : (
+          <Icon name="ellipsis" size={icon} color={colors.accent} />
+        )}
       </Pressable>
       <Pressable onPress={(e) => onCompose({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="New bot" style={buttonStyle}>
-        <Icon name="compose" size={icon} color={colors.accent} />
+        {circles ? (
+          <View style={[styles.circle, { width: hit - 4, height: hit - 4, borderRadius: (hit - 4) / 2, backgroundColor: colors.accent }]}>
+            <Icon name="plus" size={icon - 4} color={onColor(colors.accent)} stroke={2.4} />
+          </View>
+        ) : (
+          <Icon name="compose" size={icon} color={colors.accent} />
+        )}
       </Pressable>
     </View>
   );
@@ -242,7 +259,7 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
         <View style={styles.gaugeSlot}>{gauge}</View>
         {buttons}
       </View>
-      <Text style={[styles.largeTitle, term && styles.largeTitleTerm]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? maxScale.mono : maxScale.chrome}>
+      <Text style={[styles.largeTitle, term && styles.largeTitleTerm, serif && { fontFamily: serif, fontSize: 46, lineHeight: 50 }]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? maxScale.mono : maxScale.chrome}>
         {term ? 'dork-bot' : 'Dork Bot'}
         {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
       </Text>
@@ -250,10 +267,11 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   );
 }
 
-function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: SavedBot; compact: boolean; selected: boolean; state: ConnectState | undefined; preview: BotPreview | undefined; onOpen: () => void }) {
+function BotRow({ saved, compact, selected, state, preview, onOpen, last = false }: { saved: SavedBot; compact: boolean; selected: boolean; state: ConnectState | undefined; preview: BotPreview | undefined; onOpen: () => void; last?: boolean }) {
   const { colors, theme } = useTheme();
   const styles = useStyles();
   const term = theme.shape.brackets;
+  const card = !!theme.shape.listCard;
   const bot = saved.bot;
   const name = nameOf(bot, saved.displayName);
   const mood = useBotMood(bot);
@@ -271,7 +289,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   } else if (needs) line = `Wants to run a command: ${needs.command || needs.description}`;
   else if (doing) {
     line = doing;
-    lineStyle = { color: term ? colors.accent : colors.text };
+    lineStyle = { color: term ? colors.accent : colors.text, ...(card ? { fontStyle: 'italic' as const } : null) };
   } else line = preview ? (preview.text ?? 'No messages yet') : '';
   const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
   // Terminal marks a problem line like a console does.
@@ -333,7 +351,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
       <View style={styles.rowAvatar}>
         <BotAvatar bot={bot} size={52} mood={broken ? 'sleeping' : undefined} />
       </View>
-      <View style={styles.rowBody}>
+      <View style={[styles.rowBody, last && { borderBottomWidth: 0 }]}>
         <View style={styles.rowInner}>
           <View style={styles.line1}>
             <Text style={styles.name} numberOfLines={1}>
@@ -342,7 +360,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
             <Text style={styles.time}>
               {time}
             </Text>
-            <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
+            {card ? null : <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />}
           </View>
           <View style={styles.line2}>
             <Text style={[styles.preview, lineStyle]} numberOfLines={2}>
@@ -359,11 +377,14 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
 const useStyles = makeStyles(({ colors, mix, theme: { shape: { dashed } } }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { paddingBottom: 24 },
+  // Paper: the whole list is one white card (radius 22) inset 12 from the edges.
+  listCard: { marginHorizontal: 12, marginBottom: 24, backgroundColor: colors.card, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
   listCompact: { paddingHorizontal: 8, paddingBottom: 12, gap: 2 },
   emptyWrap: { flexGrow: 1, justifyContent: 'center', padding: 32 },
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  circle: { alignItems: 'center', justifyContent: 'center' },
   // Terminal text actions: [ ... ] [ + new ]
   textAction: { minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   textActionText: { color: colors.accent, fontSize: 14, fontWeight: '600' },

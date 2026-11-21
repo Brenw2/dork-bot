@@ -195,6 +195,7 @@ export function Composer(p: ComposerProps) {
               accessibilityLabel={p.label}
               multiline
               editable={enabled}
+              keyboardAppearance={theme.statusBar === 'dark' ? 'light' : undefined}
               {...keyProps}
             />
             <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, skin({ borderRadius: fieldMin / 2 })]} />

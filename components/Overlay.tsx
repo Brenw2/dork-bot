@@ -88,7 +88,7 @@ export function Overlay({ title, bot, popover = false, children }: { title: stri
   );
 }
 
-const useStyles = makeStyles(({ colors }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, theme: { shape } }) => StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
   panel: {
     backgroundColor: colors.bg,
@@ -96,17 +96,17 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+    boxShadow: shape.radii ? '0 20px 60px rgba(0,0,0,0.18)' : '0 20px 60px rgba(0,0,0,0.5)',
   },
   popover: {
     position: 'absolute',
     top: 52,
     backgroundColor: colors.raised,
-    borderRadius: 12,
+    borderRadius: shape.radii ? 15 : 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.menuBorder,
     overflow: 'hidden',
-    boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+    boxShadow: shape.radii ? '0 12px 40px rgba(0,0,0,0.18)' : '0 12px 40px rgba(0,0,0,0.5)',
   },
   header: {
     flexDirection: 'row',

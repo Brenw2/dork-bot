@@ -78,8 +78,9 @@ function useReduceMotion(): boolean {
 /** The bot's avatar: its pixel character at 76% inside a disc of its color at 18% (docs/design/REVIEW.md). Terminal: a square tile with a 1 pt line in the bot's color. */
 export function BotAvatar({ bot, size = 52, mood }: { bot: string; size?: number; mood?: Mood }) {
   const { color } = useBotLook(bot);
-  const { theme } = useTheme();
+  const { theme, colors } = useTheme();
   const tile = theme.shape.square;
+  const ring = theme.shape.ring;
   return (
     <View
       style={{
@@ -90,6 +91,8 @@ export function BotAvatar({ bot, size = 52, mood }: { bot: string; size?: number
         alignItems: 'center',
         justifyContent: 'center',
         ...(tile ? { borderWidth: 1, borderColor: mix(color, 0.5, theme.mixBase) } : null),
+        // Paper: the disc keeps its tint and gets a ring in the ink color.
+        ...(ring ? { borderWidth: ring, borderColor: colors.text } : null),
       }}
     >
       <BotSprite bot={bot} size={Math.round(size * 0.76)} mood={mood} />

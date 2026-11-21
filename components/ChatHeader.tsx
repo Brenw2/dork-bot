@@ -54,6 +54,11 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
         <View style={{ width: hit - 8, height: hit - 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={icon} size={big ? 24 : 19} color={color} />
         </View>
+      ) : theme.shape.circleButtons ? (
+        // Paper: the icon sits in a white circle with a hairline, inside the same 44 / 32 target.
+        <View style={{ width: hit - 4, height: hit - 4, borderRadius: (hit - 4) / 2, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={big ? 20 : 16} color={colors.text} />
+        </View>
       ) : (
         <Icon name={icon} size={big ? 24 : 19} color={color} />
       )}
@@ -69,7 +74,7 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
 export function PageHeader({ pane, list, tint, title, children }: { pane: boolean; list?: { hidden: boolean; toggle: () => void }; tint: string; title: ReactNode; children: ReactNode }) {
   const { colors, label, skin, theme } = useTheme();
   // Terminal: the back link is mint (the kit's "‹ bots"); Classic keeps the bot's color.
-  const backTint = theme.shape.brackets ? colors.accent : tint;
+  const backTint = theme.shape.brackets || theme.shape.circleButtons ? colors.accent : tint;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   // Desktop shortcut: Ctrl+\ shows or hides the bot list.
@@ -106,7 +111,9 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
 }
 
 export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: boolean; list?: { hidden: boolean; toggle: () => void }; model: ChatModelState }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
+  // Paper: avatar and name sit in a white pill with a hairline (kit-paper, b2).
+  const pill = theme.shape.circleButtons ? { backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 22, paddingHorizontal: 8, paddingVertical: 4 } : null;
   const styles = useStyles();
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
@@ -148,7 +155,7 @@ export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: bool
           onPress={() => openBotSheet(bot)}
           accessibilityRole="button"
           accessibilityLabel={`Bot settings for ${name}`}
-          style={({ pressed }) => [styles.titleBlock, pressed && { backgroundColor: colors.raised }]}
+          style={({ pressed }) => [styles.titleBlock, pill, pressed && { backgroundColor: colors.raised }]}
         >
           <BotAvatar bot={bot} size={32} />
           <View style={styles.titles}>

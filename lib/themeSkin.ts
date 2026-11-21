@@ -1,7 +1,7 @@
 // Draws a theme's component styles from the styles written for Classic (plain TypeScript, no React Native, so it is
 // unit-tested). makeStyles (components/theme.tsx) runs every style sheet through skinSheet for the current theme:
 //  - Classic (no fonts, not square, not lowercase): the sheet comes back untouched, so Classic cannot move.
-//  - square: every corner radius becomes 0.
+//  - square: every corner radius becomes 0. Paper (shape.radii): radii named in its map change (12 -> 22).
 //  - fonts: a text style (it sets a size or a weight) gets the theme's font file for its weight, and loses
 //    `fontWeight` (a custom font file is already the weight; React Native would synthesize a second one over it).
 //  - lowercase: `textTransform: 'uppercase'` (section headers) becomes lowercase.
@@ -23,10 +23,15 @@ const isMono = (family: unknown) => typeof family === 'string' && /mono|menlo|co
 export function skinStyle<T>(style: T, theme: Theme): T {
   if (!style || typeof style !== 'object' || Array.isArray(style)) return style;
   const { fonts, shape } = theme;
-  if (!fonts && !shape.square && !shape.lowercase) return style;
+  if (!fonts && !shape.square && !shape.lowercase && !shape.radii) return style;
   const s = style as Style;
   const out: Style = { ...s };
-  if (shape.square) for (const k of RADII) if (typeof s[k] === 'number') out[k] = 0;
+  if (shape.square) {
+    for (const k of RADII) if (typeof s[k] === 'number') out[k] = 0;
+  } else if (shape.radii) {
+    const map = shape.radii;
+    for (const k of RADII) if (typeof s[k] === 'number' && map[s[k] as number] !== undefined) out[k] = map[s[k] as number];
+  }
   if (fonts && (s.fontSize !== undefined || s.fontWeight !== undefined || s.fontFamily !== undefined)) {
     out.fontFamily = s.fontFamily !== undefined && isMono(s.fontFamily) ? fonts.mono : weightFamily(fonts, s.fontWeight);
     delete out.fontWeight;
@@ -38,7 +43,7 @@ export function skinStyle<T>(style: T, theme: Theme): T {
 /** A whole `StyleSheet.create` result through skinStyle. Classic returns the very same object. */
 export function skinSheet<T>(sheet: T, theme: Theme): T {
   const { fonts, shape } = theme;
-  if (!fonts && !shape.square && !shape.lowercase) return sheet;
+  if (!fonts && !shape.square && !shape.lowercase && !shape.radii) return sheet;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(sheet as Record<string, unknown>)) out[k] = skinStyle(v, theme);
   return out as T;

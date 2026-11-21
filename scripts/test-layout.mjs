@@ -383,7 +383,8 @@ async function switchThemeKeepsChat(page) {
   const problems = [];
   await page.getByLabel('More', { exact: true }).first().click();
   await page.getByRole('menuitem', { name: /appearance/i }).click();
-  const other = THEME === 'terminal' ? /^Classic/ : /^Terminal/;
+  // LAYOUT_SWITCH_TO=<name> picks the row to tap (default: the other of Classic and Terminal), so Classic -> Paper is covered too.
+  const other = process.env.LAYOUT_SWITCH_TO ? new RegExp(`^${process.env.LAYOUT_SWITCH_TO}`, 'i') : THEME ? /^Classic/ : /^Terminal/;
   await page.getByRole('radio', { name: other }).click();
   await page.waitForTimeout(600);
   const after = await page.evaluate(
