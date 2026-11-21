@@ -17,7 +17,7 @@ import { splitStreaming } from '@/lib/streamBlocks';
 // Code shows the exact characters: no ligatures (">=" must not turn into "≥"), and a real
 // programming font where the desktop has one.
 const CODE_FONT = Platform.OS === 'web' ? 'ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Mono", Menlo, Consolas, monospace' : mono;
-const NO_LIGATURES = Platform.OS === 'web' ? ({ fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' } as object) : null;
+export const NO_LIGATURES = Platform.OS === 'web' ? ({ fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' } as object) : null;
 
 const CODE_BG = '#0B0C0E';
 

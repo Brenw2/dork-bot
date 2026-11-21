@@ -62,6 +62,7 @@ Inside a bot's context, interactive colour is that bot's colour (`useTint(bot)`)
 - Desktop menu: 248 wide (`MENU_WIDTH`), `raised` fill, radius 12, hairline `menuBorder`, padding 6, items 32 tall, radius 7, 14pt, 16pt icon (`dim`; destructive `bad`), shortcut 12 `faint`, hover `menuHover`. Order: create, rename, [sep] details/settings, [sep] destructive last. Destructive text ends in "…" and asks to confirm.
 - Every ⋯ menu gives its items icons (so the desktop menus match each other). A chat's ⋯ has chat actions only; the bot sheet holds the rest (REVIEW.md fix 10).
 - Dialog (desktop): 420 wide, radius 16, `dialog` fill, title 18/700, message 15/22 dim, buttons right-aligned (K3). Phone: system alert.
+- Message menu (phone): long-press a message (reply, your bubble, group message, routine result) for Copy and Select Text (plus Cancel); desktop has no menu, text drag-selects and Ctrl/Cmd+C copies.
 - Bot list ⋯ (app menu): Usage…, Notifications…, Add with a code…, Show hidden bots (Appearance… when it ships). Compose opens New bot, or a New bot / New group chat menu when rooms exist.
 
 ## K6. Sheet and panel header
@@ -70,6 +71,7 @@ Inside a bot's context, interactive colour is that bot's colour (`useTint(bot)`)
 - Desktop panel (`Overlay`): 60 tall, avatar 32 for bot sheets, title + name, create action as a 32 tall tint pill with icon, then `close` 32 box. Panel 560 x 760 max, radius 16, scrim `rgba(0,0,0,.6)`. Bot sheet is a 360 popover under the chat title.
 - Forms commit in the header. A long form may also end with one full-width primary (New bot), and then the header shows Cancel only. Never a footer button on desktop and a header button on phone for the same form.
 - Every sheet has a title. The bot sheet's title is "Settings" over the bot's name.
+- Select Text sheet (phone, from the Message menu, K5): title "Select Text", Done on the right, **Copy All** as the 44 `copy` icon on the left (header action, no footer button); the message as read-only boxes (prose 17/24, code 13/20 mono in a `code` box), each exactly lines x line height, scrolling to the safe-area bottom.
 
 ## K7. List rows, groups, cards
 - Group (`components/Grouped.tsx`): `card` fill, radius 12, rows min 52, hairline separators inset 16 (60 with a leading icon or avatar), section headers 13/18 uppercase dim, footnotes 13/18 dim. Every settings list uses it.

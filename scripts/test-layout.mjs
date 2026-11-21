@@ -290,7 +290,7 @@ const SCREENS = [
   { name: 'chat-streamed-history', extraBots: ['historian'], path: chatPath('historian'), waitFor: 'That is all.' },
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
   // Card 32: the Select Text sheet (phone): the rich reply as plain text, code in its own monospace box, Copy All.
-  { name: 'select-text', extraBots: ['coder'], path: () => `/select-text?bot=coder&text=${encodeURIComponent(RICH_REPLY)}`, waitFor: 'Copy All', check: checkSelectSheet },
+  { name: 'select-text', extraBots: ['coder'], path: () => `/select-text?bot=coder&text=${encodeURIComponent(RICH_REPLY)}`, waitFor: 'The race is in', check: checkSelectSheet },
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
   // Card 24: the routine card collapsed, expanded, and opened from a notification (scripts/layout-routine.mjs).
@@ -585,6 +585,15 @@ async function checkSelectSheet(page) {
       if (t.scrollHeight > t.clientHeight + 1) out.push(`a text box scrolls inside the page (${t.scrollHeight} > ${t.clientHeight}): its text is cut off`);
       const r = t.getBoundingClientRect();
       if (r.width < 100) out.push(`a text box is only ${r.width} wide`);
+      // Each box is exactly its lines: lines x lineHeight, no trailing blank line. Lines are counted in a mirror div
+      // at its width (wrapping included).
+      const cs = getComputedStyle(t);
+      const lh = parseFloat(cs.lineHeight);
+      const kept = t.style.height;
+      t.style.height = '1px'; // collapse it: scrollHeight is then the text's own height at this width
+      const lines = Math.round(t.scrollHeight / lh);
+      t.style.height = kept;
+      if (Math.abs(t.clientHeight - lines * lh) > 2) out.push(`a text box is ${t.clientHeight} tall, but ${lines} lines x ${lh} is ${lines * lh} ("${t.value.slice(0, 24)}")`);
     }
     const all = boxes.map((t) => t.value).join('\n---\n');
     if (!all.includes('The race is in waitForBot: it polls before the key is set.')) out.push('the message text is missing or still has markdown marks');
