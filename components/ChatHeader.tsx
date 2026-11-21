@@ -31,18 +31,21 @@ export const openBotSheet = (bot: string) => router.push({ pathname: '/bot/[bot]
 
 /** One header icon button: 44 x 44 on the phone, 32 x 32 on desktop with a hover fill (K1). */
 export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; label: string; color: string; onPress: (e: GestureResponderEvent) => void }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useStyles();
   const big = !isDesktop;
   const hit = big ? 44 : 32;
+  // Terminal draws the icon in a square outlined box, inset 4 so the button keeps its footprint.
+  const box = theme.shape.brackets ? { width: hit - 8, height: hit - 8, margin: 4, borderWidth: 1, borderColor: colors.border } : { width: hit, height: hit };
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      hitSlop={theme.shape.brackets ? 4 : undefined}
       style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
         styles.icon,
-        { width: hit, height: hit },
+        box,
         (hovered || pressed) && !big && { backgroundColor: colors.raised },
         pressed && big && { opacity: 0.6 },
       ]}
@@ -58,7 +61,7 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
  * icon buttons on the right, ending with the "..." circle.
  */
 export function PageHeader({ pane, list, tint, title, children }: { pane: boolean; list?: { hidden: boolean; toggle: () => void }; tint: string; title: ReactNode; children: ReactNode }) {
-  const { colors } = useTheme();
+  const { colors, label, skin } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   // Desktop shortcut: Ctrl+\ shows or hides the bot list.
@@ -85,7 +88,7 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
         >
           <Icon name="back" size={31} color={tint} stroke={2.6} />
-          <Text style={{ color: tint, fontSize: 17 }} maxFontSizeMultiplier={1.4}>Bots</Text>
+          <Text style={skin({ color: tint, fontSize: 17 })} maxFontSizeMultiplier={1.4}>{label('Bots')}</Text>
         </Pressable>
       )}
       <View style={[styles.center, pane && { alignItems: 'flex-start' }]}>{title}</View>

@@ -42,6 +42,7 @@ import {
 } from '@/lib/rooms';
 import type { ApprovalChoice } from '@/lib/hermes';
 import { mono, onColor } from '@/lib/theme';
+import { PROMPT } from '@/lib/themeSkin';
 import { makeStyles, useTheme } from '@/components/theme';
 
 // ---------- who is who ----------
@@ -113,7 +114,7 @@ function showMembers(room: Room, info: ReturnType<typeof useMemberInfo>) {
 
 // Tapping the title opens Members (there is no dedicated button).
 export function RoomTitle({ room }: { room: Room | null }) {
-  const { colors } = useTheme();
+  const { colors, skin } = useTheme();
   const styles = useStyles();
   const info = useMemberInfo();
   if (!room) return <View style={{ height: 32 }} />;
@@ -127,10 +128,10 @@ export function RoomTitle({ room }: { room: Room | null }) {
     >
       <MemberStack profiles={room.members.map((m) => m.profile)} size={32} />
       <View style={{ flexShrink: 1 }}>
-        <Text style={{ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={skin({ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' })} numberOfLines={1} maxFontSizeMultiplier={1.4}>
           {room.name}
         </Text>
-        <Text style={{ color: colors.dim, fontSize: 12, lineHeight: 16 }} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={skin({ color: colors.dim, fontSize: 12, lineHeight: 16 })} numberOfLines={1} maxFontSizeMultiplier={1.4}>
           {room.members.map((m) => info.name(m)).join(', ')}
         </Text>
       </View>
@@ -522,19 +523,26 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
 
 function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; it: Item; prev?: Item; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
   const styles = useStyles();
+  const { theme, colors, skin } = useTheme();
+  const rule = theme.shape.userRule;
   const sep = prev && 'at' in prev && 'at' in it && prev.at && it.at && it.at - prev.at > 1800 ? stamp(it.at) : !prev && 'at' in it && it.at ? stamp(it.at) : null;
   return (
     <>
       {sep ? (
         <Text style={styles.sep}>
-          <Text style={{ fontWeight: '600' }}>{sep.day}</Text> {sep.time}
+          <Text style={skin({ fontWeight: '600' })}>{sep.day}</Text> {sep.time}
         </Text>
       ) : null}
       {it.type === 'system' ? (
         <Text style={styles.system}>{it.text}</Text>
       ) : it.type === 'user' ? (
-        <MessageMenu text={it.text} raw style={styles.bubble}>
-          <Text style={styles.bubbleText} selectable={WEB_SELECT}>
+        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : styles.bubble}>
+          {rule ? (
+            <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no">
+              {PROMPT}
+            </Text>
+          ) : null}
+          <Text style={[styles.bubbleText, { color: colors.userText }, rule && { flex: 1 }]} selectable={WEB_SELECT}>
             <Mentions text={it.text} members={members} info={info} />
           </Text>
         </MessageMenu>
@@ -577,14 +585,14 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
 
 /** Text with each known @mention in its bot's color (semibold). @all/@everyone and @user in accent. Unknown @words stay plain. */
 function Mentions({ text, members, info }: { text: string; members: RoomMember[]; info: MemberInfo }) {
-  const { colors } = useTheme();
+  const { colors, skin } = useTheme();
   return (
     <>
       {tokenizeMentions(text, members).map((s, i) =>
         s.kind === 'plain' ? (
           s.text
         ) : (
-          <Text key={i} style={{ fontWeight: '600', color: s.kind === 'member' ? info.color(members.find((m) => m.handle === s.handle)?.profile ?? s.handle) : colors.accent }}>
+          <Text key={i} style={skin({ fontWeight: '600', color: s.kind === 'member' ? info.color(members.find((m) => m.handle === s.handle)?.profile ?? s.handle) : colors.accent })}>
             {s.kind === 'you' ? '@you' : s.text}
           </Text>
         ),
@@ -637,6 +645,8 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   system: { alignSelf: 'center', color: colors.dim, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
   bubble: { alignSelf: 'flex-end', maxWidth: '82%', marginTop: 14, backgroundColor: mix(colors.accent, 0.3), borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
   bubbleText: { color: colors.text, fontSize: BODY, lineHeight: isDesktop ? 24 : 22 },
+  ruleRow: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 14, backgroundColor: colors.card, borderLeftWidth: 2, borderLeftColor: colors.accent, paddingHorizontal: 12, paddingVertical: 9 },
+  prompt: { color: colors.accent, fontSize: BODY, lineHeight: isDesktop ? 24 : 22, fontWeight: '700' },
   msg: { flexDirection: 'row', gap: 8 },
   gutter: { width: 28 },
   needsBar: { position: 'absolute', left: -10, top: 0, bottom: 0, width: 3, borderRadius: 2, backgroundColor: colors.bad },

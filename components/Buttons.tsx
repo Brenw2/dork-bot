@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type Vi
 import { useDesk } from '@/components/ChatStatus';
 import { useBotLook } from '@/components/useBotLook';
 import { onColor } from '@/lib/theme';
+import { MONO_MAX_FONT_SCALE } from '@/lib/themes';
 import { makeStyles, useTheme } from '@/components/theme';
 
 /** The tint for a screen: the bot's color inside its context, the accent outside it. */
@@ -39,7 +40,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, label: say, skin, theme } = useTheme();
   const styles = useStyles();
   const botTint = useTint(bot);
   const tint = color ?? botTint;
@@ -47,6 +48,8 @@ export function Button({
   const off = disabled || busy;
   const fill = off ? colors.card : kind === 'primary' ? tint : mix(tint, 0.2);
   const text = off && !busy ? colors.faint : kind === 'primary' ? onColor(tint) : colors.text;
+  // Terminal writes an enabled button as [ label ] (lowercase); a disabled one is just its label.
+  const shown = theme.shape.brackets && !off ? `[${say(label)}]` : say(label);
   return (
     <Pressable
       onPress={onPress}
@@ -54,11 +57,11 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: !!disabled, busy: !!busy }}
-      style={({ pressed }) => [styles.big, { height: desk ? 40 : 50, borderRadius: desk ? 20 : 25, backgroundColor: fill }, pressed && { opacity: 0.7 }, style]}
+      style={({ pressed }) => [styles.big, skin({ height: desk ? 40 : 50, borderRadius: desk ? 20 : 25, backgroundColor: fill }), pressed && { opacity: 0.7 }, style]}
     >
       {busy ? <ActivityIndicator color={text} /> : null}
-      <Text style={[styles.bigText, { color: text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-        {label}
+      <Text style={[styles.bigText, { color: text }]} numberOfLines={1} maxFontSizeMultiplier={theme.shape.brackets ? MONO_MAX_FONT_SCALE : 1.4}>
+        {shown}
       </Text>
     </Pressable>
   );
@@ -72,12 +75,16 @@ export type SmallTone = 'filled' | 'tint' | 'neutral' | 'danger';
  * danger: Remove. Prefer swipe or ⋯ for destructive row actions.
  */
 export function SmallButton({ label, onPress, bot, tone = 'tint', disabled, busy, accessibilityLabel }: { label: string; onPress: () => void; bot?: string; tone?: SmallTone; disabled?: boolean; busy?: boolean; accessibilityLabel?: string }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, label: say, theme } = useTheme();
   const styles = useStyles();
   const tint = useTint(bot);
   const desk = useDesk();
   const bg = tone === 'filled' ? tint : tone === 'tint' ? mix(tint, 0.2) : tone === 'neutral' ? colors.raised : mix(colors.bad, 0.2);
   const fg = tone === 'filled' ? onColor(tint) : tone === 'danger' ? colors.bad : colors.text;
+  // Terminal: filled and tint read [ label ]; neutral is an outlined box and danger a red outline, both plain words.
+  const term = theme.shape.brackets;
+  const outline = term && (tone === 'neutral' || tone === 'danger') ? { backgroundColor: disabled ? colors.card : colors.bg, borderWidth: 1, borderColor: tone === 'danger' ? colors.bad : colors.border } : null;
+  const shown = term && (tone === 'filled' || tone === 'tint') && !disabled ? `[${say(label)}]` : say(label);
   return (
     <Pressable
       onPress={onPress}
@@ -85,10 +92,10 @@ export function SmallButton({ label, onPress, bot, tone = 'tint', disabled, busy
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       hitSlop={desk ? 2 : { top: 7, bottom: 7, left: 4, right: 4 }}
-      style={({ pressed }) => [styles.small, { height: desk ? 28 : 30, backgroundColor: disabled ? colors.card : bg }, (pressed || busy) && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.small, { height: desk ? 28 : 30, backgroundColor: disabled ? colors.card : bg }, outline, (pressed || busy) && { opacity: 0.6 }]}
     >
-      <Text style={[styles.smallText, { color: disabled ? colors.faint : fg }]} maxFontSizeMultiplier={1.4}>
-        {label}
+      <Text style={[styles.smallText, { color: disabled ? colors.faint : fg }]} maxFontSizeMultiplier={term ? MONO_MAX_FONT_SCALE : 1.4}>
+        {shown}
       </Text>
     </Pressable>
   );

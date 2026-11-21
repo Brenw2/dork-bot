@@ -46,7 +46,7 @@ export function StreamingMarkdown({ text, accent }: { text: string; accent: stri
 }
 
 export const Markdown = memo(function Markdown({ text, accent }: { text: string; accent: string }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useStyles();
   const tokens = useMemo(() => {
     try {
@@ -56,7 +56,7 @@ export const Markdown = memo(function Markdown({ text, accent }: { text: string;
     }
   }, [text]);
   if (!tokens) return <Text style={styles.p}>{text}</Text>;
-  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors })}</View>;
+  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets })}</View>;
 });
 
 function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): ReactNode[] {
@@ -86,8 +86,10 @@ function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): Re
       }
       case 'heading': {
         const h = t as Tokens.Heading;
+        // Terminal: a heading is the accent color behind its "##" marks, like markdown source.
         out.push(
-          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1]]} selectable={SELECTABLE} accessibilityRole="header">
+          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1], look.marks && { color: colors.accent }]} selectable={SELECTABLE} accessibilityRole="header">
+            {look.marks ? `${'#'.repeat(Math.min(h.depth, 6))} ` : null}
             {inline(h.tokens, accent, look)}
           </Text>,
         );
@@ -229,8 +231,9 @@ const decode = decodeEntities;
 
 /** `plain`: no colouring (a fence still being written: colours would flicker as the code grows). */
 export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: string; plain?: boolean }) {
-  const { colors } = useTheme();
+  const { colors, theme, label: say } = useTheme();
   const styles = useStyles();
+  const term = theme.shape.brackets;
   const [copied, setCopied] = useState(false);
   const lines = useMemo(() => highlight(code.replace(/\n$/, ''), plain ? undefined : lang), [code, lang, plain]);
   const label = languageFor(lang) ?? (lang?.trim() || 'text');
@@ -244,8 +247,8 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
       <View style={styles.codeHeader}>
         <Text style={styles.codeLang}>{label}</Text>
         <Pressable onPress={copy} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={copied ? 'Copied' : 'Copy code'} style={styles.copy}>
-          {copied ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
-          <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy'}</Text>
+          {copied || term ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
+          <Text style={[styles.copyText, term && { color: colors.accent }]}>{say(copied ? 'Copied' : 'Copy')}</Text>
         </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.codeScroll}>
@@ -304,7 +307,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
   );
 }
 
-type Look = { styles: ReturnType<typeof useStyles>; colors: Colors };
+type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. */ marks?: boolean };
 const BODY = BODY_SIZE;
 const heading = (colors: Colors): TextStyle[] => [
   { fontSize: 22, marginTop: 6 },

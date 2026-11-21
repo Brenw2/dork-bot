@@ -26,7 +26,10 @@ import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorkin
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist-web');
-const OUT = join(ROOT, 'artifacts', 'layout');
+// LAYOUT_THEME=terminal runs every screen in that theme (the stored Appearance choice is seeded); its screenshots go to
+// artifacts/layout-terminal so Classic's artifacts/layout stays comparable run to run.
+const THEME = process.env.LAYOUT_THEME || '';
+const OUT = join(ROOT, 'artifacts', THEME ? `layout-${THEME}` : 'layout');
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
 
@@ -258,6 +261,7 @@ function seedFor(screen) {
     for (const bot of bots) store[`dork-bot-key.${bot}`] = KEY;
   }
   if (screen.paired) store['dork-hermes-manager'] = JSON.stringify({ adminUrl: ADMIN, chatUrl: HERMES, refreshToken: 'r'.repeat(40) });
+  if (THEME) store.appearance = THEME;
   return store;
 }
 
@@ -285,6 +289,9 @@ const SCREENS = [
   { name: 'work-session-done', path: () => '/work-session/assistant?id=local-77be02', waitFor: 'Three themes' },
   // Streaming reply polish (card: stream bot replies): mid-fence, finished, and the same reply loaded from history.
   { name: 'chat-streaming', extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: (page) => sendIn(page, 'streamer', 'plan my morning', 'for (const step of') },
+  // Switching the theme with a reply on screen and a half-typed draft: nothing remounts (the same DOM nodes), the text
+  // and the draft stay. Opens the sheet from the sidebar menu and taps the theme that isn't selected.
+  { name: 'theme-switch-midstream', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: switchThemeKeepsChat, anyTheme: true },
   // The reader scrolls up, then the reply starts: the 'Jump to latest' pill shows (web: a normal list; the phone's
   // inverted list is not covered here). The second screen taps it: back at the end, pill gone.
   { name: 'chat-stream-pill', extraBots: ['scroller'], path: (p) => (resetScroller(), chatPath('scroller')(p)), waitFor: 'That is all.', act: scrollUpThenStream },
@@ -353,6 +360,43 @@ async function sendIn(page, bot, text, wait) {
   await typeIn(page, bot, text);
   await page.getByLabel(`Message ${bot}`).press('Enter');
   if (wait) await page.getByText(wait, { exact: false }).first().waitFor({ timeout: 15_000 });
+}
+
+// Theme switch mid-stream: send, let the partial reply show, type a draft, and tag the reply's text node and the message
+// box with a property that only survives if React keeps the very same element.
+const DRAFT = 'and then run the tests';
+async function markThenDraft(page) {
+  await sendIn(page, 'streamer', 'plan my morning', 'for (const step of');
+  await typeIn(page, 'streamer', DRAFT);
+  await page.evaluate(() => {
+    const box = document.querySelector('textarea');
+    if (box) box.__kept = true;
+    const text = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && (e.textContent || '').includes('for (const step of'));
+    if (text) text.__kept = true;
+  });
+}
+async function switchThemeKeepsChat(page) {
+  const problems = [];
+  await page.getByLabel('More', { exact: true }).first().click();
+  await page.getByRole('menuitem', { name: /appearance/i }).click();
+  const other = THEME === 'terminal' ? /^Classic/ : /^Terminal/;
+  await page.getByRole('radio', { name: other }).click();
+  await page.waitForTimeout(600);
+  const after = await page.evaluate(
+    ({ draft }) => {
+      const box = document.querySelector('textarea');
+      const text = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && (e.textContent || '').includes('for (const step of'));
+      return { boxKept: !!box?.__kept, value: box?.value, textKept: !!text?.__kept, text: !!text, bg: getComputedStyle(document.body).backgroundColor, draft };
+    },
+    { draft: DRAFT },
+  );
+  if (!after.boxKept) problems.push('the message box was remounted by the theme switch');
+  if (after.value !== DRAFT) problems.push(`the draft changed: ${JSON.stringify(after.value)}`);
+  if (!after.text) problems.push('the streaming text is gone after the switch');
+  else if (!after.textKept) problems.push('the streaming text was remounted by the theme switch');
+  await page.getByRole('button', { name: 'Done' }).first().click().catch(() => undefined);
+  await page.waitForTimeout(300);
+  return problems;
 }
 
 async function fakeHermes(route) {
@@ -1221,9 +1265,12 @@ async function main() {
           fixed: FIXED[screen.name] ?? [],
           seen: SEEN[screen.name] ?? [],
         });
-        if (screen.name === 'chat') problems.push(...(await page.evaluate(measureTranscript)));
-        if (screen.name === 'chats') problems.push(...(await page.evaluate(measureChats)));
-        if (screen.check) problems.push(...(await screen.check(page, posture)));
+        // The per-screen checks measure Classic's locked numbers (radius 12, #1A1C20, 600 weight...). In another theme they
+        // would only report that the theme isn't Classic, so a themed run keeps the generic audit (overflow, keep-outs,
+        // hit areas, page errors) and the checks marked anyTheme.
+        if (!THEME && screen.name === 'chat') problems.push(...(await page.evaluate(measureTranscript)));
+        if (!THEME && screen.name === 'chats') problems.push(...(await page.evaluate(measureChats)));
+        if (screen.check && (!THEME || screen.anyTheme)) problems.push(...(await screen.check(page, posture)));
       } catch (e) {
         problems = [`didn't render: ${e.message.split('\n')[0]}`];
       }

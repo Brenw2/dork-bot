@@ -1,7 +1,7 @@
 // The app's themes (Appearance setting, docs: design-comps/dork-bot-redesign-2026-11-19/THEMES.md). Plain TypeScript, no
 // React Native, so tests can import it. Classic equals the app as it was before themes: every value here is the old
 // lib/theme.ts value. Terminal, Paper and Arcade are added by their own cards, each after Design's PASS.
-export type ThemeId = 'classic';
+export type ThemeId = 'classic' | 'terminal';
 
 export interface Colors {
   bg: string;
@@ -35,6 +35,33 @@ export interface Colors {
   track: string; // usage bar track
   scrollThumb: string; // desktop scrollbar thumb
   scrollThumbHover: string;
+  // Terminal card:
+  userText: string; // text in your own message
+  /** Send/Stop: `bot` = the bot's color (Classic, as before), `accent` = this theme's accent. */
+  send: 'bot' | 'accent';
+}
+
+/** The font files a theme draws with (expo-font family names, see components/themeFonts.ts). null = the system fonts. */
+export interface Fonts {
+  regular: string;
+  semibold: string;
+  bold: string;
+  /** Code blocks and inline code. */
+  mono: string;
+}
+
+/**
+ * How a theme's components are drawn beyond colors. Classic is all false: its styles are used exactly as written.
+ * square: every corner radius is 0. lowercase: titles, buttons and menu items are lowercase (not message text).
+ * userRule: your messages are full-width rows with a left rule and a prompt, not bubbles. brackets: enabled
+ * buttons read `[ label ]`. dashed: list separators are dashed.
+ */
+export interface Shape {
+  square: boolean;
+  lowercase: boolean;
+  userRule: boolean;
+  brackets: boolean;
+  dashed: boolean;
 }
 
 export interface Theme {
@@ -45,6 +72,8 @@ export interface Theme {
   /** What `mix()` tints blend into: the app background. */
   mixBase: string;
   colors: Colors;
+  fonts: Fonts | null;
+  shape: Shape;
 }
 
 export const THEMES: Record<ThemeId, Theme> = {
@@ -84,11 +113,69 @@ export const THEMES: Record<ThemeId, Theme> = {
       track: '#2A2D33',
       scrollThumb: '#2A2D33',
       scrollThumbHover: '#3A3E45',
+      userText: '#ECEDEF',
+      send: 'bot',
     },
+    fonts: null,
+    shape: { square: false, lowercase: false, userRule: false, brackets: false, dashed: false },
+  },
+  // Terminal (design-comps/dork-bot-redesign-2026-11-19, kit-terminal.png): near-black console, mint accent, one mono
+  // font, square corners. Values from themes.proposed.ts; `track` and the scrollbar are the Terminal border family.
+  terminal: {
+    id: 'terminal',
+    name: 'Terminal',
+    statusBar: 'light',
+    mixBase: '#050607',
+    colors: {
+      bg: '#050607',
+      card: '#0B0E0F',
+      border: '#1B2224',
+      text: '#D7E3DD',
+      dim: '#738580',
+      accent: '#7CF5B0',
+      user: '#0B0E0F',
+      ok: '#7CF5B0',
+      bad: '#FF6B6B',
+      warn: '#F2A65A',
+      raised: '#12171A',
+      hover: '#0E1214',
+      faint: '#4A5754',
+      sidebar: '#030404',
+      chevron: '#2F3A3C',
+      disclosure: '#4A5754',
+      code: '#000000',
+      menuBorder: '#24302F',
+      menuHover: '#162020',
+      errorBg: '#170B0B',
+      errorLine: '#3A1A1A',
+      errorText: '#FFC9C9',
+      errorDetail: '#C99F9F',
+      badgeText: '#050607',
+      dialog: '#0B0E0F',
+      inlineCode: '#12171A',
+      codeText: '#D7E3DD',
+      track: '#1B2224',
+      scrollThumb: '#1B2224',
+      scrollThumbHover: '#2F3A3C',
+      userText: '#FFFFFF',
+      send: 'accent',
+    },
+    fonts: { regular: 'JetBrainsMono-Regular', semibold: 'JetBrainsMono-SemiBold', bold: 'JetBrainsMono-Bold', mono: 'JetBrainsMono-Regular' },
+    shape: { square: true, lowercase: true, userRule: true, brackets: true, dashed: true },
   },
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
+/**
+ * Terminal's mono text grows with Dynamic Type up to this (Design: 1.3 on Silkscreen and Terminal mono). One place to
+ * change: when the text-scale helper from the Dynamic Type card (lib/type.ts, maxScale.mono) is on main, point this at it.
+ */
+export const MONO_MAX_FONT_SCALE = 1.3;
+/**
+ * The themes the Appearance picker offers, in order. A theme joins this list only after Design's PASS on it
+ * (THEMES.md); until then it is built but not offered. Terminal: the card is merged on Design's PASS.
+ */
+export const PICKER_THEMES: ThemeId[] = ['classic', 'terminal'];
 export const DEFAULT_THEME: ThemeId = 'classic';
 
 /** A stored value as a theme id; anything unknown (a theme from a newer build, junk) is the default. */

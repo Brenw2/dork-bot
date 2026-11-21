@@ -182,7 +182,7 @@ function useSecondsLeft(): number {
  * bot's next step would be, and scrolls with the chat. One tap answers; while it's in flight the buttons dim.
  */
 export function ApprovalCard({ request, bot, busy, onAnswer }: { request: ApprovalRequest; bot: string; busy: boolean; onAnswer: (choice: ApprovalChoice) => void }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, label } = useTheme();
   const styles = useStyles();
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
@@ -195,7 +195,7 @@ export function ApprovalCard({ request, bot, busy, onAnswer }: { request: Approv
         <BotSprite bot={bot} size={24} />
         <View style={{ flex: 1 }}>
           <Text style={styles.approvalTitle} maxFontSizeMultiplier={CHROME_SCALE}>
-            Run this command?
+            {label('Run this command?')}
           </Text>
           <Text style={styles.approvalSub} maxFontSizeMultiplier={CHROME_SCALE} numberOfLines={1}>
             {name} needs your OK

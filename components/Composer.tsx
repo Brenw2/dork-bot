@@ -11,6 +11,8 @@ import { MAX_IMAGES, type Attachment } from '@/lib/attachments';
 import { isSendEnter } from '@/lib/enterKey';
 import { runPaste, showPasteChip } from '@/lib/pasteChip';
 import { onColor } from '@/lib/theme';
+import { MONO_MAX_FONT_SCALE } from '@/lib/themes';
+import { PROMPT } from '@/lib/themeSkin';
 import { makeStyles, useTheme } from '@/components/theme';
 
 const WEB = Platform.OS === 'web';
@@ -55,11 +57,12 @@ export interface ComposerProps {
  * Keyboard avoidance stays with the screen (KeyboardAvoidingView), since it depends on the header above.
  */
 export function Composer(p: ComposerProps) {
-  const { colors } = useTheme();
+  const { colors, theme, skin } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const desk = useDesk();
   const fieldMin = desk ? 44 : 36;
+  const term = theme.shape.brackets;
   const enabled = p.enabled ?? true;
   const images = p.images ?? [];
   const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
@@ -111,9 +114,13 @@ export function Composer(p: ComposerProps) {
       : Menu.show('Add a picture', [...PICK_SOURCES.map((s) => ({ text: s.label, icon: 'plus' as const, onPress: () => attach(s.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
 
   // Send/Stop: a 30 circle 3 in from the field's corner (desktop 32, 6 in); the field's own line is a hairline.
-  const roundSize = desk
-    ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
-    : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth };
+  const roundSize = skin(
+    desk
+      ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
+      : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth },
+  );
+  // Send takes the theme (Classic: the bot's color as before; Terminal: the accent).
+  const sendColor = colors.send === 'accent' ? colors.accent : p.color;
 
   const keyProps = WEB
     ? {
@@ -153,7 +160,7 @@ export function Composer(p: ComposerProps) {
         <View style={styles.composer}>
           {onImages ? (
             <Pressable
-              style={({ pressed }) => [styles.attach, { width: fieldMin, height: fieldMin, borderRadius: fieldMin / 2 }, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.attach, skin({ width: fieldMin, height: fieldMin, borderRadius: fieldMin / 2 }), term && { borderWidth: 1, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
               onPress={(e) => openAttach({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
               disabled={!enabled || images.length >= MAX_IMAGES}
               hitSlop={4}
@@ -163,12 +170,18 @@ export function Composer(p: ComposerProps) {
               <Icon name="plus" size={18} color={colors.dim} stroke={2.67} />
             </Pressable>
           ) : null}
-          <View testID="composer-field" style={[styles.field, { minHeight: fieldMin, borderRadius: fieldMin / 2 }, p.dimmed && { opacity: 0.5 }]}>
+          <View testID="composer-field" style={[styles.field, skin({ minHeight: fieldMin, borderRadius: fieldMin / 2 }), p.dimmed && { opacity: 0.5 }]}>
+            {term ? (
+              <Text style={[styles.prompt, desk && { top: 10, fontSize: 16, lineHeight: 24 }]} accessibilityElementsHidden importantForAccessibility="no" pointerEvents="none" maxFontSizeMultiplier={MONO_MAX_FONT_SCALE}>
+                {PROMPT}
+              </Text>
+            ) : null}
             <TextInput
               ref={inputRef}
               style={[
                 styles.input,
-                desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: 6 * 22 + 14 },
+                term && styles.inputTerm,
+                skin(desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: 6 * 22 + 14 }),
                 WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
                 WEB && ({ outlineStyle: 'none' } as object),
               ]}
@@ -184,10 +197,10 @@ export function Composer(p: ComposerProps) {
               editable={enabled}
               {...keyProps}
             />
-            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, { borderRadius: fieldMin / 2 }]} />
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, skin({ borderRadius: fieldMin / 2 })]} />
             {p.canSend ? (
-              <Pressable testID="composer-send" style={[styles.roundButton, roundSize, { backgroundColor: p.color }]} onPress={p.onSend} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
-                <Icon name="arrow-up" size={16} color={onColor(p.color)} stroke={3.9} />
+              <Pressable testID="composer-send" style={[styles.roundButton, roundSize, { backgroundColor: sendColor }]} onPress={p.onSend} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
+                <Icon name="arrow-up" size={16} color={onColor(sendColor)} stroke={3.9} />
               </Pressable>
             ) : p.stop ? (
               <Pressable testID="composer-stop" style={[styles.roundButton, roundSize, { backgroundColor: colors.text }]} onPress={p.stop.onPress} disabled={p.stop.disabled} accessibilityRole="button" accessibilityLabel={p.stop.label ?? 'Stop'} hitSlop={6}>
@@ -223,6 +236,9 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   field: { flex: 1, backgroundColor: colors.card, justifyContent: 'center' },
   fieldLine: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   input: { color: colors.text, paddingLeft: 14 },
+  // Terminal: the prompt mark sits at the field's left, so the text starts after it.
+  inputTerm: { paddingLeft: 28 },
+  prompt: { position: 'absolute', left: 12, top: 7, color: colors.accent, fontSize: 17, lineHeight: 22, fontWeight: '700' },
   roundButton: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   hintLine: { color: colors.faint, fontSize: 12, lineHeight: 16, marginTop: 6, marginLeft: 52 },
 }));

@@ -38,7 +38,7 @@ function useApprovalTick(): number {
 import { RoomListRow } from '@/components/RoomRow';
 import { useRoomRows } from '@/components/roomsClient';
 import { makeStyles, useTheme } from '@/components/theme';
-import { THEME_IDS } from '@/lib/themes';
+import { PICKER_THEMES, MONO_MAX_FONT_SCALE } from '@/lib/themes';
 
 /**
  * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
@@ -116,7 +116,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
         { text: 'Usage…', icon: 'clock', onPress: () => router.push('/usage') },
         { text: 'Notifications…', icon: 'chats', onPress: () => router.push('/notifications') },
         // Only once there is a choice (Classic alone has nothing to pick).
-        ...(THEME_IDS.length > 1 ? [{ text: 'Appearance…', icon: 'palette' as const, onPress: () => router.push('/appearance') }] : []),
+        ...(PICKER_THEMES.length > 1 ? [{ text: 'Appearance…', icon: 'palette' as const, onPress: () => router.push('/appearance') }] : []),
         { text: 'Add with a code…', icon: 'plus', onPress: () => router.push('/add') },
         { text: 'Show hidden bots', icon: 'info', onPress: () => router.push('/new') },
         { text: 'Cancel', style: 'cancel' },
@@ -180,13 +180,15 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
 }
 
 function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boolean; top: number; usage: UsageSnapshot | null; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useStyles();
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
+  const term = theme.shape.brackets;
+  // Terminal: each header icon sits in a square outlined box, inset 4 so the row keeps its size.
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
     styles.headerButton,
-    { width: hit, height: hit },
+    term ? { width: hit - 8, height: hit - 8, margin: 4, borderWidth: 1, borderColor: colors.border } : { width: hit, height: hit },
     (hovered || pressed) && isDesktop && { backgroundColor: colors.raised },
     pressed && !isDesktop && { opacity: 0.6 },
   ];
@@ -204,8 +206,9 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   if (compact) {
     return (
       <View style={[styles.sidebarHeader, { paddingTop: top, height: 56 + top }]}>
-        <Text style={styles.sidebarTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-          Dork Bot
+        <Text style={styles.sidebarTitle} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={1.4}>
+          {term ? 'dork-bot' : 'Dork Bot'}
+          {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
         </Text>
         <View style={styles.sidebarRight}>
           {gauge}
@@ -220,16 +223,18 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
         <View style={styles.gaugeSlot}>{gauge}</View>
         {buttons}
       </View>
-      <Text style={styles.largeTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-        Dork Bot
+      <Text style={styles.largeTitle} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? MONO_MAX_FONT_SCALE : 1.4}>
+        {term ? 'dork-bot' : 'Dork Bot'}
+        {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
       </Text>
     </View>
   );
 }
 
 function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: SavedBot; compact: boolean; selected: boolean; state: ConnectState | undefined; preview: BotPreview | undefined; onOpen: () => void }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useStyles();
+  const term = theme.shape.brackets;
   const bot = saved.bot;
   const name = nameOf(bot, saved.displayName);
   const mood = useBotMood(bot);
@@ -247,12 +252,14 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   } else if (needs) line = `Wants to run a command: ${needs.command || needs.description}`;
   else if (doing) {
     line = doing;
-    lineStyle = { color: colors.text };
+    lineStyle = { color: term ? colors.accent : colors.text };
   } else line = preview ? (preview.text ?? 'No messages yet') : '';
+  const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
+  // Terminal marks a problem line like a console does.
+  if (term && broken) line = `! ${line}`;
 
   const big = !isDesktop; // phone, and the Duo's sidebar on iOS: larger text and 44 pt targets
   const [hovered, setHovered] = useState(false);
-  const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
 
   const badge = needs ? <Badge label="Needs you" /> : null;
 
@@ -330,7 +337,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   );
 }
 
-const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix, theme: { shape: { dashed } } }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { paddingBottom: 24 },
   listCompact: { paddingHorizontal: 8, paddingBottom: 12, gap: 2 },
@@ -347,7 +354,7 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   // Phone rows: full-bleed, 76 tall at least, hairline from x 80
   row: { flexDirection: 'row', minHeight: 76 },
   rowAvatar: { width: 80, paddingLeft: 16, paddingTop: 12 },
-  rowBody: { flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowBody: { flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, ...(dashed ? { borderStyle: 'dashed' as const } : null) },
   rowInner: { paddingTop: 10, paddingBottom: 10, paddingRight: 16, gap: 1 },
   line1: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   line2: { flexDirection: 'row', alignItems: 'center', gap: 8 },
