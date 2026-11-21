@@ -1,16 +1,18 @@
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
+import { Icon } from '@/components/AppIcons';
 import { Column } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
 import { loadManager } from '@/components/manager';
 import { MemberDisc, MemberStack } from '@/components/RoomAvatar';
 import { newId, roomLink } from '@/components/roomsClient';
+import { Sheet } from '@/components/Sheet';
 import { listBots, type SavedBot } from '@/lib/bots';
+import { onColor } from '@/lib/color';
 import { nameOf } from '@/lib/names';
 import { createProblem, MAX_MEMBERS, MIN_MEMBERS } from '@/lib/rooms';
-import { headerSides } from '@/lib/headerItems';
 import { makeStyles, useTheme } from '@/components/theme';
 
 /**
@@ -60,26 +62,8 @@ export function RoomNew() {
 
   return (
     <View style={styles.screen}>
-      {/* The phone sheet's header: Cancel | New group chat | Create. The desktop panel has its own footer buttons. */}
-      {!isDesktop ? (
-        <Stack.Screen
-          options={{
-            title: 'New group chat',
-            ...headerSides({
-              left: (
-                <Pressable onPress={confirm} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.barSide}>
-                  <Text style={styles.barLink}>Cancel</Text>
-                </Pressable>
-              ),
-              right: (
-                <Pressable onPress={create} disabled={!ready} hitSlop={12} accessibilityRole="button" accessibilityLabel="Create" accessibilityState={{ disabled: !ready }} style={[styles.barSide, { alignItems: 'flex-end' }]}>
-                  {busy ? <ActivityIndicator color={colors.accent} /> : <Text style={[styles.barLink, { fontWeight: '600' }, !ready && { color: colors.faint }]}>Create</Text>}
-                </Pressable>
-              ),
-            }),
-          }}
-        />
-      ) : null}
+      {/* Phone: the shared sheet header (Cancel | New group chat | Create). Desktop: the panel's header pill (Sheet commit). */}
+      <Sheet title="New group chat" close="cancel" onCancel={confirm} commit={{ label: 'Create', onPress: create, disabled: !ready }} />
       <Column>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={isDesktop ? styles.headRow : styles.headCol}>
@@ -134,7 +118,7 @@ export function RoomNew() {
                         </Text>
                       ) : null}
                     </View>
-                    <View style={[styles.check, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}>{on ? <Text style={styles.tick}>✓</Text> : null}</View>
+                    <View style={[styles.check, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}>{on ? <Icon name="check" size={14} color={onColor(colors.accent)} stroke={3} /> : null}</View>
                   </Pressable>
                 );
               })}
@@ -143,17 +127,6 @@ export function RoomNew() {
           <Text style={styles.footnote}>2 to 6 bots. Each one replies when it has something to add; @mention a bot to ask just that one.</Text>
           {error ? <Text style={[styles.footnote, { color: colors.bad }]}>{error}</Text> : null}
         </ScrollView>
-
-        {isDesktop ? (
-          <View style={styles.footer}>
-            <Pressable onPress={cancel} style={[styles.deskBtn, { backgroundColor: colors.raised }]} accessibilityRole="button">
-              <Text style={styles.deskText}>Cancel</Text>
-            </Pressable>
-            <Pressable onPress={create} disabled={!ready} style={[styles.deskBtn, { backgroundColor: ready ? colors.accent : colors.card }]} accessibilityRole="button" accessibilityState={{ disabled: !ready }}>
-              <Text style={[styles.deskText, !ready && { color: colors.faint }]}>Create group chat</Text>
-            </Pressable>
-          </View>
-        ) : null}
       </Column>
     </View>
   );
@@ -161,8 +134,6 @@ export function RoomNew() {
 
 const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  barSide: { minWidth: 60, minHeight: 44, justifyContent: 'center', ...(Platform.OS === 'web' ? { marginHorizontal: 16 } : null) },
-  barLink: { color: colors.accent, fontSize: 17 },
   content: { padding: 16, paddingBottom: 32 },
   headCol: { alignItems: 'center', gap: 12 },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
@@ -177,9 +148,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   memberName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
   memberJob: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.chevron, alignItems: 'center', justifyContent: 'center' },
-  tick: { color: '#fff', fontSize: 14, fontWeight: '700', lineHeight: 16 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginTop: 12, marginHorizontal: 16 },
-  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  deskBtn: { height: 32, borderRadius: 8, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  deskText: { color: colors.text, fontSize: 14, fontWeight: '600' },
 }));

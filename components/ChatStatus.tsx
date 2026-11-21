@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { BotSprite } from '@/components/BotSprite';
-import { CheckIcon, CrossIcon } from '@/components/ChatIcons';
+import { Icon } from '@/components/AppIcons';
+import { ApprovalButtons } from '@/components/ApprovalButtons';
 import { isDesktop } from '@/components/desktop';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
@@ -124,22 +125,21 @@ export function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) 
         hitSlop={{ top: 6, bottom: 6 }}
         style={styles.chip}
       >
-        {live ? <Spinner /> : failed ? <CrossIcon size={12} color={colors.bad} /> : <CheckIcon size={12} color={colors.dim} />}
+        {live ? <Spinner /> : failed ? <Icon name="close" size={12} color={colors.bad} stroke={4.4} /> : <Icon name="check" size={12} color={colors.dim} stroke={4.4} />}
         <Text style={styles.chipText} numberOfLines={1} maxFontSizeMultiplier={CHROME_SCALE}>
           {label}
         </Text>
-        {live ? null : (
-          <Text style={styles.chipChevron} maxFontSizeMultiplier={CHROME_SCALE}>
-            {open ? '⌄' : '›'}
-          </Text>
-        )}
+        {live ? null : <Icon name={open ? 'chevron-down' : 'chevron'} size={12} color={colors.dim} stroke={3} />}
       </Pressable>
       {open
         ? tools.map((t, i) => (
             <Pressable key={i} onPress={() => setOpenStep(openStep === i ? null : i)} disabled={!t.preview} accessibilityRole="button" style={styles.stepRow}>
-              <Text style={[styles.step, t.status === 'failed' && { color: colors.bad }]} numberOfLines={1}>
-                {t.status === 'running' ? '…' : t.status === 'failed' ? '✕' : '✓'} {t.name}
-              </Text>
+              <View style={styles.stepLine}>
+                {t.status === 'running' ? null : <Icon name={t.status === 'failed' ? 'close' : 'check'} size={11} color={t.status === 'failed' ? colors.bad : colors.dim} stroke={3} />}
+                <Text style={[styles.step, t.status === 'failed' && { color: colors.bad }]} numberOfLines={1}>
+                  {t.status === 'running' ? '… ' : ''}{t.name}
+                </Text>
+              </View>
               {openStep === i && t.preview ? (
                 <Text style={[styles.step, styles.preview]} numberOfLines={12}>
                   {t.preview}
@@ -193,17 +193,6 @@ export function ApprovalCard({ request, bot, busy, onAnswer }: { request: Approv
   const desk = useDesk();
   const left = useSecondsLeft();
   const buttons = approvalOrder(request.choices, desk);
-  const rows: ApprovalChoice[][] = [];
-  if (desk) rows.push(buttons);
-  else for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
-  const height = desk ? 36 : 44;
-  const style = (c: ApprovalChoice) =>
-    c === 'once'
-      ? { backgroundColor: color }
-      : c === 'deny'
-        ? { borderColor: colors.bad }
-        : { backgroundColor: mix(color, 0.2) };
-  const textColor = (c: ApprovalChoice) => (c === 'once' ? onColor(color) : c === 'deny' ? colors.bad : colors.text);
   return (
     <View testID="approval-card" style={[styles.approval, { borderColor: mix(color, 0.55) }, desk && { maxWidth: 560 }]} accessibilityLiveRegion="polite">
       <View style={styles.approvalHead}>
@@ -225,28 +214,7 @@ export function ApprovalCard({ request, bot, busy, onAnswer }: { request: Approv
         </ScrollView>
       ) : null}
       {request.description ? <Text style={styles.approvalWhy}>Hermes flagged it: {request.description}</Text> : null}
-      <View style={styles.approvalButtons}>
-        {rows.map((row, r) => (
-          <View key={r} style={styles.approvalRow}>
-            {row.map((c) => (
-              <Pressable
-                key={c}
-                disabled={busy}
-                onPress={() => onAnswer(c)}
-                accessibilityRole="button"
-                accessibilityLabel={CHOICE_LABEL[c]}
-                testID={`approval-${c}`}
-                style={({ pressed }) => [styles.approvalButton, { height }, style(c), (pressed || busy) && { opacity: 0.6 }]}
-              >
-                <Text style={[styles.approvalButtonText, { color: textColor(c) }]} numberOfLines={1} maxFontSizeMultiplier={CHROME_SCALE}>
-                  {CHOICE_LABEL[c]}
-                </Text>
-              </Pressable>
-            ))}
-            {!desk && row.length === 1 ? <View style={{ flex: 1 }} /> : null}
-          </View>
-        ))}
-      </View>
+      <ApprovalButtons choices={buttons} labels={CHOICE_LABEL} color={color} desk={desk} disabled={busy} dim={busy} onAnswer={(c) => onAnswer(c as ApprovalChoice)} />
       <View style={styles.approvalFoot}>
         <Text style={styles.approvalNote}>Answers right away. No answer counts as Deny.</Text>
         <Text style={styles.approvalNote} accessibilityLabel={`${countdown(left)} left to answer`}>
@@ -265,7 +233,7 @@ export function DecisionChip({ decision, bot }: { decision: Decision; bot: strin
   const denied = decision.choice === 'deny';
   return (
     <View style={styles.chip} accessible accessibilityLabel={`${CHOICE_DONE[decision.choice]}: ${decision.command}`}>
-      {denied ? <CrossIcon size={12} color={colors.bad} /> : <CheckIcon size={12} color={color} />}
+      {denied ? <Icon name="close" size={12} color={colors.bad} stroke={4.4} /> : <Icon name="check" size={12} color={color} stroke={4.4} />}
       <Text style={styles.chipText} numberOfLines={1} maxFontSizeMultiplier={CHROME_SCALE}>
         {CHOICE_DONE[decision.choice]}
         {decision.command ? ` · ${decision.command}` : ''}
@@ -284,8 +252,8 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   activity: { alignSelf: 'flex-start', maxWidth: '100%', gap: 6 },
   chip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, height: 32, maxWidth: '100%', paddingHorizontal: 12, borderRadius: 16, backgroundColor: colors.card },
   chipText: { color: colors.dim, fontSize: 13, flexShrink: 1 },
-  chipChevron: { color: colors.dim, fontSize: 15, lineHeight: 18 },
   stepRow: { paddingLeft: 12 },
+  stepLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   step: { color: colors.dim, fontSize: 13, lineHeight: 20 },
   preview: { fontFamily: mono, paddingLeft: 16 },
   approval: { alignSelf: 'stretch', padding: 14, gap: 10, borderRadius: 16, borderWidth: 1, backgroundColor: colors.card },
@@ -296,10 +264,6 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   approvalCodeBody: { paddingHorizontal: 12, paddingVertical: 10 },
   approvalCommand: { color: colors.text, fontFamily: mono, fontSize: 13, lineHeight: 18 },
   approvalWhy: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  approvalButtons: { gap: 8 },
-  approvalRow: { flexDirection: 'row', gap: 8 },
-  approvalButton: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  approvalButtonText: { fontSize: 15, fontWeight: '600' },
   approvalFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   approvalNote: { color: colors.dim, fontSize: 12, lineHeight: 16 },
 }));

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Icon } from '@/components/AppIcons';
 import { loadManager } from '@/components/manager';
 import { Sheet } from '@/components/Sheet';
 import { useTint } from '@/components/Buttons';
@@ -104,7 +105,7 @@ export default function PickModel() {
                     {item}
                   </Text>
                   {isDefault(provider, item) ? <Text style={styles.tag}>default</Text> : null}
-                  {working ? <ActivityIndicator size="small" /> : chosen ? <Text style={[styles.check, { color: tint }]}>✓</Text> : null}
+                  {working ? <ActivityIndicator size="small" /> : chosen ? <Icon name="check" size={22} color={tint} stroke={2.2} /> : null}
                 </Pressable>
               </View>
             );

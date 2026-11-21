@@ -2,7 +2,8 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 export type IconName =
   | 'compose' | 'ellipsis' | 'chats' | 'sidebar' | 'back' | 'check' | 'search' | 'warning' | 'clock' | 'plug'
-  | 'palette' | 'info' | 'trash' | 'pencil' | 'plus' | 'close';
+  | 'palette' | 'info' | 'trash' | 'pencil' | 'plus' | 'close'
+  | 'chevron' | 'chevron-down' | 'arrow-up' | 'arrow-down' | 'stop' | 'copy' | 'refresh';
 
 /** The app's line icons (24 x 24 grid), drawn with react-native-svg so they look the same on the phone and the desktop. */
 export function Icon({ name, size = 24, color, stroke = 1.8 }: { name: IconName; size?: number; color: string; stroke?: number }) {
@@ -107,6 +108,47 @@ export function Icon({ name, size = 24, color, stroke = 1.8 }: { name: IconName;
       break;
     case 'close':
       body = <Path d="M6 6l12 12M18 6 6 18" {...line} />;
+      break;
+    case 'chevron':
+      body = <Path d="M9 4.5 16.5 12 9 19.5" {...line} />;
+      break;
+    case 'chevron-down':
+      body = <Path d="M4.5 9 12 16.5 19.5 9" {...line} />;
+      break;
+    case 'arrow-up':
+      body = (
+        <>
+          <Path d="M12 20V5" {...line} />
+          <Path d="M5.5 11.5 12 5l6.5 6.5" {...line} />
+        </>
+      );
+      break;
+    case 'arrow-down':
+      body = (
+        <>
+          <Path d="M12 4v15" {...line} />
+          <Path d="M5.5 12.5 12 19l6.5-6.5" {...line} />
+        </>
+      );
+      break;
+    case 'stop':
+      body = <Rect x={0} y={0} width={24} height={24} rx={4.8} fill={color} />;
+      break;
+    case 'copy':
+      body = (
+        <>
+          <Rect x={9} y={9} width={12} height={12} rx={2.5} {...line} />
+          <Path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15" {...line} />
+        </>
+      );
+      break;
+    case 'refresh':
+      body = (
+        <>
+          <Path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" {...line} />
+          <Path d="M19.5 4v4.5H15" {...line} />
+        </>
+      );
       break;
   }
   return (

@@ -49,6 +49,7 @@ export function Sheet({
   action: create,
   close = 'done',
   commit,
+  onCancel,
 }: {
   title: string;
   bot?: string;
@@ -56,6 +57,8 @@ export function Sheet({
   close?: 'done' | 'cancel';
   /** A form's commit ("Save", "Create"): semibold on the right of the header (a small primary button in a desktop panel). */
   commit?: { label: string; onPress: () => void; disabled?: boolean };
+  /** What Cancel does (default: close the sheet). A form with unsaved input asks first. */
+  onCancel?: () => void;
 }) {
   const { colors } = useTheme();
   const { color: botColor } = useBotLook(bot ?? '');
@@ -86,7 +89,7 @@ export function Sheet({
           left: create ? (
             <HeaderIcon icon={create.icon} label={create.label} color={color} onPress={create.onPress} />
           ) : close === 'cancel' ? (
-            <TextButton label="Cancel" color={color} bold={false} />
+            <TextButton label="Cancel" color={color} bold={false} onPress={onCancel} />
           ) : null,
           right: hasCommit ? (
             <TextButton label={commitLabel ?? ''} color={commitOff ? colors.faint : color} bold onPress={() => !commitOff && commitRef.current?.onPress()} />
@@ -109,10 +112,10 @@ function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-function TextButton({ label, color, bold, onPress = dismiss }: { label: string; color: string; bold: boolean; onPress?: () => void }) {
+function TextButton({ label, color, bold, onPress }: { label: string; color: string; bold: boolean; onPress?: () => void }) {
   const styles = useStyles();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
+    <Pressable onPress={onPress ?? dismiss} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
       <Text style={[styles.textButtonText, { color }, bold && { fontWeight: '600' }]} maxFontSizeMultiplier={1.4}>{label}</Text>
     </Pressable>
   );
@@ -131,7 +134,7 @@ export function HeaderIcon({ icon, label, color, onPress }: { icon: IconName; la
 const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   titleBlock: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
   title: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  subtitle: { color: colors.dim, fontSize: 12, lineHeight: 15 },
+  subtitle: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   textButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   textButtonText: { fontSize: 17 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

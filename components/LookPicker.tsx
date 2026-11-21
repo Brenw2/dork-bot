@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Icon } from '@/components/AppIcons';
 import { Sprite } from '@/components/BotSprite';
 import { Group, GroupHeader, GroupRow, LEADING_INSET } from '@/components/Grouped';
 import { BOT_COLORS, CHARACTER_IDS, CHARACTERS, lookName, looksOf, type Look } from '@/lib/sprites';
@@ -64,7 +65,7 @@ export function LookPicker({ value, onChange }: { value: Look; onChange: (look: 
                   key={v}
                   label={name}
                   leading={<Sprite character={value.character} variant={v} color={value.color} mood="idle" size={32} seed={v} />}
-                  right={on ? <Text style={[styles.check, { color: value.color }]}>✓</Text> : undefined}
+                  right={on ? <Icon name="check" size={22} color={value.color} stroke={2.2} /> : undefined}
                   onPress={() => onChange({ ...value, variant: v })}
                   accessibilityLabel={name}
                 />

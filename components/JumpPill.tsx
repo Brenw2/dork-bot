@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ArrowDownIcon } from '@/components/ChatIcons';
+import { Icon } from '@/components/AppIcons';
 import { makeStyles, useTheme } from '@/components/theme';
 
 /**
@@ -18,7 +18,7 @@ export function JumpPill({ visible, onPress }: { visible: boolean; onPress: () =
     <View pointerEvents="box-none" style={styles.wrap}>
       <Animated.View pointerEvents={visible ? 'auto' : 'none'} style={{ opacity }} accessibilityElementsHidden={!visible} importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}>
         <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Jump to latest" hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={styles.pill}>
-          <ArrowDownIcon size={14} color={colors.text} stroke={2} />
+          <Icon name="arrow-down" size={14} color={colors.text} stroke={3.43} />
           <Text style={styles.text}>Jump to latest</Text>
         </Pressable>
       </Animated.View>

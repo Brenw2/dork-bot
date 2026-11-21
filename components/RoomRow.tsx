@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Icon } from '@/components/AppIcons';
 import { isDesktop } from '@/components/desktop';
 import { MemberStack } from '@/components/RoomAvatar';
 import { timeLabel, type RoomRow as Row } from '@/lib/rooms';
@@ -107,7 +108,7 @@ export function RoomListRow({
             <Text style={styles.time} maxFontSizeMultiplier={1.4}>
               {time}
             </Text>
-            <Text style={styles.chevron}>›</Text>
+            <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
           </View>
           <View style={styles.line2}>
             <Text style={styles.preview} numberOfLines={2} maxFontSizeMultiplier={1.4}>

@@ -10,7 +10,7 @@ import { onColor } from '@/lib/color';
 import { mono } from '@/lib/theme';
 import { isDesktop } from '@/components/desktop';
 import { isBareLink, shortUrl } from '@/lib/shortUrl';
-import { CopyIcon } from '@/components/icons';
+import { Icon } from '@/components/AppIcons';
 import { splitStreaming } from '@/lib/streamBlocks';
 import { makeStyles, useTheme } from '@/components/theme';
 import type { Colors } from '@/lib/themes';
@@ -243,7 +243,7 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
       <View style={styles.codeHeader}>
         <Text style={styles.codeLang}>{label}</Text>
         <Pressable onPress={copy} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={copied ? 'Copied' : 'Copy code'} style={styles.copy}>
-          {copied ? null : <CopyIcon size={15} color={colors.text} />}
+          {copied ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
           <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy'}</Text>
         </Pressable>
       </View>

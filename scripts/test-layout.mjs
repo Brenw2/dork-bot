@@ -19,6 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { NOTE_AT, ROUTINE_SCREENS } from './layout-routine.mjs';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
+import { PASTE_SCREENS } from './layout-paste.mjs';
 import { USAGE_SCREENS } from './layout-usage.mjs';
 import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, checkErrorCard, checkErrorDetails, checkLook, checkNotSent, checkNotifications } from './layout-fixes-69.mjs';
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
@@ -300,6 +301,8 @@ const SCREENS = [
   { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
   // Card 8: group chat (fixtures and the fake rooms socket are in scripts/layout-rooms.mjs).
   ...ROOM_SCREENS,
+  // Card 30: the Paste photo chip.
+  ...PASTE_SCREENS,
   // Fix 3: the message box with text in it (Send inside the field). Fixes 4 and 5: a reply on its way (see fakeHermes).
   { name: 'chat-typing', path: chatPath('assistant'), waitFor: 'Any time.', act: (page) => typeIn(page, 'assistant', 'what time is sunset'), check: checkComposer },
   { name: 'chat-thinking', extraBots: ['thinker'], path: chatPath('thinker'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'thinker', 'what time is sunset'), page.getByLabel('Typing').first().waitFor()), check: checkThinking },
@@ -565,10 +568,10 @@ function measureTranscript() {
 function measureChats() {
   // The Work row's own chevron (a finished step chip in the chat pane has its own).
   const row = [...document.querySelectorAll('[role=button], [role=link]')].find((e) => (e.getAttribute('aria-label') || '').includes("assistant's work"));
-  const chev = row && [...row.querySelectorAll('div,span')].find((e) => e.children.length === 0 && e.textContent.trim() === '›');
+  const chev = row && row.querySelector('svg path');
   if (!chev) return ['the Work row chevron is missing'];
-  const c = getComputedStyle(chev).color;
-  return c === 'rgb(93, 98, 106)' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
+  const c = (chev.getAttribute('stroke') || '').toLowerCase();
+  return c === '#5d626a' ? [] : [`Work row chevron should be #5D626A, got ${c}`];
 }
 
 const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-error': ['Message failer'], 'chat-not-sent': ['Message unsender'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
@@ -893,7 +896,7 @@ async function uiPolishTests(browser, base) {
     for (const t of ['Chats', 'Routines', 'Connectors', 'Look']) tiles.push(await rectOf(page, `${t} for assistant`));
     for (const r of tiles) check(near(r?.height, 68), `a tile must be 68 tall, got ${r?.height}`);
     check(new Set(tiles.map((r) => Math.round(r?.y))).size === 1, 'the 4 tiles are in one row');
-    const nameFont = await page.getByText('assistant', { exact: true }).first().evaluate((el) => getComputedStyle(el).fontSize);
+    const nameFont = await page.getByText('assistant', { exact: true }).last().evaluate((el) => getComputedStyle(el).fontSize);
     check(nameFont === '22px', `the bot's name must be 22, got ${nameFont}`);
     const rows = await page.evaluate(() => ['Model', 'Routine results', 'Rename', 'Hide bot', 'Delete bot…'].map((t) => { const e = [...document.querySelectorAll('[role=button]')].find((b) => (b.getAttribute('aria-label') ?? '').startsWith(t)); return [t, e?.getBoundingClientRect().height]; }));
     for (const [t, h] of rows) check(h >= 52, `"${t}" row must be at least 52 tall, got ${h}`);

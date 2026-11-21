@@ -74,7 +74,7 @@ export default function BotSheet() {
 
   return (
     <View style={styles.screen}>
-      <Sheet title="" bot={bot} />
+      <Sheet title="Settings" bot={bot} />
       <ScrollView contentContainerStyle={[styles.body, column]}>
         <View style={styles.hero}>
           <BotAvatar bot={bot} size={72} />

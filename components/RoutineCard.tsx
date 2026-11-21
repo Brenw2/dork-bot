@@ -3,7 +3,6 @@
 // Opened from a notification, it expands and flashes once. Same on the phone and the desktop.
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/components/AppIcons';
 import { Markdown } from '@/components/Markdown';
 import { ROUTINE_MOTION, routineHasBody, routineHint, routineLabel, routinePreview, routineTints } from '@/lib/routineCard';
@@ -141,9 +140,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
         {body ? (
           <View style={styles.chevronBox}>
             <Animated.View style={{ transform: [{ rotate }] }}>
-              <Svg width={9} height={15} viewBox="0 0 9 15" fill="none">
-                <Path d="M1.5 1.5 7.5 7.5 1.5 13.5" stroke={colors.disclosure} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
+              <Icon name="chevron" size={20} color={colors.disclosure} stroke={2.64} />
             </Animated.View>
           </View>
         ) : null}

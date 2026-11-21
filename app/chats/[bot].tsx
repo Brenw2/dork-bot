@@ -131,7 +131,7 @@ export default function Chats() {
                       <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.4}>{name}</Text>
                       {isDesktop && hovered === item.id ? (
                         <Pressable onPress={(e) => actions(item, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${name}`}>
-                          <Text style={styles.more}>⋯</Text>
+                          <Icon name="ellipsis" size={19} color={colors.dim} />
                         </Pressable>
                       ) : (
                         <Text style={styles.when} maxFontSizeMultiplier={1.4}>{time}</Text>
@@ -170,7 +170,7 @@ function WorkRowLink({ bot, botName, color }: { bot: string; botName: string; co
           <Text style={styles.workName}>Work</Text>
           {note ? <Text style={[styles.workNote, running ? { color } : null]}>{note}</Text> : null}
         </View>
-        <Text style={styles.workChevron}>›</Text>
+        <Icon name="chevron" size={16} color={colors.disclosure} stroke={2.4} />
       </Pressable>
     </View>
   );
