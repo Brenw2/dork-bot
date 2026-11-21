@@ -115,7 +115,7 @@ function showMembers(room: Room, info: ReturnType<typeof useMemberInfo>) {
 
 // Tapping the title opens Members (there is no dedicated button).
 export function RoomTitle({ room }: { room: Room | null }) {
-  const { colors, skin } = useTheme();
+  const { colors, skin, caps } = useTheme();
   const styles = useStyles();
   const info = useMemberInfo();
   if (!room) return <View style={{ height: 32 }} />;
@@ -129,7 +129,7 @@ export function RoomTitle({ room }: { room: Room | null }) {
     >
       <MemberStack profiles={room.members.map((m) => m.profile)} size={32} />
       <View style={{ flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>
-        <Text style={skin({ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' })} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
+        <Text style={[skin({ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }), caps]} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
           {room.name}
         </Text>
         <Text style={skin({ color: colors.dim, fontSize: 12, lineHeight: 16 })} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
