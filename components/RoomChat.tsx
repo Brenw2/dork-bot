@@ -43,6 +43,7 @@ import {
 import type { ApprovalChoice } from '@/lib/hermes';
 import { mono, onColor } from '@/lib/theme';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 // ---------- who is who ----------
 
@@ -127,10 +128,10 @@ export function RoomTitle({ room }: { room: Room | null }) {
     >
       <MemberStack profiles={room.members.map((m) => m.profile)} size={32} />
       <View style={{ flexShrink: 1 }}>
-        <Text style={{ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={{ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' }} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
           {room.name}
         </Text>
-        <Text style={{ color: colors.dim, fontSize: 12, lineHeight: 16 }} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={{ color: colors.dim, fontSize: 12, lineHeight: 16 }} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
           {room.members.map((m) => info.name(m)).join(', ')}
         </Text>
       </View>
@@ -424,7 +425,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
               {sugg.map((s, i) => (
                 <View key={s.handle}>
                   {s.kind === 'all' && i > 0 ? <View style={styles.popLine} /> : null}
-                  <Pressable onPress={() => choose(s.handle)} accessibilityRole="menuitem" style={[styles.popRow, isDesktop && { height: 40 }, i === pick && { backgroundColor: colors.menuHover }]}>
+                  <Pressable onPress={() => choose(s.handle)} accessibilityRole="menuitem" style={[styles.popRow, isDesktop && { minHeight: 40 }, i === pick && { backgroundColor: colors.menuHover }]}>
                     {s.kind === 'all' ? (
                       <View style={[styles.allDisc, isDesktop && { width: 26, height: 26 }]}>
                         <Text style={{ color: colors.accent, fontSize: 13 }}>👥</Text>
@@ -660,7 +661,7 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   stripDot: { color: colors.dim, fontSize: 13, marginHorizontal: 2 },
   resume: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   popover: { position: 'absolute', left: 12, right: 12, bottom: '100%', marginBottom: 4, backgroundColor: colors.raised, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.menuBorder, overflow: 'hidden' },
-  popRow: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
+  popRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
   popLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.menuBorder, marginHorizontal: 12 },
   popName: { color: colors.text, fontSize: 15, fontWeight: '600' },
   popHandle: { color: colors.dim, fontSize: 13 },

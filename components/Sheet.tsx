@@ -11,6 +11,7 @@ import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import { headerSides } from '@/lib/headerItems';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 export interface SheetAction {
   label: string;
@@ -106,8 +107,8 @@ function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const styles = useStyles();
   return (
     <View style={styles.titleBlock} accessibilityRole="header">
-      <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1.4}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.4}>{subtitle}</Text> : null}
+      <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{title}</Text>
+      {subtitle ? <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -116,7 +117,7 @@ function TextButton({ label, color, bold, onPress }: { label: string; color: str
   const styles = useStyles();
   return (
     <Pressable onPress={onPress ?? dismiss} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
-      <Text style={[styles.textButtonText, { color }, bold && { fontWeight: '600' }]} maxFontSizeMultiplier={1.4}>{label}</Text>
+      <Text style={[styles.textButtonText, { color }, bold && { fontWeight: '600' }]} maxFontSizeMultiplier={maxScale.chrome}>{label}</Text>
     </Pressable>
   );
 }

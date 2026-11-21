@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/AppIcons';
 import { Chip } from '@/components/Chips';
@@ -12,6 +12,7 @@ import { isSendEnter } from '@/lib/enterKey';
 import { runPaste, showPasteChip } from '@/lib/pasteChip';
 import { onColor } from '@/lib/theme';
 import { makeStyles, useTheme } from '@/components/theme';
+import { scaled } from '@/lib/type';
 
 const WEB = Platform.OS === 'web';
 const INPUT_PANE_SHARE = 0.4; // desktop: the message box grows to this share of the chat pane's height
@@ -168,7 +169,7 @@ export function Composer(p: ComposerProps) {
               ref={inputRef}
               style={[
                 styles.input,
-                desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: 6 * 22 + 14 },
+                desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: scaled(6 * 22, PixelRatio.getFontScale()) + 14 },
                 WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
                 WEB && ({ outlineStyle: 'none' } as object),
               ]}

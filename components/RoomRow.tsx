@@ -63,16 +63,16 @@ export function RoomListRow({
         <MemberStack profiles={row.members.map((m) => m.profile)} size={40} />
         <View style={styles.sideText}>
           <View style={styles.line1}>
-            <Text style={[styles.sideName, { fontSize: big ? 16 : 15, lineHeight: 20 }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.sideName, { fontSize: big ? 16 : 15, lineHeight: 20 }]} numberOfLines={1}>
               {row.name}
               <Text style={styles.count}> · {row.count}</Text>
             </Text>
-            <Text style={styles.sideTime} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.sideTime}>
               {time}
             </Text>
           </View>
           <View style={styles.line2}>
-            <Text style={[styles.sidePreview, { fontSize: big ? 14 : 13, lineHeight: 18 }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.sidePreview, { fontSize: big ? 14 : 13, lineHeight: 18 }]} numberOfLines={1}>
               {line}
             </Text>
             {badge}
@@ -96,17 +96,17 @@ export function RoomListRow({
       <View style={styles.rowBody}>
         <View style={styles.rowInner}>
           <View style={styles.line1}>
-            <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.name} numberOfLines={1}>
               {row.name}
               <Text style={styles.count}> · {row.count}</Text>
             </Text>
-            <Text style={styles.time} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.time}>
               {time}
             </Text>
             <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
           </View>
           <View style={styles.line2}>
-            <Text style={styles.preview} numberOfLines={2} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.preview} numberOfLines={2}>
               {line}
             </Text>
             {badge}

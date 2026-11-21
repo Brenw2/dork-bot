@@ -13,6 +13,7 @@ import { useBotName } from '@/components/useBotName';
 import { useBotUsage, useDays, useUsageSnapshot } from '@/components/useUsage';
 import { formatCost, formatCount, formatTokens, hasActivity } from '@/lib/usage';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 // One bot's usage (Fix 12): the same 7/30/90 control, six tiles, tokens per day with day selection, and by-model rows.
 export default function BotUsageScreen() {
@@ -49,17 +50,17 @@ export default function BotUsageScreen() {
         <View style={styles.nav}>
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/usage'))} accessibilityRole="button" accessibilityLabel="Back to Usage" style={styles.back}>
             <Icon name="back" size={31} color={color} stroke={2.6} />
-            <Text style={[styles.backText, { color }]} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.backText, { color }]} maxFontSizeMultiplier={maxScale.chrome}>
               Usage
             </Text>
           </Pressable>
           <View style={styles.who} accessible accessibilityLabel={`${name}, last ${days} days`}>
             <BotAvatar bot={bot} size={32} />
             <View>
-              <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+              <Text style={styles.name} numberOfLines={1}>
                 {name}
               </Text>
-              <Text style={styles.sub} maxFontSizeMultiplier={1.4}>
+              <Text style={styles.sub}>
                 Last {days} days
               </Text>
             </View>
@@ -83,13 +84,13 @@ export default function BotUsageScreen() {
               <Tile label="Tool calls" value={formatCount(usage.toolCalls)} />
               <Tile label="Est. cost" value={formatCost(usage.cost)} />
             </View>
-            <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+            <Text style={styles.header} accessibilityRole="header">
               Tokens per day
             </Text>
             {active ? <DailyChart u={usage} color={color} now={now} /> : <EmptyChart days={days} />}
             {active && usage.models.length ? (
               <>
-                <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+                <Text style={styles.header} accessibilityRole="header">
                   By model
                 </Text>
                 <View style={styles.list}>

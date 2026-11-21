@@ -116,16 +116,16 @@ export default function Chats() {
                 >
                   <View style={styles.text}>
                     <View style={styles.line1}>
-                      <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.4}>{name}</Text>
+                      <Text style={styles.name} numberOfLines={1}>{name}</Text>
                       {isDesktop && hovered === item.id ? (
                         <Pressable onPress={(e) => actions(item, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${name}`}>
                           <Icon name="ellipsis" size={19} color={colors.dim} />
                         </Pressable>
                       ) : (
-                        <Text style={styles.when} maxFontSizeMultiplier={1.4}>{time}</Text>
+                        <Text style={styles.when}>{time}</Text>
                       )}
                     </View>
-                    {preview && preview !== name ? <Text style={styles.preview} numberOfLines={1} maxFontSizeMultiplier={1.4}>{preview}</Text> : null}
+                    {preview && preview !== name ? <Text style={styles.preview} numberOfLines={1}>{preview}</Text> : null}
                   </View>
                   <View style={styles.gutter}>{isOpen ? <Icon name="check" size={22} color={color} stroke={2.2} /> : null}</View>
                 </Pressable>

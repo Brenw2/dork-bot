@@ -24,6 +24,7 @@ import { getConnection, listBots, onBotsChanged, type SavedBot } from '@/lib/bot
 import { connectError, doingLine, errorLine, latestPreview, rowTime, sortRows, type BotPreview, type ConnectState } from '@/lib/botList';
 import { HermesClient, type FetchLike } from '@/lib/hermes';
 import { nameOf } from '@/lib/names';
+import { maxScale } from '@/lib/type';
 import type { UsageSnapshot } from '@/lib/usage';
 const REFRESH_MS = 15_000;
 // The last thing seen for each bot survives leaving and coming back to the list, so rows don't flash empty.
@@ -203,8 +204,8 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   const gauge = <UsageGauge snapshot={usage} onPress={() => router.push('/usage')} />;
   if (compact) {
     return (
-      <View style={[styles.sidebarHeader, { paddingTop: top, height: 56 + top }]}>
-        <Text style={styles.sidebarTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+      <View style={[styles.sidebarHeader, { paddingTop: top, minHeight: 56 + top }]}>
+        <Text style={styles.sidebarTitle} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome}>
           Dork Bot
         </Text>
         <View style={styles.sidebarRight}>
@@ -220,7 +221,7 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
         <View style={styles.gaugeSlot}>{gauge}</View>
         {buttons}
       </View>
-      <Text style={styles.largeTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+      <Text style={styles.largeTitle} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome}>
         Dork Bot
       </Text>
     </View>
@@ -271,7 +272,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
         <BotAvatar bot={bot} size={40} mood={broken ? 'sleeping' : undefined} />
         <View style={styles.sideText}>
           <View style={styles.line1}>
-            <Text style={[styles.sideName, { fontSize: big ? 16 : 15, lineHeight: 20 }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.sideName, { fontSize: big ? 16 : 15, lineHeight: 20 }]} numberOfLines={1}>
               {name}
             </Text>
             {isDesktop && hovered ? (
@@ -279,13 +280,13 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
                 <Icon name="ellipsis" size={19} color={colors.dim} />
               </Pressable>
             ) : (
-              <Text style={styles.sideTime} maxFontSizeMultiplier={1.4}>
+              <Text style={styles.sideTime}>
                 {time}
               </Text>
             )}
           </View>
           <View style={styles.line2}>
-            <Text style={[styles.sidePreview, { fontSize: big ? 14 : 13, lineHeight: 18 }, lineStyle]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.sidePreview, { fontSize: big ? 14 : 13, lineHeight: 18 }, lineStyle]} numberOfLines={1}>
               {line}
             </Text>
             {badge}
@@ -310,16 +311,16 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
       <View style={styles.rowBody}>
         <View style={styles.rowInner}>
           <View style={styles.line1}>
-            <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.name} numberOfLines={1}>
               {name}
             </Text>
-            <Text style={styles.time} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.time}>
               {time}
             </Text>
             <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
           </View>
           <View style={styles.line2}>
-            <Text style={[styles.preview, lineStyle]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.preview, lineStyle]} numberOfLines={2}>
               {line}
             </Text>
             {badge}
@@ -338,7 +339,7 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  largeButtons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, paddingLeft: 16, paddingRight: 8 },
+  largeButtons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingLeft: 16, paddingRight: 8 },
   gaugeSlot: { flexDirection: 'row', alignItems: 'center' },
   sidebarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   largeTitle: { color: colors.text, fontSize: 34, lineHeight: 41, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
@@ -356,7 +357,7 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   chevron: { color: colors.chevron, fontSize: 15, lineHeight: 20 },
   preview: { flex: 1, color: colors.dim, fontSize: 15, lineHeight: 20 },
   // Sidebar rows: 64 tall, inset 8, radius 10, avatar 40
-  sideRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 12, borderRadius: 10 },
+  sideRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
   sideText: { flex: 1, gap: 1 },
   sideName: { flex: 1, color: colors.text, fontWeight: '600' },
   sideTime: { color: colors.dim, fontSize: 12, lineHeight: 16 },

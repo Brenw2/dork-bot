@@ -20,6 +20,7 @@ import { useWorkingOn } from '@/components/workWatch';
 import { WorkingOn } from '@/components/WorkingOn';
 import { providerName } from '@/lib/models';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 /** "gemma4:31b · Dork": the chat's model under the bot's name. */
 export function modelLabel(m: Pick<ChatModelState, 'choice' | 'catalog' | 'error'>): string {
@@ -74,7 +75,7 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
     return () => globalThis.removeEventListener?.('keydown', onKey);
   }, [list]);
   return (
-    <View style={[styles.bar, pane ? styles.barPane : { height: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
+    <View style={[styles.bar, pane ? styles.barPane : { minHeight: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
       {pane ? (
         list ? <HeaderButton icon="sidebar" color={colors.dim} label={list.hidden ? 'Show the bot list' : 'Hide the bot list'} onPress={list.toggle} /> : null
       ) : (
@@ -85,7 +86,7 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
         >
           <Icon name="back" size={31} color={tint} stroke={2.6} />
-          <Text style={{ color: tint, fontSize: 17 }} maxFontSizeMultiplier={1.4}>Bots</Text>
+          <Text style={{ color: tint, fontSize: 17 }} maxFontSizeMultiplier={maxScale.chrome}>Bots</Text>
         </Pressable>
       )}
       <View style={[styles.center, pane && { alignItems: 'flex-start' }]}>{title}</View>
@@ -141,8 +142,8 @@ export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: bool
         >
           <BotAvatar bot={bot} size={32} />
           <View style={styles.titles}>
-            <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={1.4}>{name}</Text>
-            {work ? <WorkingOn bot={bot} /> : <Text style={styles.model} numberOfLines={1} maxFontSizeMultiplier={1.4}>{modelLabel(model)}</Text>}
+            <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{name}</Text>
+            {work ? <WorkingOn bot={bot} /> : <Text style={styles.model} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{modelLabel(model)}</Text>}
           </View>
         </Pressable>
       }

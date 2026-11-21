@@ -70,7 +70,7 @@ const useStyles = makeStyles(({ colors }) =>
   StyleSheet.create({
     field: { minHeight: 44, borderRadius: 12, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, color: colors.text, fontSize: 17, paddingHorizontal: 14, paddingVertical: 10 },
     multiline: { minHeight: 90, textAlignVertical: 'top' },
-    search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, borderRadius: 10, paddingHorizontal: 10, backgroundColor: colors.card },
+    search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36, borderRadius: 10, paddingHorizontal: 10, backgroundColor: colors.card },
     searchInput: { flex: 1, color: colors.text, fontSize: 17, padding: 0 },
     clear: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.raised },
   }),

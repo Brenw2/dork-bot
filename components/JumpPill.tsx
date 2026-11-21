@@ -28,6 +28,6 @@ export function JumpPill({ visible, onPress }: { visible: boolean; onPress: () =
 
 const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' },
-  pill: { height: 32, paddingHorizontal: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.raised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  pill: { minHeight: 32, paddingHorizontal: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.raised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   text: { color: colors.text, fontSize: 13, fontWeight: '600' },
 }));
