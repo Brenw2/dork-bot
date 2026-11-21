@@ -10,11 +10,12 @@ import { BotUsageRow, FailBanner, ProviderCard, Segmented, SkeletonBotRows, Skel
 import { useBotsUsage, useDays, useUsageSnapshot } from '@/components/useUsage';
 import { clockLabel, dueResets, hasActivity, localTokens, sortBots, updatedLine } from '@/lib/usage';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 const Header = ({ children }: { children: string }) => {
 const styles = useStyles();
 return (
-  <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+  <Text style={styles.header} accessibilityRole="header">
     {children}
   </Text>
 );
@@ -77,12 +78,12 @@ export default function UsageScreen() {
         <View style={[styles.nav, scrolled && styles.navScrolled]}>
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityRole="button" accessibilityLabel="Back to Bots" style={styles.back}>
             <Icon name="back" size={31} color={colors.accent} stroke={2.6} />
-            <Text style={styles.backText} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.backText} maxFontSizeMultiplier={maxScale.chrome}>
               Bots
             </Text>
           </Pressable>
           {scrolled ? (
-            <Text style={styles.navTitle} accessibilityRole="header" maxFontSizeMultiplier={1.4} pointerEvents="none">
+            <Text style={styles.navTitle} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome} pointerEvents="none">
               Usage
             </Text>
           ) : null}
@@ -103,7 +104,7 @@ export default function UsageScreen() {
           </View>
         ) : (
           <>
-            <Text style={[styles.title, scrolled && { opacity: 0 }]} accessibilityRole={scrolled ? undefined : 'header'} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.title, scrolled && { opacity: 0 }]} accessibilityRole={scrolled ? undefined : 'header'} maxFontSizeMultiplier={maxScale.chrome}>
               Usage
             </Text>
             <View style={styles.updatedWrap}>

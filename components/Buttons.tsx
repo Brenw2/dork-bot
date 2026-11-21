@@ -4,8 +4,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type Vi
 import { useDesk } from '@/components/ChatStatus';
 import { useBotLook } from '@/components/useBotLook';
 import { onColor } from '@/lib/theme';
-import { MONO_MAX_FONT_SCALE } from '@/lib/themes';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 /** The tint for a screen: the bot's color inside its context, the accent outside it. */
 export function useTint(bot?: string): string {
@@ -57,10 +57,10 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: !!disabled, busy: !!busy }}
-      style={({ pressed }) => [styles.big, skin({ height: desk ? 40 : 50, borderRadius: desk ? 20 : 25, backgroundColor: fill }), pressed && { opacity: 0.7 }, style]}
+      style={({ pressed }) => [styles.big, skin({ minHeight: desk ? 40 : 50, borderRadius: desk ? 20 : 25, backgroundColor: fill }), pressed && { opacity: 0.7 }, style]}
     >
       {busy ? <ActivityIndicator color={text} /> : null}
-      <Text style={[styles.bigText, { color: text }]} numberOfLines={1} maxFontSizeMultiplier={theme.shape.brackets ? MONO_MAX_FONT_SCALE : 1.4}>
+      <Text style={[styles.bigText, { color: text }]} numberOfLines={2} maxFontSizeMultiplier={theme.shape.brackets ? maxScale.mono : maxScale.chrome}>
         {shown}
       </Text>
     </Pressable>
@@ -92,9 +92,9 @@ export function SmallButton({ label, onPress, bot, tone = 'tint', disabled, busy
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       hitSlop={desk ? 2 : { top: 7, bottom: 7, left: 4, right: 4 }}
-      style={({ pressed }) => [styles.small, { height: desk ? 28 : 30, backgroundColor: disabled ? colors.card : bg }, outline, (pressed || busy) && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.small, { minHeight: desk ? 28 : 30, backgroundColor: disabled ? colors.card : bg }, outline, (pressed || busy) && { opacity: 0.6 }]}
     >
-      <Text style={[styles.smallText, { color: disabled ? colors.faint : fg }]} maxFontSizeMultiplier={term ? MONO_MAX_FONT_SCALE : 1.4}>
+      <Text style={[styles.smallText, { color: disabled ? colors.faint : fg }]} maxFontSizeMultiplier={term ? maxScale.mono : maxScale.chrome}>
         {shown}
       </Text>
     </Pressable>

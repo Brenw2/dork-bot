@@ -21,6 +21,7 @@ import { NOTE_AT, ROUTINE_SCREENS } from './layout-routine.mjs';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
 import { PASTE_SCREENS } from './layout-paste.mjs';
 import { USAGE_SCREENS } from './layout-usage.mjs';
+import { textScaleInit, typeScreens } from './layout-type.mjs';
 import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, checkErrorCard, checkErrorDetails, checkLook, checkNotSent, checkNotifications } from './layout-fixes-69.mjs';
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
 
@@ -331,6 +332,9 @@ const SCREENS = [
   // Card 25: Usage screen, bot detail, header gauge (scripts/layout-usage.mjs).
   ...USAGE_SCREENS,
 ];
+
+// Card 33: the screens that carry text, again at iOS's xxxL text size (scripts/layout-type.mjs).
+SCREENS.push(...typeScreens(SCREENS, ['bots', 'chat', 'chat-rich', 'chat-routine-card', 'room-list', 'room-chat', 'usage', 'usage-bot', 'bot-sheet', 'chats', 'routines', 'model']));
 
 function chatPath(bot) {
   return (p) => (p === 'duo-open-landscape' ? `/?bot=${bot}` : `/chat/${bot}`);
@@ -1244,6 +1248,7 @@ async function main() {
         { insets: shape.insets, store: seedFor(screen) },
       );
       if (screen.rooms) await page.addInitScript(roomsMock, { data: ROOM_DATA[screen.rooms] });
+      if (screen.textScale) await page.addInitScript(textScaleInit, { scale: screen.textScale });
       await page.route(`${HERMES}/**`, fakeHermes);
       await page.route(`${ADMIN}/**`, fakeHermes);
       if (screen.mock) await screen.mock(page); // after the defaults: a later route wins

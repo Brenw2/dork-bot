@@ -167,11 +167,6 @@ export const THEMES: Record<ThemeId, Theme> = {
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
 /**
- * Terminal's mono text grows with Dynamic Type up to this (Design: 1.3 on Silkscreen and Terminal mono). One place to
- * change: when the text-scale helper from the Dynamic Type card (lib/type.ts, maxScale.mono) is on main, point this at it.
- */
-export const MONO_MAX_FONT_SCALE = 1.3;
-/**
  * The themes the Appearance picker offers, in order. A theme joins this list only after Design's PASS on it
  * (THEMES.md); until then it is built but not offered. Terminal: the card is merged on Design's PASS.
  */

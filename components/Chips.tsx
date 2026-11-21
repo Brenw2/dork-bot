@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { onColor } from '@/lib/theme';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 /**
  * A tappable choice or status: 32 tall, radius 16, padding 12, 13/600. As a choice: selected = `tint` fill with
@@ -46,7 +47,7 @@ export function Chip({
   const body = (
     <>
       {leading}
-      <Text style={[styles.chipText, { color: text }]} numberOfLines={numberOfLines} maxFontSizeMultiplier={1.4}>
+      <Text style={[styles.chipText, { color: text }]} numberOfLines={numberOfLines} maxFontSizeMultiplier={maxScale.chrome}>
         {say(label)}
       </Text>
       {trailing}
@@ -81,7 +82,7 @@ export function Badge({ label }: { label: string }) {
   const { label: say } = useTheme();
   return (
     <View style={styles.badge}>
-      <Text style={styles.badgeText} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.badgeText} maxFontSizeMultiplier={maxScale.chrome}>
         {say(label)}
       </Text>
     </View>
@@ -94,7 +95,7 @@ export function Tag({ label, leading, accessibilityLabel }: { label: string; lea
   return (
     <View style={styles.tag} accessible accessibilityLabel={accessibilityLabel ?? label}>
       {leading}
-      <Text style={styles.tagText} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.tagText} maxFontSizeMultiplier={maxScale.chrome}>
         {label}
       </Text>
     </View>
@@ -103,11 +104,11 @@ export function Tag({ label, leading, accessibilityLabel }: { label: string; lea
 
 const useStyles = makeStyles(({ colors }) =>
   StyleSheet.create({
-    chip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, height: 32, maxWidth: '100%', paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: 'transparent', justifyContent: 'center' },
+    chip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, minHeight: 32, maxWidth: '100%', paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: 'transparent', justifyContent: 'center' },
     chipText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
-    badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
+    badge: { minHeight: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
     badgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
-    tag: { height: 22, borderRadius: 11, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card },
+    tag: { minHeight: 22, borderRadius: 11, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card },
     tagText: { color: colors.dim, fontSize: 12, fontWeight: '500' },
   }),
 );

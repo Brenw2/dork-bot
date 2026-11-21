@@ -16,6 +16,7 @@ import { useChatModel } from '@/components/useChatModel';
 import type { BotMeta } from '@/lib/manager';
 import { mutePatch } from '@/lib/push';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 type Path = '/look/[bot]' | '/chats/[bot]' | '/routines/[bot]' | '/connectors/[bot]' | '/model/[bot]' | '/routine-results/[bot]';
 
@@ -78,7 +79,7 @@ export default function BotSheet() {
       <ScrollView contentContainerStyle={[styles.body, column]}>
         <View style={styles.hero}>
           <BotAvatar bot={bot} size={72} />
-          <Text style={styles.name} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.name}>
             {name}
           </Text>
           {job ? <Text style={styles.job}>{job}</Text> : null}
@@ -87,7 +88,7 @@ export default function BotSheet() {
           {tiles.map((t) => (
             <Pressable key={t.label} onPress={() => go(t.path)} accessibilityRole="button" accessibilityLabel={`${t.label} for ${name}`} style={({ pressed }) => [styles.tile, pressed && { backgroundColor: colors.raised }]}>
               <Icon name={t.icon} size={22} color={color} />
-              <Text style={styles.tileLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+              <Text style={styles.tileLabel} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
                 {label(t.label)}
               </Text>
             </Pressable>

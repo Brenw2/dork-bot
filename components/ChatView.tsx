@@ -39,7 +39,7 @@ import { leaveAction } from '@/lib/busy';
 import { Composer } from '@/components/Composer';
 import { Activity, ApprovalCard, DecisionChip, TypingRow } from '@/components/ChatStatus';
 import { mono } from '@/lib/theme';
-import { MONO_MAX_FONT_SCALE } from '@/lib/themes';
+import { maxScale } from '@/lib/type';
 import { PROMPT } from '@/lib/themeSkin';
 import { makeStyles, useTheme } from '@/components/theme';
 
@@ -674,7 +674,7 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
         // Terminal: your message is a full-width row with a rule at the left and a prompt mark, not a bubble.
         <MessageMenu text={message.content} bot={bot} raw style={rule ? styles.ruleRow : [styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
           {rule ? (
-            <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no" maxFontSizeMultiplier={MONO_MAX_FONT_SCALE}>
+            <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no" maxFontSizeMultiplier={maxScale.mono}>
               {PROMPT}
             </Text>
           ) : null}

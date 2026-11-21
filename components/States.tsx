@@ -13,12 +13,12 @@ export function EmptyState({ body, title, icon, style }: { body?: string; title?
     <View style={[styles.empty, style]}>
       {icon ? <View style={styles.disc}>{icon}</View> : null}
       {title ? (
-        <Text style={styles.title} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.title}>
           {title}
         </Text>
       ) : null}
       {body ? (
-        <Text style={styles.body} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.body}>
           {body}
         </Text>
       ) : null}
@@ -47,7 +47,7 @@ export function ErrorBanner({ text, action, card, style, testID }: { text: strin
   return (
     <View style={[styles.banner, card ? styles.card : styles.band, style]} accessibilityLiveRegion="polite" testID={testID}>
       <Icon name="warning" size={18} color={colors.bad} />
-      <Text style={styles.bannerText} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.bannerText}>
         {text}
       </Text>
       {action ? <SmallButton label={action.label} tone="danger" onPress={action.onPress} accessibilityLabel={action.accessibilityLabel} /> : null}
@@ -59,7 +59,7 @@ export function ErrorBanner({ text, action, card, style, testID }: { text: strin
 export function FormError({ text, style }: { text: string; style?: StyleProp<TextStyle> }) {
   const styles = useStyles();
   return (
-    <Text style={[styles.formError, style]} accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.4}>
+    <Text style={[styles.formError, style]} accessibilityLiveRegion="polite">
       {text}
     </Text>
   );

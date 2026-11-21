@@ -1,7 +1,7 @@
 // Pieces of the Usage screen (card 25, docs/design/REVIEW.md "Fix 12", comps in docs/design/comps/25-*).
 // Thresholds, number formats and copy are the tested rules in lib/usage.ts.
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import { ActivityIndicator, PixelRatio, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Icon } from '@/components/AppIcons';
 import { Button } from '@/components/Buttons';
@@ -44,6 +44,7 @@ import {
   type UsageWindow,
 } from '@/lib/usage';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale, scaled } from '@/lib/type';
 import type { Colors } from '@/lib/themes';
 
 export const levelColor = (colors: Colors, level: Level): string => ({ ok: colors.ok, warn: colors.warn, bad: colors.bad })[level];
@@ -89,21 +90,21 @@ export function WindowRow({ w, now }: { w: UsageWindow; now: number }) {
   return (
     <View style={styles.window} accessible accessibilityLabel={spoken(w, now)}>
       <View style={styles.line}>
-        <Text style={[styles.windowLabel, { flexShrink: 1 }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={[styles.windowLabel, { flexShrink: 1 }]} numberOfLines={1}>
           {w.label}
         </Text>
-        <Text style={[styles.windowPercent, TABULAR, { color: c }]} maxFontSizeMultiplier={1.4}>
+        <Text style={[styles.windowPercent, TABULAR, { color: c }]}>
           {Math.round(w.percent)}%
         </Text>
       </View>
       <ProgressBar percent={w.percent} level={level} />
       <View style={styles.line}>
-        <Text style={[styles.reset, { flexShrink: 1 }]} maxFontSizeMultiplier={1.4}>
+        <Text style={[styles.reset, { flexShrink: 1 }]}>
           {resetLine(w.resetsAt, now)}
           {clock}
         </Text>
         {word ? (
-          <Text style={[styles.word, { color: levelColor(colors, level) }]} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.word, { color: levelColor(colors, level) }]}>
             {word}
           </Text>
         ) : null}
@@ -133,11 +134,11 @@ function ProviderHead({ p }: { p: ProviderUsage }) {
         <ChipGlyph />
       </View>
       <View style={styles.headText}>
-        <Text style={styles.providerName} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.providerName} numberOfLines={1}>
           {displayName(p)}
         </Text>
         {sub ? (
-          <Text style={styles.providerSub} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.providerSub} numberOfLines={1}>
             {sub}
           </Text>
         ) : null}
@@ -157,7 +158,7 @@ function AccountRows({ a, now }: { a: UsageAccount; now: number }) {
     <>
       <Sep />
       <View style={styles.accountHead}>
-        <Text style={styles.accountLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.accountLabel} numberOfLines={1}>
           {a.label}
         </Text>
       </View>
@@ -170,7 +171,7 @@ function AccountRows({ a, now }: { a: UsageAccount; now: number }) {
         ))
       ) : (
         <View style={styles.plainRow}>
-          <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.noData}>
             {a.state === 'limited' ? `Limit reached. ${resetLine(a.resetsAt, now)}` : a.state === 'unavailable' ? 'Not signed in' : 'No usage data from Hermes'}
           </Text>
         </View>
@@ -199,14 +200,14 @@ export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; 
           <Sep />
           <View style={styles.window}>
             <View style={styles.line}>
-              <Text style={styles.windowLabel} maxFontSizeMultiplier={1.4}>
+              <Text style={styles.windowLabel}>
                 Credits
               </Text>
-              <Text style={[styles.windowPercent, TABULAR]} maxFontSizeMultiplier={1.4}>
+              <Text style={[styles.windowPercent, TABULAR]}>
                 {formatCredits(p.credits)}
               </Text>
             </View>
-            <Text style={styles.reset} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.reset}>
               Balance from {p.name}
             </Text>
           </View>
@@ -216,10 +217,10 @@ export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; 
         <>
           <Sep />
           <View style={[styles.plainRow, styles.line]}>
-            <Text style={styles.windowLabel} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.windowLabel}>
               Tokens · {days} days
             </Text>
-            <Text style={[styles.windowPercent, TABULAR]} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.windowPercent, TABULAR]}>
               {localTokens === null ? '…' : formatTokens(localTokens)}
             </Text>
           </View>
@@ -229,7 +230,7 @@ export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; 
         <>
           <Sep />
           <View style={styles.plainRow}>
-            <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.noData}>
               No usage data from Hermes
             </Text>
           </View>
@@ -294,11 +295,11 @@ export function FailBanner({ since, onRetry }: { since: string; onRetry: () => v
   return (
     <View style={styles.banner} accessibilityRole="alert">
       <Icon name="warning" size={18} color={colors.bad} />
-      <Text style={styles.bannerText} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.bannerText}>
         Couldn't update. Showing data from {since}.
       </Text>
       <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry" hitSlop={7} style={styles.bannerButton}>
-        <Text style={styles.bannerButtonText} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.bannerButtonText}>
           Retry
         </Text>
       </Pressable>
@@ -312,10 +313,10 @@ export function Unreachable({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.unreachable}>
       <Icon name="warning" size={36} color={colors.dim} />
-      <Text style={styles.unreachableTitle} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.unreachableTitle}>
         Can't reach b-lab
       </Text>
-      <Text style={styles.unreachableText} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.unreachableText}>
         Usage comes from Hermes. Check the connection and try again.
       </Text>
       <Button label="Try again" onPress={onRetry} style={{ marginTop: 12 }} />
@@ -331,7 +332,7 @@ export function UpdatedLine({ text, loading, failed, onRetry }: { text: string |
     return (
       <View style={styles.updated}>
         <ActivityIndicator size="small" color={colors.dim} style={{ transform: [{ scale: 0.6 }], width: 12, height: 12 }} />
-        <Text style={styles.updatedText} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.updatedText}>
           Updating…
         </Text>
       </View>
@@ -339,11 +340,11 @@ export function UpdatedLine({ text, loading, failed, onRetry }: { text: string |
   if (failed)
     return (
       <View style={styles.updated}>
-        <Text style={styles.updatedText} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.updatedText}>
           Couldn't update ·
         </Text>
         <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry" hitSlop={10}>
-          <Text style={[styles.updatedText, { color: colors.accent }]} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.updatedText, { color: colors.accent }]}>
             Retry
           </Text>
         </Pressable>
@@ -351,7 +352,7 @@ export function UpdatedLine({ text, loading, failed, onRetry }: { text: string |
     );
   return (
     <View style={styles.updated}>
-      <Text style={styles.updatedText} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.updatedText}>
         {text ?? ''}
       </Text>
     </View>
@@ -377,7 +378,7 @@ export function Segmented({ value, onChange, color: given }: { value: Days; onCh
           accessibilityLabel={`${d} days`}
           style={[styles.segment, d === value && { backgroundColor: mix(color, 0.3) }]}
         >
-          <Text style={[styles.segmentText, d === value ? skin({ color: colors.text, fontWeight: '600' }) : skin({ fontWeight: '500' })]} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.segmentText, d === value ? skin({ color: colors.text, fontWeight: '600' }) : skin({ fontWeight: '500' })]} maxFontSizeMultiplier={maxScale.chrome}>
             {d} days
           </Text>
         </Pressable>
@@ -390,10 +391,10 @@ function Column3({ label, value }: { label: string; value: string }) {
   const styles = useStyles();
   return (
     <View style={styles.col}>
-      <Text style={[styles.colValue, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+      <Text style={[styles.colValue, TABULAR]} numberOfLines={1}>
         {value}
       </Text>
-      <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.colLabel} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -434,27 +435,27 @@ export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hi
       <BotAvatar bot={u.bot} size={isDesktop ? 36 : 40} mood={active ? undefined : 'sleeping'} />
       <View style={styles.botBody}>
         <View style={styles.line}>
-          <Text style={[styles.botName, !active && { color: colors.dim }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.botName, !active && { color: colors.dim }]} numberOfLines={1}>
             {name}
             {hidden ? <Text style={styles.hiddenTag}>  Hidden</Text> : null}
           </Text>
-          <Text style={[styles.botCost, TABULAR, !active && { color: colors.dim }]} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.botCost, TABULAR, !active && { color: colors.dim }]}>
             {cost}
           </Text>
         </View>
         {active ? (
           <>
-            <Text style={[styles.botLine, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+            <Text style={[styles.botLine, TABULAR]} numberOfLines={1}>
               {formatTokens(u.input)} in · {formatTokens(u.output)} out · {formatCount(u.apiCalls)} calls
             </Text>
             {top ? (
-              <Text style={styles.botLine} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+              <Text style={styles.botLine} numberOfLines={1}>
                 {top}
               </Text>
             ) : null}
           </>
         ) : (
-          <Text style={styles.botLine} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.botLine}>
             No activity in {u.days} days
           </Text>
         )}
@@ -470,10 +471,10 @@ export function Tile({ label, value }: { label: string; value: string }) {
   const styles = useStyles();
   return (
     <View style={styles.tile} accessible accessibilityLabel={`${label}, ${value}`}>
-      <Text style={[styles.colValue, TABULAR]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+      <Text style={[styles.colValue, TABULAR]} numberOfLines={1}>
         {value}
       </Text>
-      <Text style={styles.colLabel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.colLabel} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -503,6 +504,7 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
   const labels = axisLabels(series, u.days);
   const point = picked === null ? null : series[picked];
   const slot = plotW / Math.max(1, series.length);
+  const fontScale = PixelRatio.getFontScale();
   return (
     <View
       style={styles.chartCard}
@@ -516,10 +518,10 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
         if (delta) setPicked((cur) => stepPicked(cur, delta, series.length));
       }}
     >
-      <View style={{ height: 30 }}>
+      <View style={{ height: 12 + scaled(18, fontScale) * (fontScale > 1.2 ? 2 : 1) }}>
         {point ? (
           <View style={[styles.callout, { left: Math.max(0, Math.min(plotW - 190, (picked ?? 0) * slot + slot / 2 - 95)) }]}>
-            <Text style={styles.calloutText} maxFontSizeMultiplier={1.4}>
+            <Text style={styles.calloutText}>
               <Text style={skin({ fontWeight: '600', color: colors.text })}>{calloutText(point.day, point.tokens).split(' · ')[0]}</Text> · {formatTokens(point.tokens)} tokens
             </Text>
           </View>
@@ -557,18 +559,18 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
         </View>
         <View style={styles.gutter}>
           {[1, 0.5].map((f) => (
-            <Text key={f} style={[styles.axis, TABULAR, { position: 'absolute', left: 6, bottom: f * (PLOT - 1) - 8 }]} maxFontSizeMultiplier={1.4}>
+            <Text key={f} style={[styles.axis, TABULAR, { position: 'absolute', left: 6, bottom: f * (PLOT - 1) - 8 }]} maxFontSizeMultiplier={maxScale.chrome}>
               {formatTokens(top * f)}
             </Text>
           ))}
         </View>
       </View>
-      <View style={[styles.axisRow, { marginRight: 36 }]}>
+      <View style={[styles.axisRow, { marginRight: 36, height: scaled(16, fontScale, maxScale.chrome) }]}>
         {labels.map((l, k) => (
           <Text
             key={`${l.index}-${l.text}`}
             style={[styles.axis, { position: 'absolute', left: Math.max(0, Math.min(plotW - 40, l.index * slot + slot / 2 - 20)), width: 40, textAlign: 'center' }]}
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={maxScale.chrome}
           >
             {l.text}
           </Text>
@@ -582,7 +584,7 @@ export function EmptyChart({ days }: { days: number }) {
   const styles = useStyles();
   return (
     <View style={[styles.chartCard, { height: PLOT + 24, alignItems: 'center', justifyContent: 'center' }]}>
-      <Text style={styles.noData} maxFontSizeMultiplier={1.4}>
+      <Text style={styles.noData}>
         No activity in the last {days} days
       </Text>
     </View>
@@ -597,22 +599,22 @@ export function ModelRow({ m, u, providers, color }: { m: ModelUsage; u: BotUsag
   return (
     <View style={styles.modelRow} accessible accessibilityLabel={`${m.model}${provider ? `, ${provider}` : ''}, ${spokenTokens(m.input)} tokens in, ${spokenTokens(m.output)} out, ${formatCount(m.apiCalls)} calls, ${share} percent, ${formatCost(m.cost)}`}>
       <View style={styles.line}>
-        <Text style={[styles.botName, skin({ fontWeight: '400' })]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={[styles.botName, skin({ fontWeight: '400' })]} numberOfLines={1}>
           {m.model}
         </Text>
-        <Text style={[styles.windowPercent, TABULAR]} maxFontSizeMultiplier={1.4}>
+        <Text style={[styles.windowPercent, TABULAR]}>
           {formatCost(m.cost)}
         </Text>
       </View>
       {provider ? (
-        <Text style={styles.botLine} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.botLine}>
           {provider}
         </Text>
       ) : null}
       <View style={styles.share}>
         <View style={{ width: `${share}%`, minWidth: share > 0 ? 2 : 0, height: 4, borderRadius: 2, backgroundColor: color }} />
       </View>
-      <Text style={[styles.botLine, TABULAR]} maxFontSizeMultiplier={1.4}>
+      <Text style={[styles.botLine, TABULAR]}>
         {formatTokens(m.input)} in · {formatTokens(m.output)} out · {formatCount(m.apiCalls)} calls · {share}%
       </Text>
     </View>
@@ -648,7 +650,7 @@ export function GaugePill({ state, onPress, active = false }: { state: GaugeStat
         <Circle cx={10} cy={10} r={r} stroke={colors.border} strokeWidth={3} fill="none" />
         {shown > 0 ? <Circle cx={10} cy={10} r={r} stroke={c} strokeWidth={3} fill="none" strokeLinecap="round" strokeDasharray={`${circ * (shown / 100)} ${circ}`} transform="rotate(-90 10 10)" /> : null}
       </Svg>
-      <Text style={[styles.pillText, TABULAR, { color: state.level === 'ok' ? colors.text : c, fontSize: isDesktop ? 13 : 15 }]} maxFontSizeMultiplier={1.2}>
+      <Text style={[styles.pillText, TABULAR, { color: state.level === 'ok' ? colors.text : c, fontSize: isDesktop ? 13 : 15 }]} maxFontSizeMultiplier={maxScale.chrome}>
         {shown}%
       </Text>
     </Pressable>
@@ -683,14 +685,14 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   skel: { backgroundColor: colors.raised, borderRadius: 6 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.errorBg, borderColor: colors.errorLine, borderWidth: 0.5, borderRadius: 12, padding: 12 },
   bannerText: { flex: 1, color: colors.errorText, fontSize: 13, lineHeight: 18 },
-  bannerButton: { height: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
+  bannerButton: { minHeight: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
   bannerButtonText: { color: colors.errorText, fontSize: 13, fontWeight: '600' },
   unreachable: { alignItems: 'center', gap: 10, paddingVertical: 80, paddingHorizontal: 32 },
   unreachableTitle: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', marginTop: 6 },
   unreachableText: { color: colors.dim, fontSize: 15, lineHeight: 20, textAlign: 'center' },
   updated: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 18 },
   updatedText: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  segmented: { flexDirection: 'row', height: 36, backgroundColor: colors.card, borderRadius: 10, padding: 2 },
+  segmented: { flexDirection: 'row', minHeight: 36, backgroundColor: colors.card, borderRadius: 10, padding: 2 },
   segment: { flex: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   segmentText: { color: colors.dim, fontSize: 15 },
   totals: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 12, gap: 8 },
@@ -716,6 +718,6 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   calloutText: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   modelRow: { paddingHorizontal: 16, paddingVertical: 12 },
   share: { height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 6, marginBottom: 6, overflow: 'hidden' },
-  pill: { height: 32, borderRadius: 16, paddingLeft: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pill: { minHeight: 32, borderRadius: 16, paddingLeft: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillText: { fontWeight: '600' },
 }));

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/AppIcons';
 import { Chip } from '@/components/Chips';
@@ -11,9 +11,9 @@ import { MAX_IMAGES, type Attachment } from '@/lib/attachments';
 import { isSendEnter } from '@/lib/enterKey';
 import { runPaste, showPasteChip } from '@/lib/pasteChip';
 import { onColor } from '@/lib/theme';
-import { MONO_MAX_FONT_SCALE } from '@/lib/themes';
 import { PROMPT } from '@/lib/themeSkin';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale, scaled } from '@/lib/type';
 
 const WEB = Platform.OS === 'web';
 const INPUT_PANE_SHARE = 0.4; // desktop: the message box grows to this share of the chat pane's height
@@ -172,7 +172,7 @@ export function Composer(p: ComposerProps) {
           ) : null}
           <View testID="composer-field" style={[styles.field, skin({ minHeight: fieldMin, borderRadius: fieldMin / 2 }), p.dimmed && { opacity: 0.5 }]}>
             {term ? (
-              <Text style={[styles.prompt, desk && { top: 10, fontSize: 16, lineHeight: 24 }]} accessibilityElementsHidden importantForAccessibility="no" pointerEvents="none" maxFontSizeMultiplier={MONO_MAX_FONT_SCALE}>
+              <Text style={[styles.prompt, desk && { top: 10, fontSize: 16, lineHeight: 24 }]} accessibilityElementsHidden importantForAccessibility="no" pointerEvents="none" maxFontSizeMultiplier={maxScale.mono}>
                 {PROMPT}
               </Text>
             ) : null}
@@ -181,7 +181,7 @@ export function Composer(p: ComposerProps) {
               style={[
                 styles.input,
                 term && styles.inputTerm,
-                skin(desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: 6 * 22 + 14 }),
+                skin(desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: scaled(6 * 22, PixelRatio.getFontScale()) + 14 }),
                 WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
                 WEB && ({ outlineStyle: 'none' } as object),
               ]}

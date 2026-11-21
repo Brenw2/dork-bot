@@ -28,7 +28,7 @@ export function Group({ children, style, inset = 16 }: { children: ReactNode; st
 export function GroupHeader({ children }: { children: string }) {
   const styles = useStyles();
   return (
-    <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+    <Text style={styles.header} accessibilityRole="header">
       {children}
     </Text>
   );
@@ -73,17 +73,17 @@ export function GroupRow({
     <>
       {leading}
       <View style={styles.text}>
-        <Text style={[styles.label, destructive && { color: colors.bad }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={[styles.label, destructive && { color: colors.bad }]} numberOfLines={1}>
           {say(label)}
         </Text>
         {detail ? (
-          <Text style={[styles.detail, detailColor ? { color: detailColor } : null]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
+          <Text style={[styles.detail, detailColor ? { color: detailColor } : null]} numberOfLines={2}>
             {detail}
           </Text>
         ) : null}
       </View>
       {value ? (
-        <Text style={styles.value} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.value} numberOfLines={1}>
           {value}
         </Text>
       ) : null}
