@@ -57,11 +57,14 @@ export interface ComposerProps {
  * Keyboard avoidance stays with the screen (KeyboardAvoidingView), since it depends on the header above.
  */
 export function Composer(p: ComposerProps) {
-  const { colors, theme, skin } = useTheme();
+  const { colors, theme, skin, depth } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const desk = useDesk();
-  const fieldMin = desk ? 44 : 36;
+  // Arcade: 44 tall everywhere (the kit's field and + button), radius 14 / 12 instead of a pill.
+  const arc = !!theme.pixel;
+  const fieldMin = desk || arc ? 44 : 36;
+  const fieldRadius = theme.pixel ? theme.pixel.radii.field : fieldMin / 2;
   const term = theme.shape.brackets;
   const enabled = p.enabled ?? true;
   const images = p.images ?? [];
@@ -114,13 +117,17 @@ export function Composer(p: ComposerProps) {
       : Menu.show('Add a picture', [...PICK_SOURCES.map((s) => ({ text: s.label, icon: 'plus' as const, onPress: () => attach(s.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
 
   // Send/Stop: a 30 circle 3 in from the field's corner (desktop 32, 6 in); the field's own line is a hairline.
-  const roundSize = skin(
-    desk
-      ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
-      : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth },
-  );
-  // Send takes the theme (Classic: the bot's color as before; Terminal: the accent).
-  const sendColor = colors.send === 'accent' ? colors.accent : p.color;
+  const roundSize = arc
+    ? { width: 32, height: 32, borderRadius: 10, right: 6, bottom: 6 }
+    : skin(
+        desk
+          ? { width: 32, height: 32, borderRadius: 16, right: 6 - StyleSheet.hairlineWidth, bottom: 6 - StyleSheet.hairlineWidth }
+          : { width: 30, height: 30, borderRadius: 15, right: 3 - StyleSheet.hairlineWidth, bottom: 3 - StyleSheet.hairlineWidth },
+      );
+  // Send takes the theme (Classic: the bot's color as before; Terminal: the accent; Arcade: its pink, a hex in `send`).
+  const sendColor = colors.send === 'accent' ? colors.accent : colors.send === 'bot' ? p.color : colors.send;
+  // Arcade: Send and Stop are the same pink square with the darker pink edge (2 pt).
+  const sendEdge = theme.pixel ? depth(theme.pixel.sendDepth) && { ...depth(theme.pixel.sendDepth), shadowOffset: { width: 0, height: 2 } } : null;
 
   const keyProps = WEB
     ? {
@@ -160,7 +167,7 @@ export function Composer(p: ComposerProps) {
         <View style={styles.composer}>
           {onImages ? (
             <Pressable
-              style={({ pressed }) => [styles.attach, skin({ width: fieldMin, height: fieldMin, borderRadius: fieldMin / 2 }), term && { borderWidth: 1, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.attach, skin({ width: fieldMin, height: fieldMin, borderRadius: fieldMin / 2 }), term && { borderWidth: 1, borderColor: colors.border }, arc && { borderRadius: 12 }, depth(), pressed && { opacity: 0.6 }]}
               onPress={(e) => openAttach({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
               disabled={!enabled || images.length >= MAX_IMAGES}
               hitSlop={4}
@@ -170,7 +177,7 @@ export function Composer(p: ComposerProps) {
               <Icon name="plus" size={18} color={colors.dim} stroke={2.67} />
             </Pressable>
           ) : null}
-          <View testID="composer-field" style={[styles.field, skin({ minHeight: fieldMin, borderRadius: fieldMin / 2 }), p.dimmed && { opacity: 0.5 }]}>
+          <View testID="composer-field" style={[styles.field, skin({ minHeight: fieldMin, borderRadius: fieldRadius }), p.dimmed && { opacity: 0.5 }]}>
             {term ? (
               <Text style={[styles.prompt, desk && { top: 10, fontSize: 16, lineHeight: 24 }]} accessibilityElementsHidden importantForAccessibility="no" pointerEvents="none" maxFontSizeMultiplier={maxScale.mono}>
                 {PROMPT}
@@ -182,6 +189,7 @@ export function Composer(p: ComposerProps) {
                 styles.input,
                 term && styles.inputTerm,
                 skin(desk ? { fontSize: 16, lineHeight: 24, paddingVertical: 10, paddingRight: 44 } : { fontSize: 17, lineHeight: 22, paddingVertical: 7, paddingRight: 36, maxHeight: scaled(6 * 22, PixelRatio.getFontScale()) + 14 }),
+                arc && { paddingRight: 44 },
                 WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
                 WEB && ({ outlineStyle: 'none' } as object),
               ]}
@@ -197,14 +205,14 @@ export function Composer(p: ComposerProps) {
               editable={enabled}
               {...keyProps}
             />
-            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, skin({ borderRadius: fieldMin / 2 })]} />
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, skin({ borderRadius: fieldMin / 2 }), arc && { borderRadius: fieldRadius, borderWidth: 2 }]} />
             {p.canSend ? (
-              <Pressable testID="composer-send" style={[styles.roundButton, roundSize, { backgroundColor: sendColor }]} onPress={p.onSend} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
+              <Pressable testID="composer-send" style={[styles.roundButton, roundSize, { backgroundColor: sendColor }, sendEdge]} onPress={p.onSend} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
                 <Icon name="arrow-up" size={16} color={onColor(sendColor)} stroke={3.9} />
               </Pressable>
             ) : p.stop ? (
-              <Pressable testID="composer-stop" style={[styles.roundButton, roundSize, { backgroundColor: colors.text }]} onPress={p.stop.onPress} disabled={p.stop.disabled} accessibilityRole="button" accessibilityLabel={p.stop.label ?? 'Stop'} hitSlop={6}>
-                <Icon name="stop" size={10} color={colors.bg} />
+              <Pressable testID="composer-stop" style={[styles.roundButton, roundSize, { backgroundColor: arc ? sendColor : colors.text }, sendEdge]} onPress={p.stop.onPress} disabled={p.stop.disabled} accessibilityRole="button" accessibilityLabel={p.stop.label ?? 'Stop'} hitSlop={6}>
+                <Icon name="stop" size={10} color={arc ? colors.code : colors.bg} />
               </Pressable>
             ) : null}
           </View>

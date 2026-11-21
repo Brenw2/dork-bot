@@ -32,12 +32,14 @@ export const openBotSheet = (bot: string) => router.push({ pathname: '/bot/[bot]
 
 /** One header icon button: 44 x 44 on the phone, 32 x 32 on desktop with a hover fill (K1). */
 export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; label: string; color: string; onPress: (e: GestureResponderEvent) => void }) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, depth } = useTheme();
   const styles = useStyles();
   const big = !isDesktop;
   const hit = big ? 44 : 32;
   // Terminal draws the icon in a square outlined box inside the full-size target, so the button keeps its 44 / 32 footprint.
   const term = theme.shape.brackets;
+  // Arcade: the same box, filled with the card color, radius 12, with the pressable edge; the icon is the text color.
+  const arc = !!theme.pixel;
   return (
     <Pressable
       onPress={onPress}
@@ -46,13 +48,17 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
       style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
         styles.icon,
         { width: hit, height: hit },
-        (hovered || pressed) && !big && { backgroundColor: colors.raised },
-        pressed && big && { opacity: 0.6 },
+        (hovered || pressed) && !big && !arc && { backgroundColor: colors.raised },
+        pressed && (big || arc) && { opacity: 0.6 },
       ]}
     >
       {term ? (
         <View style={{ width: hit - 8, height: hit - 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={icon} size={big ? 24 : 19} color={color} />
+        </View>
+      ) : arc ? (
+        <View style={[{ width: hit - 8, height: hit - 8, borderRadius: 12, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }, depth()]}>
+          <Icon name={icon} size={big ? 22 : 17} color={colors.text} />
         </View>
       ) : (
         <Icon name={icon} size={big ? 24 : 19} color={color} />
@@ -67,9 +73,9 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
  * icon buttons on the right, ending with the "..." circle.
  */
 export function PageHeader({ pane, list, tint, title, children }: { pane: boolean; list?: { hidden: boolean; toggle: () => void }; tint: string; title: ReactNode; children: ReactNode }) {
-  const { colors, label, skin, theme } = useTheme();
-  // Terminal: the back link is mint (the kit's "‹ bots"); Classic keeps the bot's color.
-  const backTint = theme.shape.brackets ? colors.accent : tint;
+  const { colors, label, skin, theme, caps } = useTheme();
+  // Terminal and Arcade: the back link is the accent (the kit's "‹ bots"); Classic keeps the bot's color.
+  const backTint = theme.shape.brackets || theme.pixel ? colors.accent : tint;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   // Desktop shortcut: Ctrl+\ shows or hides the bot list.
@@ -96,7 +102,7 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
         >
           <Icon name="back" size={31} color={backTint} stroke={2.6} />
-          <Text style={skin({ color: backTint, fontSize: 17 })} maxFontSizeMultiplier={maxScale.chrome}>{label('Bots')}</Text>
+          <Text style={[skin({ color: backTint, fontSize: 17 }), caps]} maxFontSizeMultiplier={maxScale.chrome}>{label('Bots')}</Text>
         </Pressable>
       )}
       <View style={[styles.center, pane && { alignItems: 'flex-start' }]}>{title}</View>
@@ -106,7 +112,7 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
 }
 
 export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: boolean; list?: { hidden: boolean; toggle: () => void }; model: ChatModelState }) {
-  const { colors } = useTheme();
+  const { colors, caps } = useTheme();
   const styles = useStyles();
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
@@ -152,7 +158,7 @@ export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: bool
         >
           <BotAvatar bot={bot} size={32} />
           <View style={styles.titles}>
-            <Text style={styles.name} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{name}</Text>
+            <Text style={[styles.name, caps]} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{name}</Text>
             {work ? <WorkingOn bot={bot} /> : <Text style={styles.model} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{modelLabel(model)}</Text>}
           </View>
         </Pressable>

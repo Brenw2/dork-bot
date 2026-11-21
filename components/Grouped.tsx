@@ -5,15 +5,17 @@ import { Children, isValidElement, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Icon } from '@/components/AppIcons';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 /** The separator inset for rows that have a leading icon or avatar. */
 export const LEADING_INSET = 60;
 
 export function Group({ children, style, inset = 16 }: { children: ReactNode; style?: StyleProp<ViewStyle>; inset?: number }) {
   const styles = useStyles();
+  const { theme, depth, colors } = useTheme();
   const items = Children.toArray(children).filter(isValidElement);
-  return (
-    <View style={[styles.group, style]}>
+  const inner = (
+    <View style={[styles.group, theme.pixel ? { borderWidth: 1, borderColor: colors.border } : style]}>
       {items.map((child, i) => (
         <View key={i}>
           {i > 0 ? <View style={[styles.sep, { marginLeft: inset }]} /> : null}
@@ -22,13 +24,18 @@ export function Group({ children, style, inset = 16 }: { children: ReactNode; st
       ))}
     </View>
   );
+  // Arcade: the pressable edge is a shadow, and the group clips its rows (overflow hidden), which would clip the
+  // shadow too, so the edge sits on a wrapper with the same corners.
+  return theme.pixel ? <View style={[{ borderRadius: theme.pixel.radii.card, backgroundColor: colors.card }, depth(), style]}>{inner}</View> : inner;
 }
 
-/** A section header over a group: 13/18 uppercase dim, +0.3 tracking, 32 from the left, 18 above and 7 below. */
+/** A section header over a group: 13/18 uppercase dim, +0.3 tracking, 32 from the left, 18 above and 7 below. Arcade: Silkscreen. */
 export function GroupHeader({ children }: { children: string }) {
   const styles = useStyles();
+  const { px } = useTheme();
+  const pixel = !!px();
   return (
-    <Text style={styles.header} accessibilityRole="header">
+    <Text style={[styles.header, px()]} accessibilityRole="header" maxFontSizeMultiplier={pixel ? maxScale.mono : maxScale.body}>
       {children}
     </Text>
   );

@@ -17,7 +17,8 @@ import { maxScale } from '@/lib/type';
 
 // One bot's usage (Fix 12): the same 7/30/90 control, six tiles, tokens per day with day selection, and by-model rows.
 export default function BotUsageScreen() {
-  const { colors } = useTheme();
+  const { colors, px } = useTheme();
+  const pixel = !!px();
   const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const column = useColumnStyle();
@@ -84,13 +85,13 @@ export default function BotUsageScreen() {
               <Tile label="Tool calls" value={formatCount(usage.toolCalls)} />
               <Tile label="Est. cost" value={formatCost(usage.cost)} />
             </View>
-            <Text style={styles.header} accessibilityRole="header">
+            <Text style={[styles.header, px()]} accessibilityRole="header" maxFontSizeMultiplier={pixel ? maxScale.mono : maxScale.body}>
               Tokens per day
             </Text>
             {active ? <DailyChart u={usage} color={color} now={now} /> : <EmptyChart days={days} />}
             {active && usage.models.length ? (
               <>
-                <Text style={styles.header} accessibilityRole="header">
+                <Text style={[styles.header, px()]} accessibilityRole="header" maxFontSizeMultiplier={pixel ? maxScale.mono : maxScale.body}>
                   By model
                 </Text>
                 <View style={styles.list}>

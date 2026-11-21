@@ -1,7 +1,7 @@
 // The app's themes (Appearance setting, docs: design-comps/dork-bot-redesign-2026-11-19/THEMES.md). Plain TypeScript, no
 // React Native, so tests can import it. Classic equals the app as it was before themes: every value here is the old
 // lib/theme.ts value. Terminal, Paper and Arcade are added by their own cards, each after Design's PASS.
-export type ThemeId = 'classic' | 'terminal';
+export type ThemeId = 'classic' | 'terminal' | 'arcade';
 
 export interface Colors {
   bg: string;
@@ -38,7 +38,12 @@ export interface Colors {
   // Terminal card:
   userText: string; // text in your own message
   /** Send/Stop: `bot` = the bot's color (Classic, as before), `accent` = this theme's accent. */
-  send: 'bot' | 'accent';
+  send: 'bot' | 'accent' | (string & {});
+  // Arcade card (optional: the other themes don't set them):
+  /** The 3 pt "pressable" bottom edge (shape.depth). */
+  depth?: string;
+  /** The "Needs you" badge fill, where it isn't `bad`. */
+  needsYou?: string;
 }
 
 /** The font files a theme draws with (expo-font family names, see components/themeFonts.ts). null = the system fonts. */
@@ -48,6 +53,41 @@ export interface Fonts {
   bold: string;
   /** Code blocks and inline code. */
   mono: string;
+  /** Silkscreen, the pixel face for small labels (Arcade). */
+  label?: string;
+  /** Silkscreen Bold, for the large title (Arcade). */
+  display?: string;
+}
+
+/** Corner radii a theme sets in place of Classic's (Arcade). Keys follow themes.proposed.ts `radius`. */
+export interface Radii {
+  card: number;
+  row: number;
+  button: number;
+  small: number;
+  field: number;
+  bubble: number;
+  tail: number;
+  avatar: number;
+  menu: number;
+  sheet: number;
+}
+
+/**
+ * Arcade's extras (all optional, Classic and Terminal set none): `depth` is the bottom edge in pt (colors.depth is its
+ * color), `caps` upper-cases labels, buttons, badges, names and headers (never message text, previews or
+ * placeholders), `tile` makes the avatar a solid rounded tile. `radii` replaces Classic's corner radii by value (see
+ * lib/themeSkin.ts RADII_MAP). The *Depth colors are the edges under your bubble and the Send button.
+ */
+export interface Pixel {
+  depth: number;
+  caps: boolean;
+  tile: boolean;
+  radii: Radii;
+  titleShadow: string;
+  userDepth: string;
+  sendDepth: string;
+  replyBorder: string;
 }
 
 /**
@@ -74,6 +114,8 @@ export interface Theme {
   colors: Colors;
   fonts: Fonts | null;
   shape: Shape;
+  /** Arcade's look beyond the shared shape flags. Absent in the other themes. */
+  pixel?: Pixel;
 }
 
 export const THEMES: Record<ThemeId, Theme> = {
@@ -163,6 +205,62 @@ export const THEMES: Record<ThemeId, Theme> = {
     fonts: { regular: 'JetBrainsMono-Regular', semibold: 'JetBrainsMono-SemiBold', bold: 'JetBrainsMono-Bold', mono: 'JetBrainsMono-Regular' },
     shape: { square: true, lowercase: true, userRule: true, brackets: true, dashed: true },
   },
+  // Arcade (kit-arcade.png, c1, c2): deep purple, cyan and pink, Space Grotesk for the UI, Silkscreen for small labels,
+  // chunky radii and a 3 pt pressable edge. Values from themes.proposed.ts; `track` and the scrollbar are its border family.
+  arcade: {
+    id: 'arcade',
+    name: 'Arcade',
+    statusBar: 'light',
+    mixBase: '#120F24',
+    colors: {
+      bg: '#120F24',
+      card: '#1E1A3A',
+      border: '#2A2552',
+      text: '#F5F3FF',
+      dim: '#A9A3CC',
+      accent: '#3DE0FF',
+      user: '#3DE0FF',
+      ok: '#3DE0FF',
+      bad: '#FF6B7A',
+      warn: '#FF9E5A',
+      raised: '#2A2552',
+      hover: '#231E45',
+      faint: '#7D77A3',
+      sidebar: '#0E0B1D',
+      chevron: '#4A4473',
+      disclosure: '#7D77A3',
+      code: '#0A0817',
+      menuBorder: '#3A3470',
+      menuHover: '#332D63',
+      errorBg: '#2A1230',
+      errorLine: '#4D1F45',
+      errorText: '#FFC7D6',
+      errorDetail: '#D9A3B8',
+      badgeText: '#0A0817',
+      dialog: '#1E1A3A',
+      inlineCode: '#2A2552',
+      codeText: '#F5F3FF',
+      track: '#2A2552',
+      scrollThumb: '#2A2552',
+      scrollThumbHover: '#3A3470',
+      userText: '#0A0817',
+      send: '#FF5FA2',
+      depth: '#0A0817',
+      needsYou: '#FF5FA2',
+    },
+    fonts: { regular: 'SpaceGrotesk-Regular', semibold: 'SpaceGrotesk-SemiBold', bold: 'SpaceGrotesk-Bold', mono: 'JetBrainsMono-Regular', label: 'Silkscreen-Regular', display: 'Silkscreen-Bold' },
+    shape: { square: false, lowercase: false, userRule: false, brackets: false, dashed: false },
+    pixel: {
+      depth: 3,
+      caps: true,
+      tile: true,
+      radii: { card: 18, row: 18, button: 14, small: 10, field: 14, bubble: 18, tail: 6, avatar: 15, menu: 14, sheet: 20 },
+      titleShadow: '#FF5FA2',
+      userDepth: '#1A7F96',
+      sendDepth: '#9C2D5E',
+      replyBorder: '#4A3F8F',
+    },
+  },
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
@@ -170,7 +268,7 @@ export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
  * The themes the Appearance picker offers, in order. A theme joins this list only after Design's PASS on it
  * (THEMES.md); until then it is built but not offered. Terminal: the card is merged on Design's PASS.
  */
-export const PICKER_THEMES: ThemeId[] = ['classic', 'terminal'];
+export const PICKER_THEMES: ThemeId[] = ['classic', 'terminal', 'arcade'];
 export const DEFAULT_THEME: ThemeId = 'classic';
 
 /** A stored value as a theme id; anything unknown (a theme from a newer build, junk) is the default. */

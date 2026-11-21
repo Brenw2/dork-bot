@@ -40,13 +40,14 @@ import { RoomListRow } from '@/components/RoomRow';
 import { useRoomRows } from '@/components/roomsClient';
 import { makeStyles, useTheme } from '@/components/theme';
 import { PICKER_THEMES } from '@/lib/themes';
+import { onColor } from '@/lib/color';
 
 /**
  * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
  * compact: the sidebar next to a chat (desktop and the open Duo in landscape).
  */
 export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
-  const { colors, label } = useTheme();
+  const { colors, label, theme } = useTheme();
   const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, ConnectState>>({});
@@ -163,7 +164,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
             </View>
           ) : undefined
         }
-        contentContainerStyle={rows.length ? (compact ? styles.listCompact : styles.list) : styles.emptyWrap}
+        contentContainerStyle={rows.length ? (compact ? styles.listCompact : theme.pixel ? styles.listCards : styles.list) : styles.emptyWrap}
         ListEmptyComponent={
           <EmptyState
             style={{ marginTop: 0 }}
@@ -181,11 +182,27 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
 }
 
 function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boolean; top: number; usage: UsageSnapshot | null; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, px, depth } = useTheme();
   const styles = useStyles();
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const term = theme.shape.brackets;
+  const arc = !!theme.pixel;
+  const mono = term || arc; // wide faces (Terminal's mono, Arcade's Silkscreen) are capped at maxScale.mono
+  // Arcade (c1): two square-ish buttons with the pressable edge, ... on the card color and + on the accent. The box is
+  // 36 (desktop 32) inside the same 44 (32) target, so the touch size is unchanged.
+  const boxButton = (name: 'ellipsis' | 'compose', a11y: string, fill: string, fg: string, onPress: (e: { nativeEvent: { pageX: number; pageY: number } }) => void) => (
+    <Pressable
+      onPress={(e) => onPress(e)}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      style={({ pressed }: { pressed: boolean }) => [styles.headerButton, { width: hit, height: hit }, pressed && !isDesktop && { opacity: 0.6 }]}
+    >
+      <View style={[styles.arcBox, { width: hit - 8, height: hit - 8, borderRadius: 12, backgroundColor: fill }, depth()]}>
+        <Icon name={name} size={isDesktop ? 17 : 22} color={fg} />
+      </View>
+    </Pressable>
+  );
   // Terminal: each header action is text (see textButton), so there is no icon box to size.
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
     styles.headerButton,
@@ -211,6 +228,11 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
       {textButton('[ ... ]', 'More', (e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
       {textButton('[ + new ]', 'New bot', (e) => onCompose({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
     </View>
+  ) : arc ? (
+    <View style={styles.headerButtons}>
+      {boxButton('ellipsis', 'More', colors.card, colors.text, (e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
+      {boxButton('compose', 'New bot', colors.accent, onColor(colors.accent), (e) => onCompose({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
+    </View>
   ) : (
     <View style={styles.headerButtons}>
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
@@ -225,7 +247,7 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   if (compact) {
     return (
       <View style={[styles.sidebarHeader, { paddingTop: top, minHeight: 56 + top }]}>
-        <Text style={styles.sidebarTitle} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={maxScale.chrome}>
+        <Text style={[styles.sidebarTitle, arc && px('display')]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={arc ? maxScale.mono : maxScale.chrome}>
           {term ? 'dork-bot' : 'Dork Bot'}
           {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
         </Text>
@@ -242,7 +264,7 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
         <View style={styles.gaugeSlot}>{gauge}</View>
         {buttons}
       </View>
-      <Text style={[styles.largeTitle, term && styles.largeTitleTerm]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? maxScale.mono : maxScale.chrome}>
+      <Text style={[styles.largeTitle, term && styles.largeTitleTerm, arc && styles.largeTitleArc, arc && px('display')]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={mono ? maxScale.mono : maxScale.chrome}>
         {term ? 'dork-bot' : 'Dork Bot'}
         {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
       </Text>
@@ -251,9 +273,10 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
 }
 
 function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: SavedBot; compact: boolean; selected: boolean; state: ConnectState | undefined; preview: BotPreview | undefined; onOpen: () => void }) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, caps, depth } = useTheme();
   const styles = useStyles();
   const term = theme.shape.brackets;
+  const arc = !!theme.pixel;
   const bot = saved.bot;
   const name = nameOf(bot, saved.displayName);
   const mood = useBotMood(bot);
@@ -271,7 +294,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   } else if (needs) line = `Wants to run a command: ${needs.command || needs.description}`;
   else if (doing) {
     line = doing;
-    lineStyle = { color: term ? colors.accent : colors.text };
+    lineStyle = { color: term || arc ? colors.accent : colors.text };
   } else line = preview ? (preview.text ?? 'No messages yet') : '';
   const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
   // Terminal marks a problem line like a console does.
@@ -297,7 +320,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
         <BotAvatar bot={bot} size={40} mood={broken ? 'sleeping' : undefined} />
         <View style={styles.sideText}>
           <View style={styles.line1}>
-            <Text style={[styles.sideName, { fontSize: big ? 16 : 15, lineHeight: 20 }]} numberOfLines={1}>
+            <Text style={[styles.sideName, { fontSize: big ? 16 : 15, lineHeight: 20 }, caps]} numberOfLines={1}>
               {name}
             </Text>
             {isDesktop && hovered ? (
@@ -328,21 +351,21 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint="Opens the chat. Long-press for the bot's settings."
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.raised }]}
+      style={({ pressed }) => [styles.row, arc && styles.rowCard, arc && depth(), pressed && { backgroundColor: colors.raised }]}
     >
-      <View style={styles.rowAvatar}>
+      <View style={[styles.rowAvatar, arc && styles.rowAvatarCard]}>
         <BotAvatar bot={bot} size={52} mood={broken ? 'sleeping' : undefined} />
       </View>
-      <View style={styles.rowBody}>
-        <View style={styles.rowInner}>
+      <View style={[styles.rowBody, arc && styles.rowBodyCard]}>
+        <View style={[styles.rowInner, arc && styles.rowInnerCard]}>
           <View style={styles.line1}>
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={[styles.name, arc && styles.nameArc, caps]} numberOfLines={1}>
               {name}
             </Text>
             <Text style={styles.time}>
               {time}
             </Text>
-            <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
+            {arc ? null : <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />}
           </View>
           <View style={styles.line2}>
             <Text style={[styles.preview, lineStyle]} numberOfLines={2}>
@@ -356,9 +379,18 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   );
 }
 
-const useStyles = makeStyles(({ colors, mix, theme: { shape: { dashed } } }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix, theme: { shape: { dashed }, pixel } }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { paddingBottom: 24 },
+  // Arcade (c1): each bot is its own card, 8 apart.
+  listCards: { paddingTop: 4, paddingBottom: 24 },
+  rowCard: { alignItems: 'center', minHeight: 0, marginHorizontal: 12, marginBottom: 8, paddingVertical: 9, paddingLeft: 9, paddingRight: 12, backgroundColor: colors.card, borderRadius: pixel?.radii.row ?? 12 },
+  rowAvatarCard: { width: 64, paddingLeft: 0, paddingTop: 0 },
+  rowBodyCard: { borderBottomWidth: 0 },
+  rowInnerCard: { paddingTop: 0, paddingBottom: 0, paddingRight: 0 },
+  nameArc: { fontWeight: '700', fontSize: 16, lineHeight: 22, letterSpacing: 0.3 },
+  arcBox: { alignItems: 'center', justifyContent: 'center' },
+  largeTitleArc: { fontSize: 26, lineHeight: 34, paddingBottom: 12, textShadowColor: pixel?.titleShadow ?? 'transparent', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 0 },
   listCompact: { paddingHorizontal: 8, paddingBottom: 12, gap: 2 },
   emptyWrap: { flexGrow: 1, justifyContent: 'center', padding: 32 },
   // Header

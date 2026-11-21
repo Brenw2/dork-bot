@@ -7,7 +7,7 @@ import { loadThemeFonts } from '@/components/themeFonts';
 import { mix as mixOn } from '@/lib/color';
 import * as SecureStore from '@/lib/secureStore';
 import { DEFAULT_THEME, parseTheme, THEMES, type Theme, type ThemeId } from '@/lib/themes';
-import { skinSheet, skinStyle, themed } from '@/lib/themeSkin';
+import { capsText, depthStyle, pixelText, skinSheet, skinStyle, themed } from '@/lib/themeSkin';
 
 const KEY = 'appearance';
 
@@ -23,6 +23,12 @@ export interface ThemeApi {
   label: (text: string) => string;
   /** An inline style (one written in a component, not in makeStyles) drawn for this theme: its font, its corners. */
   skin: <T>(style: T) => T;
+  /** Arcade: the pixel face (Silkscreen) in caps for a small label; `display` is the bold one, for the large title. Undefined in other themes. */
+  px: (kind?: 'label' | 'display') => ReturnType<typeof pixelText>;
+  /** Arcade: caps in the UI face (buttons, names, headers). Undefined in other themes. */
+  caps: ReturnType<typeof capsText>;
+  /** Arcade: the 3 pt pressable bottom edge as a style (a hard shadow); `color` overrides the edge color. Undefined in other themes. */
+  depth: (color?: string) => ReturnType<typeof depthStyle>;
 }
 
 function api(theme: Theme, setTheme: (id: ThemeId) => void): ThemeApi {
@@ -35,6 +41,9 @@ function api(theme: Theme, setTheme: (id: ThemeId) => void): ThemeApi {
     setTheme,
     label: (text) => themed(theme, text),
     skin: (style) => skinStyle(style, theme),
+    px: (kind) => pixelText(theme, kind),
+    caps: capsText(theme),
+    depth: (color) => depthStyle(theme, color),
   };
 }
 

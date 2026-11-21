@@ -524,7 +524,10 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
 
 function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; it: Item; prev?: Item; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
   const styles = useStyles();
-  const { theme, colors, skin } = useTheme();
+  const { theme, colors, skin, depth } = useTheme();
+  // Arcade: your bubble is the theme's cyan with a 6 pt tail corner and a darker edge, as in the 1:1 chat.
+  const px = theme.pixel;
+  const arcBubble = px ? [styles.bubble, { backgroundColor: colors.user, borderBottomRightRadius: px.radii.tail }, depth(px.userDepth)] : styles.bubble;
   const rule = theme.shape.userRule;
   const sep = prev && 'at' in prev && 'at' in it && prev.at && it.at && it.at - prev.at > 1800 ? stamp(it.at) : !prev && 'at' in it && it.at ? stamp(it.at) : null;
   return (
@@ -537,13 +540,13 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
       {it.type === 'system' ? (
         <Text style={styles.system}>{it.text}</Text>
       ) : it.type === 'user' ? (
-        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : styles.bubble}>
+        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : arcBubble}>
           {rule ? (
             <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no">
               {PROMPT}
             </Text>
           ) : null}
-          <Text style={[styles.bubbleText, { color: colors.userText }, rule && { flex: 1 }]} selectable={WEB_SELECT}>
+          <Text style={[styles.bubbleText, { color: colors.userText }, rule && { flex: 1 }, px && skin({ fontWeight: '600' })]} selectable={WEB_SELECT}>
             <Mentions text={it.text} members={members} info={info} />
           </Text>
         </MessageMenu>
@@ -556,6 +559,7 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
 
 function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: string; it: Extract<Item, { type: 'member' }>; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
   const styles = useStyles();
+  const { caps } = useTheme();
   const profile = it.member?.profile ?? it.actorId;
   const color = info.color(profile);
   return (
@@ -565,7 +569,7 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
       <View style={{ flex: 1 }}>
         {it.grouped ? null : (
           <View style={styles.nameLine}>
-            <Text style={[styles.speaker, { color }]}>{info.name(it.member, it.actorId)}</Text>
+            <Text style={[styles.speaker, { color }, caps]}>{info.name(it.member, it.actorId)}</Text>
             <Text style={styles.time}>{clockTime(it.at)}</Text>
             {unanswered ? <Badge label="Needs you" /> : null}
           </View>
@@ -605,7 +609,7 @@ function Mentions({ text, members, info }: { text: string; members: RoomMember[]
 const CHOICE: Record<string, string> = { once: 'Allow once', session: 'Allow in this chat', always: 'Always allow', deny: 'Deny' };
 
 function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; member: RoomMember | null; room: string; info: MemberInfo; onAnswer: (c: string) => void }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, theme, caps, depth } = useTheme();
   const styles = useStyles();
   const profile = member?.profile ?? a.memberId;
   const color = info.color(profile);
@@ -613,11 +617,11 @@ function ApprovalCard({ a, member, room, info, onAnswer }: { a: PendingAction; m
   const [done, setDone] = useState(false);
   const desk = useDesk();
   return (
-    <View style={[styles.approval, { borderColor: mix(color, 0.55) }]} accessibilityLiveRegion="polite">
+    <View style={[styles.approval, { borderColor: theme.pixel ? colors.border : mix(color, 0.55) }, depth()]} accessibilityLiveRegion="polite">
       <View style={styles.apHead}>
         <MemberDisc bot={profile} size={28} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.apTitle}>{a.command ? 'Run this command?' : 'Needs your OK'}</Text>
+          <Text style={[styles.apTitle, caps]}>{a.command ? 'Run this command?' : 'Needs your OK'}</Text>
           <Text style={styles.apSub}>{info.name(member, a.memberId)} needs your OK in {room}</Text>
         </View>
       </View>

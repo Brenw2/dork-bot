@@ -183,8 +183,9 @@ function AccountRows({ a, now }: { a: UsageAccount; now: number }) {
 /** One grouped card per provider. `localTokens`/`days` feed the local-model row; Hermes sends no plan or detail, so none shows. */
 export function ProviderCard({ p, now, localTokens, days }: { p: ProviderUsage; now: number; localTokens: number | null; days: Days }) {
   const styles = useStyles();
+  const { depth } = useTheme();
   return (
-    <View style={styles.card} accessibilityLabel={`${displayName(p)} usage`}>
+    <View style={[styles.card, depth()]} accessibilityLabel={`${displayName(p)} usage`}>
       <ProviderHead p={p} />
       {p.kind === 'windows'
         ? p.windows.map((w, i) => (
@@ -404,9 +405,10 @@ function Column3({ label, value }: { label: string; value: string }) {
 /** Tokens, API calls, Est. cost across every bot. */
 export function TotalsCard({ bots }: { bots: BotUsage[] }) {
   const styles = useStyles();
+  const { depth } = useTheme();
   const t = totalsOf(bots);
   return (
-    <View style={styles.totals} accessible accessibilityLabel={`${formatTokens(t.tokens)} tokens, ${formatCount(t.apiCalls)} API calls, ${formatCost(t.cost)} estimated cost`}>
+    <View style={[styles.totals, depth()]} accessible accessibilityLabel={`${formatTokens(t.tokens)} tokens, ${formatCount(t.apiCalls)} API calls, ${formatCost(t.cost)} estimated cost`}>
       <Column3 label="Tokens" value={formatTokens(t.tokens)} />
       <Column3 label="API calls" value={formatCount(t.apiCalls)} />
       <Column3 label="Est. cost" value={formatCost(t.cost)} />
@@ -469,8 +471,9 @@ export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hi
 
 export function Tile({ label, value }: { label: string; value: string }) {
   const styles = useStyles();
+  const { depth } = useTheme();
   return (
-    <View style={styles.tile} accessible accessibilityLabel={`${label}, ${value}`}>
+    <View style={[styles.tile, depth()]} accessible accessibilityLabel={`${label}, ${value}`}>
       <Text style={[styles.colValue, TABULAR]} numberOfLines={1}>
         {value}
       </Text>
@@ -488,7 +491,7 @@ const PLOT = isDesktop ? 168 : 132;
  * labels in a 36 gutter on the right. Tap or drag anywhere on the chart to pick a day; the rest dim to mix(c, .45).
  */
 export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now: number }) {
-  const { colors, mix, skin } = useTheme();
+  const { colors, mix, skin, depth } = useTheme();
   const styles = useStyles();
   const [plotW, setPlotW] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -507,7 +510,7 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
   const fontScale = PixelRatio.getFontScale();
   return (
     <View
-      style={styles.chartCard}
+      style={[styles.chartCard, depth()]}
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={`Tokens per day, busiest day ${calloutText(series[busiest].day, series[busiest].tokens).replace(' tokens', '')}`}

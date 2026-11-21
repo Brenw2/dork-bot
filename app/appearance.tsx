@@ -8,7 +8,8 @@ import { Sheet } from '@/components/Sheet';
 import { makeStyles, useTheme } from '@/components/theme';
 import { loadThemeFonts } from '@/components/themeFonts';
 import { PICKER_THEMES, THEMES, type ThemeId } from '@/lib/themes';
-import { skinStyle, PROMPT } from '@/lib/themeSkin';
+import { PROMPT, skinStyle } from '@/lib/themeSkin';
+import { maxScale } from '@/lib/type';
 
 // Appearance (design-comps/dork-bot-redesign-2026-11-19, appearance-*.png): one row per theme with a small live
 // preview drawn from that theme's own colors, its name and one line, and a radio. It applies right away and is kept
@@ -16,6 +17,7 @@ import { skinStyle, PROMPT } from '@/lib/themeSkin';
 const DESCRIPTION: Record<ThemeId, string> = {
   classic: 'Today’s look. Dark, purple accent, Messages-style.',
   terminal: 'Near-black console. Mint highlights, one mono font, square corners.',
+  arcade: 'Deep purple, cyan and pink. Chunky, pressable, pixel labels.',
 };
 
 // The preview is drawn in its own theme, so it is made with that theme's skin (its font, its corners). Until the
@@ -26,11 +28,13 @@ function Preview({ id, fontsReady }: { id: ThemeId; fontsReady: boolean }) {
   const look = fontsReady ? t : { ...t, fonts: null };
   const s = <T,>(style: T): T => skinStyle(style, look);
   const rule = t.shape.userRule;
+  const arcade = !!t.pixel;
+  const edge = arcade ? { shadowColor: c.depth, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 0 } : null;
   return (
-    <View style={s({ width: 104, height: 80, borderRadius: 12, backgroundColor: c.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, padding: 8 })} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View style={{ ...s({ width: 104, height: 80, borderRadius: 12, backgroundColor: c.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, padding: 8 }), ...(arcade ? { borderRadius: 12 } : null) }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-        <View style={s({ width: 16, height: 16, borderRadius: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.accent })} />
-        <Text style={s({ color: c.text, fontSize: 8, fontWeight: '700' })}>chief</Text>
+        <View style={s(arcade ? { width: 22, height: 22, borderRadius: 6, backgroundColor: c.accent, ...edge } : { width: 16, height: 16, borderRadius: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.accent })} />
+        <Text style={[s({ color: c.text, fontSize: 8, fontWeight: '700' }), arcade && { textTransform: 'uppercase' }]} maxFontSizeMultiplier={maxScale.mono}>chief</Text>
       </View>
       <View
         style={
@@ -41,8 +45,8 @@ function Preview({ id, fontsReady }: { id: ThemeId; fontsReady: boolean }) {
       >
         <Text style={s({ color: c.userText, fontSize: 8 })}>{rule ? `${PROMPT} ship it?` : 'Ship it?'}</Text>
       </View>
-      <View style={s({ alignSelf: 'flex-start', marginTop: 6, backgroundColor: c.accent, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 })}>
-        <Text style={s({ color: onColor(c.accent), fontSize: 8, fontWeight: '700' })}>{t.shape.brackets ? '[send]' : 'Send'}</Text>
+      <View style={[s({ alignSelf: 'flex-start', marginTop: 6, backgroundColor: c.accent, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }), edge]}>
+        <Text style={[s({ color: onColor(c.accent), fontSize: 8, fontWeight: '700' }), arcade && { textTransform: 'uppercase' }]}>{t.shape.brackets ? '[send]' : 'Send'}</Text>
       </View>
     </View>
   );
@@ -51,7 +55,7 @@ function Preview({ id, fontsReady }: { id: ThemeId; fontsReady: boolean }) {
 export default function AppearanceScreen() {
   const styles = useStyles();
   const column = useColumnStyle();
-  const { theme, colors, setTheme } = useTheme();
+  const { theme, colors, setTheme, caps } = useTheme();
   // Load every offered theme's fonts, so each preview is drawn in its own font.
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -81,7 +85,7 @@ export default function AppearanceScreen() {
               >
                 <Preview id={id} fontsReady={!!loaded[id]} />
                 <View style={styles.texts}>
-                  <Text style={styles.name}>{THEMES[id].name}</Text>
+                  <Text style={[styles.name, caps]}>{THEMES[id].name}</Text>
                   <Text style={styles.desc}>{DESCRIPTION[id]}</Text>
                 </View>
                 <View style={[styles.radio, selected && { backgroundColor: colors.accent, borderColor: colors.accent }]}>

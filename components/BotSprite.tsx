@@ -80,6 +80,27 @@ export function BotAvatar({ bot, size = 52, mood }: { bot: string; size?: number
   const { color } = useBotLook(bot);
   const { theme } = useTheme();
   const tile = theme.shape.square;
+  // Arcade: a solid tile of the bot's color with a 3 pt edge a shade darker (the sprite itself is the same).
+  if (theme.pixel?.tile) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: Math.round(size * 0.29),
+          backgroundColor: color,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: mix(color, 0.55, '#000000'),
+          shadowOffset: { width: 0, height: theme.pixel.depth },
+          shadowOpacity: 1,
+          shadowRadius: 0,
+        }}
+      >
+        <BotSprite bot={bot} size={Math.round(size * 0.74)} mood={mood} />
+      </View>
+    );
+  }
   return (
     <View
       style={{
