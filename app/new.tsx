@@ -14,6 +14,8 @@ import { CHARACTERS, lookName, type Look } from '@/lib/sprites';
 import { mono } from '@/lib/theme';
 import { Button, SmallButton } from '@/components/Buttons';
 import { Group, GroupHeader, GroupRow } from '@/components/Grouped';
+import { Field } from '@/components/Fields';
+import { FormError } from '@/components/States';
 import { Sheet } from '@/components/Sheet';
 import { makeStyles, useTheme } from '@/components/theme';
 
@@ -103,14 +105,13 @@ export default function NewBot() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
       <Sheet title="New bot" close="cancel" />
-      <Field label="Name" value={name} onChangeText={(t) => setName(t.toLowerCase())} placeholder="scout" maxLength={64} />
-      <Field
+      <Labeled label="Name" value={name} onChangeText={(t) => setName(t.toLowerCase())} placeholder="scout" maxLength={64} />
+      <Labeled
         label="What does it do?"
         value={job}
         onChangeText={setJob}
         placeholder="Finds and summarizes news about the Mets"
         multiline
-        style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
       />
       <View style={{ gap: 6 }}>
         <Text style={styles.label}>Look</Text>
@@ -132,7 +133,7 @@ export default function NewBot() {
       <Text style={styles.hint}>
         It starts on the same model and tools as {'"'}assistant{'"'}{template?.model ? ` (${template.model})` : ''}, with its own memory and chats. Switch it to any model, local or frontier, from the model line in its chat.
       </Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <FormError text={error} /> : null}
       <Button label={busy ? busy : 'Create bot'} accessibilityLabel="Create bot" busy={!!busy} disabled={!name || !job.trim()} onPress={create} />
 
       {others.length ? (
@@ -160,14 +161,13 @@ export default function NewBot() {
   );
 }
 
-function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
-  const { colors } = useTheme();
+function Labeled(props: React.ComponentProps<typeof Field> & { label: string }) {
   const styles = useStyles();
   const { label, ...input } = props;
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} autoCapitalize="none" autoCorrect={false} placeholderTextColor={colors.dim} {...input} />
+      <Field autoCapitalize="none" autoCorrect={false} {...input} />
     </View>
   );
 }
@@ -175,22 +175,12 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
 const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  body: { padding: 20, gap: 18 },
+  body: { padding: 16, gap: 16 },
   title: { color: colors.text, fontSize: 20, fontWeight: '600' },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center', lineHeight: 22 },
   code: { color: colors.text, fontFamily: mono },
   label: { color: colors.dim, fontSize: 13 },
   hint: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  input: {
-    color: colors.text,
-    fontSize: 16,
-    padding: 13,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  error: { color: colors.bad, fontSize: 14 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

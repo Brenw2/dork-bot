@@ -6,6 +6,7 @@ import { openChat } from '@/components/currentChat';
 import { ChatView } from '@/components/ChatView';
 import { RoomChat } from '@/components/RoomChat';
 import { isDesktop } from '@/components/desktop';
+import { EmptyState } from '@/components/States';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { setListHidden, useListHidden } from '@/components/useListHidden';
 import { CHAT_MAX_WIDTH, DESKTOP_SIDEBAR_WIDTH, foldNavFor, SIDEBAR_WIDTH } from '@/lib/layoutClass';
@@ -99,8 +100,8 @@ export default function Home() {
             list={{ hidden: !showList, toggle: () => setListHidden(showList) }}
           />
         ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>Pick a bot to chat with.</Text>
+          <View style={styles.pane}>
+            <EmptyState body="Pick a bot to chat with." style={{ marginTop: 0 }} />
           </View>
         )}
       </View>
@@ -112,6 +113,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   row: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
   sidebar: { width: isDesktop ? DESKTOP_SIDEBAR_WIDTH : SIDEBAR_WIDTH, backgroundColor: colors.sidebar, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
   detail: { flex: 1 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: colors.dim, fontSize: 15 },
+  pane: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 }));

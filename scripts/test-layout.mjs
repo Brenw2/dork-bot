@@ -1131,6 +1131,43 @@ async function uiPolishTests(browser, base) {
     await page.getByLabel('Show the bot list').waitFor({ timeout: 5000 });
     await shot(page, 'desktop-list-hidden');
   });
+
+  // ---- Room header (UI kit K1, G10 + G12): the same page header as the bot chat, ⋯ circle, hit areas, header crops ----
+  const roomPage = async (opts) => {
+    const ctx = await uiPage(browser, base, { extraBots: ['chief', 'coder'], ...opts });
+    await ctx.page.addInitScript(roomsMock, { data: ROOM_DATA.chat });
+    return ctx;
+  };
+  failed += await run('iphone room header', await roomPage({}), async ({ page, check, near }) => {
+    await page.goto(`${base}/room/r-ops`);
+    await page.getByText('Holding.', { exact: false }).first().waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(400);
+    const top = PHONE.insets.top;
+    for (const label of ['More for Ops room', 'Back to the bots']) {
+      const r = await rectOf(page, label);
+      check(r && r.width >= 44 - 0.5 && r.height >= 44 - 0.5, `"${label}" must be at least 44 x 44, got ${r?.width} x ${r?.height}`);
+      check(r && r.y >= top - 0.5 && r.y + r.height <= top + 52 + 0.5, `"${label}" must sit in the 52 pt bar (y ${r?.y}, h ${r?.height})`);
+    }
+    const more = await rectOf(page, 'More for Ops room');
+    check(more && near(more.y + more.height / 2, top + 26, 0.6), `the ⋯ must be centered in the bar (center ${more && more.y + more.height / 2})`);
+    await page.screenshot({ path: join(OUT, 'iphone--room-chat-header.png'), clip: { x: 0, y: 0, width: PHONE.width, height: top + 52 } });
+    await shot(page, 'iphone-room-chat');
+  });
+  failed += await run('desktop room header', await roomPage({ desktop: true, viewport: DESKTOP }), async ({ page, check, near }) => {
+    await page.goto(`${base}/?room=r-ops`);
+    await page.getByText('Holding.', { exact: false }).first().waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(500);
+    const more = await rectOf(page, 'More for Ops room');
+    check(more && more.width >= 32 - 0.5 && more.height >= 32 - 0.5, `the ⋯ must be at least 32 x 32 on desktop, got ${more?.width} x ${more?.height}`);
+    const toggle = await rectOf(page, 'Hide the bot list');
+    check(toggle && toggle.width >= 32 - 0.5 && toggle.height >= 32 - 0.5, `the sidebar toggle must be at least 32 x 32, got ${toggle?.width} x ${toggle?.height}`);
+    const body = await page.evaluate(() => document.body.innerText);
+    check(!/⚙/.test(body), 'no gear glyph in the room header');
+    // The pane header is 56 tall with the hairline under it, like the bot chat's.
+    const bar = more && { x: 320, y: 0, width: DESKTOP.width - 320, height: 56 };
+    if (bar) await page.screenshot({ path: join(OUT, 'desktop--room-chat-header.png'), clip: bar });
+    await shot(page, 'desktop-room-chat');
+  });
   return { failed, report };
 }
 

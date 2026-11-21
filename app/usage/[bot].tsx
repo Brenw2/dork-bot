@@ -6,6 +6,7 @@ import { Icon } from '@/components/AppIcons';
 import { BotAvatar } from '@/components/BotSprite';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
+import { ErrorBanner } from '@/components/States';
 import { DailyChart, EmptyChart, ModelRow, Segmented, Tile } from '@/components/UsageParts';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
@@ -71,7 +72,7 @@ export default function BotUsageScreen() {
         refreshControl={isDesktop ? undefined : <RefreshControl refreshing={pulling} onRefresh={() => void pull()} tintColor={colors.dim} />}
       >
         <Segmented value={days} onChange={setDays} color={color} />
-        {error && !usage ? <Text style={styles.error}>{error}</Text> : null}
+        {error && !usage ? <ErrorBanner card text={error} style={{ marginTop: 12 }} /> : null}
         {usage ? (
           <>
             <View style={styles.tiles}>
@@ -118,7 +119,6 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   name: { color: colors.text, fontSize: 16, lineHeight: 20, fontWeight: '600' },
   sub: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   body: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
-  error: { color: colors.bad, fontSize: 14, lineHeight: 20, marginTop: 12 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   header: { color: colors.dim, fontSize: 13, lineHeight: 18, letterSpacing: 0.3, textTransform: 'uppercase', marginLeft: 16, marginTop: 18, marginBottom: 7 },
   list: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },

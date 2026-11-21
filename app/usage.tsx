@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/AppIcons';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
+import { FormError } from '@/components/States';
 import { BotUsageRow, FailBanner, ProviderCard, Segmented, SkeletonBotRows, SkeletonCard, TotalsCard, Unreachable, UpdatedLine } from '@/components/UsageParts';
 import { useBotsUsage, useDays, useUsageSnapshot } from '@/components/useUsage';
 import { clockLabel, dueResets, hasActivity, localTokens, sortBots, updatedLine } from '@/lib/usage';
@@ -164,9 +165,7 @@ export default function UsageScreen() {
                   </View>
                 )}
                 {Object.entries(bots.errors).map(([bot, message]) => (
-                  <Text key={bot} style={styles.error}>
-                    Couldn't read {bot}'s usage: {message}
-                  </Text>
+                  <FormError key={bot} text={`Couldn't read ${bot}'s usage: ${message}`} />
                 ))}
               </View>
             )}
@@ -198,6 +197,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 68 },
   plain: { backgroundColor: colors.card, borderRadius: 12, padding: 16 },
   plainText: { color: colors.dim, fontSize: 15, lineHeight: 20 },
-  error: { color: colors.bad, fontSize: 13, lineHeight: 18 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginHorizontal: 16, marginTop: 12 },
 }));

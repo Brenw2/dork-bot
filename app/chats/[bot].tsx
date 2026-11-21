@@ -1,7 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Menu } from '@/components/alert';
+import { SearchField } from '@/components/Fields';
+import { EmptyState, ErrorBanner, Loading } from '@/components/States';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
 import { currentChat, openChat, startNewChat, useCurrentChat } from '@/components/currentChat';
@@ -87,26 +89,12 @@ export default function Chats() {
         keyboardShouldPersistTaps="handled"
         refreshControl={isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load().finally(() => setRefreshing(false)); }} tintColor={colors.dim} />}
       >
-        <View style={styles.search}>
-          <Icon name="search" size={16} color={colors.faint} />
-          <TextInput
-            style={[styles.searchInput, isDesktop && ({ outlineStyle: 'none' } as object)]}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search chats"
-            placeholderTextColor={colors.faint}
-            accessibilityLabel="Search chats"
-            autoCorrect={false}
-            autoCapitalize="none"
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
-        </View>
+        <SearchField value={query} onChangeText={setQuery} placeholder="Search chats" />
         <WorkRowLink bot={bot} botName={botName} color={color} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {chats === null && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}
-        {chats && chats.length === 0 ? <Text style={styles.empty}>No chats with {botName} yet. Say something and it shows up here.</Text> : null}
-        {chats && chats.length > 0 && shown.length === 0 ? <Text style={styles.empty}>No chats match "{query.trim()}".</Text> : null}
+        {error ? <ErrorBanner card text={error} /> : null}
+        {chats === null && !error ? <Loading /> : null}
+        {chats && chats.length === 0 ? <EmptyState body={`No chats with ${botName} yet. Say something and it shows up here.`} /> : null}
+        {chats && chats.length > 0 && shown.length === 0 ? <EmptyState body={`No chats match "${query.trim()}".`} /> : null}
         {shown.length ? (
           <Group>
             {shown.map((item) => {
@@ -179,8 +167,6 @@ function WorkRowLink({ bot, botName, color }: { bot: string; botName: string; co
 const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 16, paddingBottom: 32 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, borderRadius: 10, paddingHorizontal: 10, backgroundColor: colors.card },
-  searchInput: { flex: 1, color: colors.text, fontSize: 17, padding: 0 },
   workGroup: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
   work: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, minHeight: 56 },
   workName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
@@ -193,8 +179,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   when: { color: colors.dim, fontSize: 15, lineHeight: 20 },
   preview: { color: colors.dim, fontSize: 15, lineHeight: 20 },
   gutter: { width: 50, alignItems: 'center', justifyContent: 'center' },
-  more: { color: colors.dim, fontSize: 18, paddingHorizontal: 4 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, paddingHorizontal: 16, marginTop: -8 },
-  empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 14, lineHeight: 22 },
-  error: { color: colors.bad, fontSize: 14, paddingHorizontal: 4 },
 }));

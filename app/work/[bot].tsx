@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
+import { EmptyState, ErrorBanner, Loading } from '@/components/States';
 import { useBotLook } from '@/components/useBotLook';
 import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
@@ -27,8 +28,8 @@ export default function WorkScreen() {
     <View style={styles.screen}>
       <Sheet title="Work" bot={bot} />
       <View style={[styles.fill, column]}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {items === null && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}
+        {error ? <ErrorBanner card text={error} style={{ margin: 16 }} /> : null}
+        {items === null && !error ? <Loading /> : null}
         <FlatList
           data={items ?? []}
           keyExtractor={(w) => w.id}
@@ -36,7 +37,7 @@ export default function WorkScreen() {
           refreshControl={
             isDesktop ? undefined : <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void reload().finally(() => setRefreshing(false)); }} tintColor={colors.dim} />
           }
-          ListEmptyComponent={items ? <Text style={styles.empty}>Nothing yet. When {botName} works on something that wasn't started in the app, it shows up here.</Text> : undefined}
+          ListEmptyComponent={items ? <EmptyState body={`Nothing yet. When ${botName} works on something that wasn't started in the app, it shows up here.`} /> : undefined}
           renderItem={({ item }) => <WorkRow item={item} bot={bot} color={color} />}
         />
       </View>
@@ -87,6 +88,4 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   status: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   outcome: { color: colors.dim, fontSize: 15, lineHeight: 20 },
   meta: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 30, lineHeight: 22, paddingHorizontal: 16 },
-  error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingTop: 10 },
 }));

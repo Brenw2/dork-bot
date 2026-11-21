@@ -60,6 +60,6 @@ describe('room screen frame', () => {
     const src = read('components/RoomChat.tsx');
     expect(src).not.toContain('⚙');
     expect(src).not.toContain('Group settings');
-    expect(src).toContain('name="ellipsis"');
+    expect(src).toContain('icon="ellipsis"'); // through the shared HeaderButton
   });
 });

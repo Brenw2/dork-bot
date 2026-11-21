@@ -12,6 +12,8 @@ import { openBotSheet } from '@/components/ChatHeader';
 import { useBusyWatch } from '@/components/busyWatch';
 import { isDesktop } from '@/components/desktop';
 import { Icon } from '@/components/AppIcons';
+import { Badge } from '@/components/Chips';
+import { EmptyState } from '@/components/States';
 import { liveRuns } from '@/components/liveRuns';
 import { fetch } from '@/components/net';
 import { syncNow } from '@/components/sync';
@@ -160,15 +162,14 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
             </View>
           ) : undefined
         }
-        contentContainerStyle={rows.length ? (compact ? styles.listCompact : styles.list) : styles.empty}
+        contentContainerStyle={rows.length ? (compact ? styles.listCompact : styles.list) : styles.emptyWrap}
         ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <View style={styles.emptyDisc}>
-              <Icon name="compose" size={26} color={colors.accent} />
-            </View>
-            <Text style={styles.emptyTitle}>No bots yet</Text>
-            <Text style={styles.emptyText}>Tap New bot to make one, or to add a bot that's already on Hermes.</Text>
-          </View>
+          <EmptyState
+            style={{ marginTop: 0 }}
+            icon={<Icon name="compose" size={26} color={colors.accent} />}
+            title="No bots yet"
+            body="Tap New bot to make one, or to add a bot that's already on Hermes."
+          />
         }
         renderItem={({ item }) => (
           <BotRow saved={item.saved} compact={compact} selected={item.bot === selected} state={status[item.bot]} preview={previews[item.bot]} onOpen={() => open(item.saved)} />
@@ -253,13 +254,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   const [hovered, setHovered] = useState(false);
   const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
 
-  const badge = needs ? (
-    <View style={styles.badge}>
-      <Text style={styles.badgeText} maxFontSizeMultiplier={1.4}>
-        Needs you
-      </Text>
-    </View>
-  ) : null;
+  const badge = needs ? <Badge label="Needs you" /> : null;
 
   if (compact) {
     return (
@@ -339,11 +334,7 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { paddingBottom: 24 },
   listCompact: { paddingHorizontal: 8, paddingBottom: 12, gap: 2 },
-  empty: { flexGrow: 1, justifyContent: 'center', padding: 32 },
-  emptyBox: { alignItems: 'center', gap: 10 },
-  emptyDisc: { width: 52, height: 52, borderRadius: 26, backgroundColor: mix(colors.accent, 0.18), alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '600' },
-  emptyText: { color: colors.dim, fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  emptyWrap: { flexGrow: 1, justifyContent: 'center', padding: 32 },
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
@@ -364,8 +355,6 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   time: { color: colors.dim, fontSize: 15, lineHeight: 20 },
   chevron: { color: colors.chevron, fontSize: 15, lineHeight: 20 },
   preview: { flex: 1, color: colors.dim, fontSize: 15, lineHeight: 20 },
-  badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   // Sidebar rows: 64 tall, inset 8, radius 10, avatar 40
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 12, borderRadius: 10 },
   sideText: { flex: 1, gap: 1 },

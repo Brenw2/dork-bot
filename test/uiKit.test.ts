@@ -49,18 +49,18 @@ describe('G2 icons: AppIcons only', () => {
   it('react-native-svg is imported only where something is drawn that is not an icon', () => {
     expect(offenders((f, s) => !SVG_OK.includes(f) && /react-native-svg/.test(s))).toEqual([]);
   });
-  it('icons.tsx is gone, and ChatIcons.tsx draws nothing itself', () => {
+  it('icons.tsx and ChatIcons.tsx are gone', () => {
     expect(files).not.toContain('components/icons.tsx');
-    if (files.includes('components/ChatIcons.tsx')) expect(code('components/ChatIcons.tsx')).not.toMatch(/react-native-svg|<Svg|<Path/);
+    expect(files).not.toContain('components/ChatIcons.tsx');
   });
 });
 
 describe('G3 buttons: one button set', () => {
   // Buttons.tsx is the set; Sheet and Overlay draw header controls; Composer draws the round Send/Stop (K3).
   const ALLOW = ['components/Buttons.tsx', 'components/Sheet.tsx', 'components/Overlay.tsx', 'components/Composer.tsx'];
-  // Still to move onto Chip / Badge / ErrorBanner (K9, K10: ChatErrors, ChatHeader and UsageParts banner buttons, the
-  // step chip, the Jump pill, the gauge pill). Each leaves this list when its component lands.
-  const PENDING = ['components/ChatErrors.tsx', 'components/ChatHeader.tsx', 'components/ChatStatus.tsx', 'components/JumpPill.tsx', 'components/UsageParts.tsx'];
+  // Design-specified controls that are not buttons from the set: the floating Jump pill (K13), the usage gauge pill,
+  // the segmented control. Each has its own spec in the kit or the comps.
+  const PENDING = ['components/JumpPill.tsx', 'components/UsageParts.tsx'];
   function handBuilt(f: string, src: string): boolean {
     if (ALLOW.includes(f) || PENDING.includes(f)) return false;
     const pill = (s: string) => {
@@ -83,8 +83,8 @@ describe('G3 buttons: one button set', () => {
 });
 
 describe('G4 no glyph icons', () => {
-  // Markdown renders message content. Composer's remove-thumbnail glyph waits for the paste-photos PR (it edits that file).
-  const ALLOW = ['components/Markdown.tsx', 'components/Composer.tsx'];
+  // Markdown renders message content.
+  const ALLOW = ['components/Markdown.tsx'];
   const GLYPHS = /[⚙⋯✓✕›‹⌄▾▸↻＋⚠]/;
   it('no text glyph is used as an icon', () => {
     expect(offenders((f, s) => !ALLOW.includes(f) && GLYPHS.test(s))).toEqual([]);
@@ -117,12 +117,9 @@ describe('G9 sheet header', () => {
 });
 
 describe('G11 menu icons', () => {
-  // Composer's "Add a picture" menu (paste-photos PR edits that file) is the one without icons.
-  const ALLOW = ['components/Composer.tsx'];
   it('every Menu.show item except Cancel has an icon', () => {
     const bad: string[] = [];
     for (const f of files) {
-      if (ALLOW.includes(f)) continue;
       const src = code(f);
       for (const m of src.matchAll(/Menu\.show\(/g)) {
         const rest = src.slice(m.index!);
@@ -141,5 +138,49 @@ describe('G11 menu icons', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('G5 no hex in screens and components', () => {
+  // Sprites draw pixel art; Markdown's syntax colors wait for the theme work; theme.tsx owns the white switch thumb;
+  // pickImages.web paints a canvas, not UI.
+  const ALLOW = ['components/BotSprite.tsx', 'components/Markdown.tsx', 'components/theme.tsx', 'components/pickImages.web.ts'];
+  it('no #hex color literal outside the theme', () => {
+    expect(offenders((f, s) => !ALLOW.includes(f) && /['"`]#[0-9a-fA-F]{3,8}['"`]/.test(s))).toEqual([]);
+  });
+});
+
+describe('G7 states: empty, loading and error go through the shared components', () => {
+  it('no screen or component styles its own empty or error text', () => {
+    expect(offenders((f, s) => f !== 'components/States.tsx' && /styles\.(empty|error)\b/.test(s))).toEqual([]);
+  });
+  it('no page spinner is hand-placed: <ActivityIndicator style={{ marginTop }}> becomes <Loading>', () => {
+    const bad: string[] = [];
+    for (const f of files.filter((x) => x !== 'components/States.tsx')) {
+      for (const m of code(f).matchAll(/<ActivityIndicator[^>]*marginTop[^>]*>/g)) bad.push(`${f}: ${m[0].slice(0, 70)}`);
+    }
+    expect(bad).toEqual([]);
+  });
+  it('every app/ screen that spins a page spinner imports Loading', () => {
+    const bad = files.filter((f) => f.startsWith('app/') && /<ActivityIndicator/.test(code(f)) && !/\bLoading\b/.test(code(f)) && !/right=|size="small"/.test(code(f)));
+    expect(bad).toEqual([]);
+  });
+  it('a raw <TextInput> is only in Field, SearchField, the Composer, Dialogs (the desktop prompt) and the select-text screen', () => {
+    const ALLOW = ['components/Fields.tsx', 'components/Composer.tsx', 'components/Dialogs.tsx', 'app/select-text.tsx'];
+    expect(offenders((f, s) => !ALLOW.includes(f) && /<TextInput\b/.test(s))).toEqual([]);
+  });
+});
+
+describe('G8 rooms share the chat surface', () => {
+  const room = read('components/RoomChat.tsx');
+  it('RoomChat draws the shared header, composer and jump pill', () => {
+    expect(room).toMatch(/from '@\/components\/ChatHeader'/);
+    expect(room).toMatch(/from '@\/components\/Composer'/);
+    expect(room).toMatch(/from '@\/components\/JumpPill'/);
+    expect(room).toContain('<JumpPill');
+    expect(room).toContain('<PageHeader');
+  });
+  it('and has no keyboard strategy of its own', () => {
+    expect(room).not.toMatch(/KeyboardAvoidingView|keyboardOffset|measureInWindow/);
   });
 });

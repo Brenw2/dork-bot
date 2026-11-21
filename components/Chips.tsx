@@ -1,0 +1,111 @@
+// Chips, badges and tags (docs/design/UI-KIT.md K9): one of each, so a screen never draws its own.
+import type { ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
+
+/**
+ * A tappable choice or status: 32 tall, radius 16, padding 12, 13/600. As a choice: selected = `tint` fill with
+ * `onColor` text, unselected = a `border` outline. As a status (`status`): card fill, dim text, no outline (the
+ * chat's step chip and its answered-approval chip). `leading` / `trailing` are small icons or a spinner.
+ */
+export function Chip({
+  label,
+  onPress,
+  selected,
+  tint,
+  status,
+  leading,
+  trailing,
+  disabled,
+  accessibilityLabel,
+  accessibilityState,
+  testID,
+  style,
+  numberOfLines,
+}: {
+  label: string;
+  testID?: string;
+  onPress?: () => void;
+  selected?: boolean;
+  tint?: string;
+  status?: boolean;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityState?: { expanded?: boolean; selected?: boolean };
+  style?: StyleProp<ViewStyle>;
+  numberOfLines?: number;
+}) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const fill = status ? { backgroundColor: colors.card } : selected ? { backgroundColor: tint ?? colors.accent, borderColor: tint ?? colors.accent } : { borderColor: colors.border };
+  const text = status ? colors.dim : selected ? onColor(tint ?? colors.accent) : colors.text;
+  const body = (
+    <>
+      {leading}
+      <Text style={[styles.chipText, { color: text }]} numberOfLines={numberOfLines} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
+      {trailing}
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={[styles.chip, fill, style]} accessible accessibilityLabel={accessibilityLabel ?? label}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={accessibilityState ?? (selected === undefined ? undefined : { selected })}
+      hitSlop={{ top: 6, bottom: 6 }}
+      style={({ pressed }) => [styles.chip, fill, pressed && { opacity: 0.7 }, style]}
+    >
+      {body}
+    </Pressable>
+  );
+}
+
+/** "Needs you": 20 tall, radius 10, `bad` fill, 12 bold, `badgeText` color. List rows, room rows and the transcript. */
+export function Badge({ label }: { label: string }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.badge}>
+      <Text style={styles.badgeText} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** A non-tappable label (a group member held in a room): 22 tall, radius 11, card fill, 12. */
+export function Tag({ label, leading, accessibilityLabel }: { label: string; leading?: ReactNode; accessibilityLabel?: string }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.tag} accessible accessibilityLabel={accessibilityLabel ?? label}>
+      {leading}
+      <Text style={styles.tagText} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const useStyles = makeStyles(({ colors }) =>
+  StyleSheet.create({
+    chip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, height: 32, maxWidth: '100%', paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: 'transparent', justifyContent: 'center' },
+    chipText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
+    badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
+    badgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
+    tag: { height: 22, borderRadius: 11, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card },
+    tagText: { color: colors.dim, fontSize: 12, fontWeight: '500' },
+  }),
+);
