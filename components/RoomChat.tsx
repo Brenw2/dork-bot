@@ -224,7 +224,7 @@ function stamp(at: number): { day: string; time: string } {
 }
 
 export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; maxWidth?: number; inPane?: boolean; list?: { hidden: boolean; toggle: () => void } }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   useOnScreenRoom(id);
   const [paneHeight, setPaneHeight] = useState(0);
@@ -443,7 +443,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
           ) : null}
           onSend={() => void send()}
           canSend={canSend}
-          placeholder={placeholder}
+          placeholder={label(placeholder)}
           label={`Message ${room?.name ?? 'the group'}`}
           color={colors.accent}
           stop={busy ? { onPress: () => void stop(), label: 'Stop the room' } : undefined}

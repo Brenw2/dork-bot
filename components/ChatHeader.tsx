@@ -35,22 +35,27 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
   const styles = useStyles();
   const big = !isDesktop;
   const hit = big ? 44 : 32;
-  // Terminal draws the icon in a square outlined box, inset 4 so the button keeps its footprint.
-  const box = theme.shape.brackets ? { width: hit - 8, height: hit - 8, margin: 4, borderWidth: 1, borderColor: colors.border } : { width: hit, height: hit };
+  // Terminal draws the icon in a square outlined box inside the full-size target, so the button keeps its 44 / 32 footprint.
+  const term = theme.shape.brackets;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      hitSlop={theme.shape.brackets ? 4 : undefined}
       style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
         styles.icon,
-        box,
+        { width: hit, height: hit },
         (hovered || pressed) && !big && { backgroundColor: colors.raised },
         pressed && big && { opacity: 0.6 },
       ]}
     >
-      <Icon name={icon} size={big ? 24 : 19} color={color} />
+      {term ? (
+        <View style={{ width: hit - 8, height: hit - 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={big ? 24 : 19} color={color} />
+        </View>
+      ) : (
+        <Icon name={icon} size={big ? 24 : 19} color={color} />
+      )}
     </Pressable>
   );
 }
@@ -61,7 +66,9 @@ export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; 
  * icon buttons on the right, ending with the "..." circle.
  */
 export function PageHeader({ pane, list, tint, title, children }: { pane: boolean; list?: { hidden: boolean; toggle: () => void }; tint: string; title: ReactNode; children: ReactNode }) {
-  const { colors, label, skin } = useTheme();
+  const { colors, label, skin, theme } = useTheme();
+  // Terminal: the back link is mint (the kit's "‹ bots"); Classic keeps the bot's color.
+  const backTint = theme.shape.brackets ? colors.accent : tint;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   // Desktop shortcut: Ctrl+\ shows or hides the bot list.
@@ -87,8 +94,8 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
           accessibilityLabel="Back to the bots"
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
         >
-          <Icon name="back" size={31} color={tint} stroke={2.6} />
-          <Text style={skin({ color: tint, fontSize: 17 })} maxFontSizeMultiplier={1.4}>{label('Bots')}</Text>
+          <Icon name="back" size={31} color={backTint} stroke={2.6} />
+          <Text style={skin({ color: backTint, fontSize: 17 })} maxFontSizeMultiplier={1.4}>{label('Bots')}</Text>
         </Pressable>
       )}
       <View style={[styles.center, pane && { alignItems: 'flex-start' }]}>{title}</View>

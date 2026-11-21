@@ -80,6 +80,7 @@ export function ChatView(props: ChatViewProps) {
 
 function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusNonce }: ChatViewProps & { chat: string }) {
   const styles = useStyles();
+  const { label } = useTheme();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
@@ -473,7 +474,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
           onChangeText={setDraft}
           onSend={send}
           canSend={canSend}
-          placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
+          placeholder={disconnected ? label("Can't reach b-lab") : label(`Message ${name}`)}
           label={`Message ${name}`}
           color={color}
           stop={running && !remote ? { onPress: stop, disabled: !state.runId } : undefined}

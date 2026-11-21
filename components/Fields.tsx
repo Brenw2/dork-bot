@@ -40,7 +40,7 @@ export const Field = forwardRef<ComponentRef<typeof TextInput>, FieldProps>(func
 
 /** 36 tall, radius 10, card fill, search icon 16 `dim`, and a clear button once there is text. */
 export function SearchField({ value, onChangeText, placeholder, accessibilityLabel, style, ...rest }: Omit<TextInputProps, 'value' | 'onChangeText'> & { value: string; onChangeText: (t: string) => void; style?: StyleProp<ViewStyle> }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   return (
     <View style={[styles.search, style]}>
@@ -49,7 +49,7 @@ export function SearchField({ value, onChangeText, placeholder, accessibilityLab
         style={[styles.searchInput, NO_OUTLINE]}
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={placeholder === undefined ? undefined : label(placeholder)}
         placeholderTextColor={colors.faint}
         accessibilityLabel={accessibilityLabel ?? placeholder}
         autoCorrect={false}

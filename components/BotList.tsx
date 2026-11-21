@@ -45,7 +45,7 @@ import { PICKER_THEMES, MONO_MAX_FONT_SCALE } from '@/lib/themes';
  * compact: the sidebar next to a chat (desktop and the open Duo in landscape).
  */
 export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, ConnectState>>({});
@@ -167,8 +167,8 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
           <EmptyState
             style={{ marginTop: 0 }}
             icon={<Icon name="compose" size={26} color={colors.accent} />}
-            title="No bots yet"
-            body="Tap New bot to make one, or to add a bot that's already on Hermes."
+            title={label('No bots yet')}
+            body={label("Tap New bot to make one, or to add a bot that's already on Hermes.")}
           />
         }
         renderItem={({ item }) => (
@@ -185,14 +185,32 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
   const term = theme.shape.brackets;
-  // Terminal: each header icon sits in a square outlined box, inset 4 so the row keeps its size.
+  // Terminal: each header action is text (see textButton), so there is no icon box to size.
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
     styles.headerButton,
-    term ? { width: hit - 8, height: hit - 8, margin: 4, borderWidth: 1, borderColor: colors.border } : { width: hit, height: hit },
+    { width: hit, height: hit },
     (hovered || pressed) && isDesktop && { backgroundColor: colors.raised },
     pressed && !isDesktop && { opacity: 0.6 },
   ];
-  const buttons = (
+  // Terminal (a1): the two actions are text, "[ ... ]" and "[ + new ]", in the accent; same labels and 44 pt (desktop 32) targets.
+  const textButton = (shown: string, a11y: string, onPress: (e: { nativeEvent: { pageX: number; pageY: number } }) => void) => (
+    <Pressable
+      onPress={(e) => onPress(e)}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [styles.textAction, { minHeight: hit }, (hovered || pressed) && isDesktop && { backgroundColor: colors.raised }, pressed && !isDesktop && { opacity: 0.6 }]}
+    >
+      <Text style={styles.textActionText} maxFontSizeMultiplier={MONO_MAX_FONT_SCALE} numberOfLines={1}>
+        {shown}
+      </Text>
+    </Pressable>
+  );
+  const buttons = term ? (
+    <View style={styles.headerButtons}>
+      {textButton('[ ... ]', 'More', (e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
+      {textButton('[ + new ]', 'New bot', (e) => onCompose({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
+    </View>
+  ) : (
     <View style={styles.headerButtons}>
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
         <Icon name="ellipsis" size={icon} color={colors.accent} />
@@ -223,7 +241,7 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
         <View style={styles.gaugeSlot}>{gauge}</View>
         {buttons}
       </View>
-      <Text style={styles.largeTitle} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? MONO_MAX_FONT_SCALE : 1.4}>
+      <Text style={[styles.largeTitle, term && styles.largeTitleTerm]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? MONO_MAX_FONT_SCALE : 1.4}>
         {term ? 'dork-bot' : 'Dork Bot'}
         {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
       </Text>
@@ -345,10 +363,15 @@ const useStyles = makeStyles(({ colors, mix, theme: { shape: { dashed } } }) => 
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  // Terminal text actions: [ ... ] [ + new ]
+  textAction: { minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  textActionText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   largeButtons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, paddingLeft: 16, paddingRight: 8 },
   gaugeSlot: { flexDirection: 'row', alignItems: 'center' },
   sidebarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   largeTitle: { color: colors.text, fontSize: 34, lineHeight: 41, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
+  // Terminal: a 26 mono title (dork-bot and the block cursor), per the a1 comp.
+  largeTitleTerm: { fontSize: 26, lineHeight: 32 },
   sidebarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 18, paddingRight: isDesktop ? 12 : 4 },
   sidebarTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   // Phone rows: full-bleed, 76 tall at least, hairline from x 80

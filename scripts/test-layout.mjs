@@ -475,7 +475,7 @@ async function fakeHermes(route) {
 }
 
 // Runs in the page: every visible glyph box and control, checked against the posture's safe area and keep-outs.
-function audit({ insets, keepOut, fixed, seen }) {
+function audit({ insets, keepOut, fixed, seen, themed }) {
   const W = innerWidth;
   const H = innerHeight;
   const problems = [];
@@ -553,7 +553,7 @@ function audit({ insets, keepOut, fixed, seen }) {
   }
   // Text that must be fully in view when the screen opens (the newest chat message).
   for (const want of seen) {
-    const box = boxes.find((b) => b.kind === 'text' && b.what.includes(want));
+    const box = boxes.find((b) => b.kind === 'text' && (themed ? b.what.toLowerCase().includes(want.toLowerCase()) : b.what.includes(want)));
     const cut = box && (box.r.top > box.raw.top + 0.5 || box.r.bottom < box.raw.bottom - 0.5);
     if (!box || cut || box.raw.bottom > H - insets.bottom) problems.push(`"${want}" isn't fully in view when the screen opens`);
   }
@@ -1264,6 +1264,7 @@ async function main() {
           keepOut: shape.keepOut,
           fixed: FIXED[screen.name] ?? [],
           seen: SEEN[screen.name] ?? [],
+          themed: !!THEME,
         });
         // The per-screen checks measure Classic's locked numbers (radius 12, #1A1C20, 600 weight...). In another theme they
         // would only report that the theme isn't Classic, so a themed run keeps the generic audit (overflow, keep-outs,
@@ -1284,7 +1285,9 @@ async function main() {
       await context.close();
     }
   }
-  if (!only || only === 'composer') {
+  // The composer and ui polish tests assert Classic's locked geometry (radius 22, round avatars, 52 wide discs); a themed
+  // run covers those screens through the per-screen audit instead.
+  if (!THEME && (!only || only === 'composer')) {
     const composer = await composerTest(browser, base);
     failed += composer.length ? 1 : 0;
     report.push({ posture: 'desktop', screen: 'composer', path: "/?bot=assistant", problems: composer });
@@ -1296,7 +1299,7 @@ async function main() {
     failed += select.length ? 1 : 0;
     report.push({ posture: 'desktop', screen: 'select-text', path: '/?bot=coder', problems: select });
   }
-  if (!only || only === 'ui') {
+  if (!THEME && (!only || only === 'ui')) {
     const ui = await uiPolishTests(browser, base);
     failed += ui.failed;
     report.push(...ui.report);

@@ -51,7 +51,7 @@ function Preview({ id, fontsReady }: { id: ThemeId; fontsReady: boolean }) {
 export default function AppearanceScreen() {
   const styles = useStyles();
   const column = useColumnStyle();
-  const { theme, colors, setTheme, label } = useTheme();
+  const { theme, colors, setTheme } = useTheme();
   // Load every offered theme's fonts, so each preview is drawn in its own font.
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function AppearanceScreen() {
               >
                 <Preview id={id} fontsReady={!!loaded[id]} />
                 <View style={styles.texts}>
-                  <Text style={styles.name}>{label(THEMES[id].name)}</Text>
+                  <Text style={styles.name}>{THEMES[id].name}</Text>
                   <Text style={styles.desc}>{DESCRIPTION[id]}</Text>
                 </View>
                 <View style={[styles.radio, selected && { backgroundColor: colors.accent, borderColor: colors.accent }]}>
