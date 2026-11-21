@@ -5,6 +5,7 @@ import { AccessibilityInfo, Animated, Easing, Platform, Pressable, ScrollView, S
 import { BotSprite } from '@/components/BotSprite';
 import { Icon } from '@/components/AppIcons';
 import { ApprovalButtons } from '@/components/ApprovalButtons';
+import { Chip } from '@/components/Chips';
 import { isDesktop } from '@/components/desktop';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
@@ -117,20 +118,15 @@ export function Activity({ tools, live }: { tools: ToolCall[]; live: boolean }) 
   const label = activityLine(tools, live);
   return (
     <View style={styles.activity}>
-      <Pressable
+      <Chip
+        status
+        label={label}
+        numberOfLines={1}
         onPress={() => setOpen(!open)}
-        accessibilityRole="button"
-        accessibilityLabel={label}
         accessibilityState={{ expanded: open }}
-        hitSlop={{ top: 6, bottom: 6 }}
-        style={styles.chip}
-      >
-        {live ? <Spinner /> : failed ? <Icon name="close" size={12} color={colors.bad} stroke={4.4} /> : <Icon name="check" size={12} color={colors.dim} stroke={4.4} />}
-        <Text style={styles.chipText} numberOfLines={1} maxFontSizeMultiplier={CHROME_SCALE}>
-          {label}
-        </Text>
-        {live ? null : <Icon name={open ? 'chevron-down' : 'chevron'} size={12} color={colors.dim} stroke={3} />}
-      </Pressable>
+        leading={live ? <Spinner /> : failed ? <Icon name="close" size={12} color={colors.bad} stroke={4.4} /> : <Icon name="check" size={12} color={colors.dim} stroke={4.4} />}
+        trailing={live ? null : <Icon name={open ? 'chevron-down' : 'chevron'} size={12} color={colors.dim} stroke={3} />}
+      />
       {open
         ? tools.map((t, i) => (
             <Pressable key={i} onPress={() => setOpenStep(openStep === i ? null : i)} disabled={!t.preview} accessibilityRole="button" style={styles.stepRow}>
@@ -232,13 +228,13 @@ export function DecisionChip({ decision, bot }: { decision: Decision; bot: strin
   const { color } = useBotLook(bot);
   const denied = decision.choice === 'deny';
   return (
-    <View style={styles.chip} accessible accessibilityLabel={`${CHOICE_DONE[decision.choice]}: ${decision.command}`}>
-      {denied ? <Icon name="close" size={12} color={colors.bad} stroke={4.4} /> : <Icon name="check" size={12} color={color} stroke={4.4} />}
-      <Text style={styles.chipText} numberOfLines={1} maxFontSizeMultiplier={CHROME_SCALE}>
-        {CHOICE_DONE[decision.choice]}
-        {decision.command ? ` · ${decision.command}` : ''}
-      </Text>
-    </View>
+    <Chip
+      status
+      label={`${CHOICE_DONE[decision.choice]}${decision.command ? ` · ${decision.command}` : ''}`}
+      numberOfLines={1}
+      accessibilityLabel={`${CHOICE_DONE[decision.choice]}: ${decision.command}`}
+      leading={denied ? <Icon name="close" size={12} color={colors.bad} stroke={4.4} /> : <Icon name="check" size={12} color={color} stroke={4.4} />}
+    />
   );
 }
 
@@ -250,8 +246,6 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   still: { color: colors.dim, fontSize: 13, lineHeight: 18, marginTop: 4, marginLeft: 36 },
   spinner: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: colors.dim, borderTopColor: 'transparent' },
   activity: { alignSelf: 'flex-start', maxWidth: '100%', gap: 6 },
-  chip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, height: 32, maxWidth: '100%', paddingHorizontal: 12, borderRadius: 16, backgroundColor: colors.card },
-  chipText: { color: colors.dim, fontSize: 13, flexShrink: 1 },
   stepRow: { paddingLeft: 12 },
   stepLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   step: { color: colors.dim, fontSize: 13, lineHeight: 20 },

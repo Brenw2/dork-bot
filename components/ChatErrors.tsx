@@ -7,6 +7,7 @@ import { Icon } from '@/components/AppIcons';
 import { SmallButton } from '@/components/Buttons';
 import { CHROME_SCALE } from '@/components/ChatStatus';
 import { describeFailure, type Failure } from '@/lib/errors';
+import { ErrorBanner } from '@/components/States';
 import { makeStyles, useTheme } from '@/components/theme';
 
 /** Counts 5, 4, 3, 2, 1 and starts over: the load retries every 5 s. `restart` changes when a try happens. */
@@ -28,25 +29,7 @@ export function FailureBanner({ failure, name, secondsToRetry, onRetry, onPair }
   const view = describeFailure(failure, name, secondsToRetry);
   if (view.place !== 'banner') return null;
   const pair = view.action === 'pair';
-  return (
-    <View style={styles.banner} accessibilityLiveRegion="polite" testID="failure-banner">
-      <Icon name="warning" size={18} color={colors.bad} />
-      <Text style={styles.bannerText} maxFontSizeMultiplier={CHROME_SCALE}>
-        {view.text}
-      </Text>
-      <Pressable
-        onPress={pair ? onPair : onRetry}
-        accessibilityRole="button"
-        accessibilityLabel={pair ? 'Pair again' : 'Retry now'}
-        hitSlop={{ top: 7, bottom: 7 }}
-        style={({ pressed }) => [styles.bannerButton, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={styles.bannerButtonText} maxFontSizeMultiplier={CHROME_SCALE}>
-          {pair ? 'Pair again' : 'Retry now'}
-        </Text>
-      </Pressable>
-    </View>
-  );
+  return <ErrorBanner testID="failure-banner" text={view.text} action={{ label: pair ? 'Pair again' : 'Retry now', onPress: pair ? onPair : onRetry }} />;
 }
 
 /**
@@ -105,10 +88,6 @@ export function FailureCard({ failure, bot, name, onAgain, onNewChat, onRetryUns
 }
 
 const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.errorBg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.errorLine },
-  bannerText: { flex: 1, color: colors.errorText, fontSize: 13, lineHeight: 18 },
-  bannerButton: { height: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
-  bannerButtonText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   card: { alignSelf: 'stretch', backgroundColor: colors.errorBg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.errorLine, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, gap: 8 },
   cardTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { flex: 1, color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '600' },

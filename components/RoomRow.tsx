@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/AppIcons';
+import { Badge } from '@/components/Chips';
 import { isDesktop } from '@/components/desktop';
 import { MemberStack } from '@/components/RoomAvatar';
 import { timeLabel, type RoomRow as Row } from '@/lib/rooms';
@@ -46,13 +47,7 @@ export function RoomListRow({
   ) : (
     'No messages yet'
   );
-  const badge = row.needsYou ? (
-    <View style={styles.badge}>
-      <Text style={styles.badgeText} maxFontSizeMultiplier={1.4}>
-        Needs you
-      </Text>
-    </View>
-  ) : null;
+  const badge = row.needsYou ? <Badge label="Needs you" /> : null;
 
   if (compact) {
     return (
@@ -135,8 +130,6 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   time: { color: colors.dim, fontSize: 15, lineHeight: 20 },
   chevron: { color: colors.chevron, fontSize: 15, lineHeight: 20 },
   preview: { flex: 1, color: colors.dim, fontSize: 15, lineHeight: 20 },
-  badge: { height: 20, borderRadius: 10, paddingHorizontal: 8, backgroundColor: colors.bad, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 12, borderRadius: 10 },
   sideText: { flex: 1, gap: 1 },
   sideName: { flex: 1, color: colors.text, fontWeight: '600' },

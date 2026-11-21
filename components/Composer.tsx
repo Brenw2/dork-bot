@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowUpIcon, PlusIcon, StopIcon } from '@/components/ChatIcons';
+import { Icon } from '@/components/AppIcons';
+import { Chip } from '@/components/Chips';
+import { FormError } from '@/components/States';
 import { Menu } from '@/components/alert';
 import { useDesk } from '@/components/ChatStatus';
 import { clipboardHasImage, PICK_SOURCES, pasteClipboardImage, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
@@ -106,7 +108,7 @@ export function Composer(p: ComposerProps) {
   const openAttach = (anchor?: { x: number; y: number }) =>
     PICK_SOURCES.length === 1
       ? attach(PICK_SOURCES[0].source)
-      : Menu.show('Add a picture', [...PICK_SOURCES.map((s) => ({ text: s.label, onPress: () => attach(s.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
+      : Menu.show('Add a picture', [...PICK_SOURCES.map((s) => ({ text: s.label, icon: 'plus' as const, onPress: () => attach(s.source) })), { text: 'Cancel', style: 'cancel' as const }], anchor);
 
   // Send/Stop: a 30 circle 3 in from the field's corner (desktop 32, 6 in); the field's own line is a hairline.
   const roundSize = desk
@@ -136,24 +138,16 @@ export function Composer(p: ComposerProps) {
             <View key={i} style={styles.thumbWrap}>
               <Image source={{ uri: im.dataUrl }} style={styles.thumb} accessibilityLabel={`Picture ${i + 1}`} />
               <Pressable style={styles.thumbRemove} onPress={() => p.onRemoveImage?.(i)} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Remove picture ${i + 1}`}>
-                <Text style={styles.thumbRemoveText}>✕</Text>
+                <Icon name="close" size={11} color={colors.text} stroke={4} />
               </Pressable>
             </View>
           ))}
         </ScrollView>
       ) : null}
-      {p.attachError ? <Text style={[styles.error, p.column]}>{p.attachError}</Text> : null}
+      {p.attachError ? <FormError text={p.attachError} style={[{ paddingHorizontal: 16, paddingBottom: 6 }, p.column as never]} /> : null}
       <View style={[{ paddingTop: 8, paddingHorizontal: 12, paddingBottom: Math.max(insets.bottom, 8) }, p.column]}>
         {pasteChip ? (
-          <Pressable
-            testID="composer-paste-chip"
-            style={({ pressed }) => [styles.chip, pressed && { backgroundColor: colors.raised }]}
-            onPress={pastePhoto}
-            accessibilityRole="button"
-            accessibilityLabel="Paste photo"
-          >
-            <Text style={styles.chipText}>Paste photo</Text>
-          </Pressable>
+          <Chip testID="composer-paste-chip" label="Paste photo" onPress={pastePhoto} style={{ marginBottom: 8 }} />
         ) : null}
         {p.above}
         <View style={styles.composer}>
@@ -166,7 +160,7 @@ export function Composer(p: ComposerProps) {
               accessibilityRole="button"
               accessibilityLabel="Add a picture"
             >
-              <PlusIcon size={18} color={colors.dim} />
+              <Icon name="plus" size={18} color={colors.dim} stroke={2.67} />
             </Pressable>
           ) : null}
           <View testID="composer-field" style={[styles.field, { minHeight: fieldMin, borderRadius: fieldMin / 2 }, p.dimmed && { opacity: 0.5 }]}>
@@ -193,11 +187,11 @@ export function Composer(p: ComposerProps) {
             <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fieldLine, { borderRadius: fieldMin / 2 }]} />
             {p.canSend ? (
               <Pressable testID="composer-send" style={[styles.roundButton, roundSize, { backgroundColor: p.color }]} onPress={p.onSend} accessibilityRole="button" accessibilityLabel="Send" hitSlop={6}>
-                <ArrowUpIcon size={16} color={onColor(p.color)} />
+                <Icon name="arrow-up" size={16} color={onColor(p.color)} stroke={3.9} />
               </Pressable>
             ) : p.stop ? (
               <Pressable testID="composer-stop" style={[styles.roundButton, roundSize, { backgroundColor: colors.text }]} onPress={p.stop.onPress} disabled={p.stop.disabled} accessibilityRole="button" accessibilityLabel={p.stop.label ?? 'Stop'} hitSlop={6}>
-                <StopIcon color={colors.bg} />
+                <Icon name="stop" size={10} color={colors.bg} />
               </Pressable>
             ) : null}
           </View>
@@ -218,13 +212,8 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   attachRowBody: { gap: 8, paddingHorizontal: 12, paddingTop: 10 },
   thumbWrap: { width: 64, height: 64 },
   thumb: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.card },
-  thumbRemove: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#000', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  thumbRemoveText: { color: colors.text, fontSize: 11, fontWeight: '700' },
-  // UI kit K9 chip, unselected: 32 tall, radius 16, padding 12, 13/600, `border` outline.
-  chip: { alignSelf: 'flex-start', height: 32, borderRadius: 16, paddingHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  chipText: { color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  thumbRemove: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.code, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   attach: { backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
-  error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingBottom: 6 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end', // the plus stays level with the bottom line as the field grows

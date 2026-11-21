@@ -1,7 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/AppIcons';
+import { SearchField } from '@/components/Fields';
+import { FormError, Loading } from '@/components/States';
 import { loadManager } from '@/components/manager';
 import { Sheet } from '@/components/Sheet';
 import { useTint } from '@/components/Buttons';
@@ -62,20 +64,10 @@ export default function PickModel() {
     <View style={styles.screen}>
       <Sheet title="Model" bot={bot} />
       <View style={[styles.fill, column]}>
-        <TextInput
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search models"
-          placeholderTextColor={colors.dim}
-          accessibilityLabel="Search models"
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-        />
-        {problem ? <Text style={styles.problem}>{problem}</Text> : null}
-        {failed || error ? <Text style={styles.problem}>{failed ?? error}</Text> : null}
-        {!catalog && !error ? <ActivityIndicator style={{ marginTop: 32 }} /> : null}
+        <SearchField value={search} onChangeText={setSearch} placeholder="Search models" style={{ margin: 16, marginBottom: 0 }} />
+        {problem ? <FormError text={problem} style={styles.problem} /> : null}
+        {failed || error ? <FormError text={(failed ?? error) as string} style={styles.problem} /> : null}
+        {!catalog && !error ? <Loading /> : null}
         <SectionList
           sections={sections}
           keyExtractor={(m, i) => `${m}-${i}`}
@@ -119,8 +111,7 @@ export default function PickModel() {
 const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
-  search: { margin: 16, marginBottom: 0, color: colors.text, fontSize: 17, height: 36, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.card },
-  problem: { color: colors.bad, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingTop: 8 },
+  problem: { paddingHorizontal: 16, paddingTop: 8 },
   list: { paddingHorizontal: 16, paddingBottom: 40 },
   rowWrap: { backgroundColor: colors.card, overflow: 'hidden' },
   rowFirst: { borderTopLeftRadius: 12, borderTopRightRadius: 12 },

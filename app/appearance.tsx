@@ -26,7 +26,7 @@ function Preview({ id }: { id: ThemeId }) {
         <Text style={{ color: c.text, fontSize: 8 }}>Ship it?</Text>
       </View>
       <View style={{ alignSelf: 'flex-start', marginTop: 6, backgroundColor: c.accent, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
-        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>Send</Text>
+        <Text style={{ color: onColor(c.accent), fontSize: 8, fontWeight: '700' }}>Send</Text>
       </View>
     </View>
   );

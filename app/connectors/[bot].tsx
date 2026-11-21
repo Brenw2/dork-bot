@@ -1,7 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, SmallButton } from '@/components/Buttons';
+import { Field, SearchField } from '@/components/Fields';
+import { FormError, Loading } from '@/components/States';
+import { useBotLook } from '@/components/useBotLook';
 import { Sheet } from '@/components/Sheet';
 import { Group, GroupFootnote, GroupHeader, GroupRow } from '@/components/Grouped';
 import { useBotName } from '@/components/useBotName';
@@ -24,6 +27,7 @@ export default function ConnectorsScreen() {
   const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const botName = useBotName(bot);
+  const { color } = useBotLook(bot);
   const column = useColumnStyle();
   const [api, setApi] = useState<Connectors | null | undefined>(undefined);
   const [mine, setMine] = useState<Connector[] | null>(null);
@@ -126,11 +130,11 @@ export default function ConnectorsScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.body, column]} keyboardShouldPersistTaps="handled">
       <Sheet title="Connectors" bot={bot} />
-      {notice ? <Text style={[notice.ok ? styles.ok : styles.error, styles.notice]}>{notice.text}</Text> : null}
+      {notice ? (notice.ok ? <Text style={[styles.ok, styles.notice]}>{notice.text}</Text> : <FormError text={notice.text} style={styles.notice} />) : null}
 
       <GroupHeader>Connected</GroupHeader>
       {mine === null ? (
-        <ActivityIndicator color={colors.dim} />
+        <Loading style={{ marginTop: 16 }} />
       ) : mine.length === 0 ? (
         <GroupFootnote>Nothing yet. Pick one below and sign in; {botName} gets its tools.</GroupFootnote>
       ) : (
@@ -167,16 +171,7 @@ export default function ConnectorsScreen() {
       )}
 
       <GroupHeader>Add a connector</GroupHeader>
-      <TextInput
-        style={styles.input}
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search Notion, Linear, Strava…"
-        placeholderTextColor={colors.faint}
-        autoCapitalize="none"
-        autoCorrect={false}
-        accessibilityLabel="Search connectors"
-      />
+      <SearchField value={search} onChangeText={setSearch} placeholder="Search Notion, Linear, Strava…" accessibilityLabel="Search connectors" />
       {available.length ? (
         <Group style={{ marginTop: 12 }}>
           {available.map((e) => {
@@ -191,13 +186,13 @@ export default function ConnectorsScreen() {
                 {setupFor === e.name ? (
                   <View style={styles.setup}>
                     {e.needs.map((n) => (
-                      <TextInput
+                      <Field
                         key={n.name}
-                        style={styles.input}
+                        tint={color}
+                        onCard
                         value={values[n.name] ?? ''}
                         onChangeText={(t) => setValues((v) => ({ ...v, [n.name]: t }))}
                         placeholder={n.prompt}
-                        placeholderTextColor={colors.faint}
                         autoCapitalize="none"
                         autoCorrect={false}
                         secureTextEntry={/secret|token|key/i.test(n.name)}
@@ -213,22 +208,21 @@ export default function ConnectorsScreen() {
       ) : null}
 
       <GroupHeader>Custom connector</GroupHeader>
-      <TextInput
-        style={styles.input}
+      <Field
         value={custom.name}
         onChangeText={(name) => setCustom((c) => ({ ...c, name: name.toLowerCase() }))}
         placeholder="name, e.g. my-tools"
-        placeholderTextColor={colors.faint}
+        tint={color}
         autoCapitalize="none"
         autoCorrect={false}
         accessibilityLabel="Connector name"
       />
-      <TextInput
-        style={[styles.input, { marginTop: 8 }]}
+      <Field
+        style={{ marginTop: 8 }}
         value={custom.url}
         onChangeText={(url) => setCustom((c) => ({ ...c, url }))}
         placeholder="https://example.com/mcp"
-        placeholderTextColor={colors.faint}
+        tint={color}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"
@@ -256,7 +250,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   code: { color: colors.text, fontFamily: mono },
   notice: { marginHorizontal: 16, marginTop: 8 },
   ok: { color: colors.ok, fontSize: 14, lineHeight: 20 },
-  error: { color: colors.bad, fontSize: 14, lineHeight: 20 },
   setup: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
-  input: { color: colors.text, fontSize: 17, minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.card },
 }));

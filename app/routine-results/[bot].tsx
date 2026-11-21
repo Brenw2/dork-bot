@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, RefreshControl, ScrollView, type ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 import { useColumnStyle } from '@/components/Column';
 import { isDesktop } from '@/components/desktop';
+import { EmptyState, ErrorBanner, Loading } from '@/components/States';
 import { Markdown } from '@/components/Markdown';
 import { MessageMenu } from '@/components/MessageMenu';
 import { Sheet } from '@/components/Sheet';
@@ -68,9 +69,9 @@ export default function RoutineResultsScreen() {
           )
         }
       >
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {results === null && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}
-        {results?.length === 0 ? <Text style={styles.empty}>No routine results yet. When a routine of {botName} finishes with something to say, it shows up here.</Text> : null}
+        {error ? <ErrorBanner card text={error} /> : null}
+        {results === null && !error ? <Loading /> : null}
+        {results?.length === 0 ? <EmptyState body={`No routine results yet. When a routine of ${botName} finishes with something to say, it shows up here.`} /> : null}
         {results?.map((r) => (
           <View key={r.sessionId} style={[styles.entry, { borderColor: mix(color, 0.5) }]}>
             <View style={styles.head}>
@@ -94,6 +95,4 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 },
   name: { flex: 1, fontSize: 15, fontWeight: '600' },
   when: { color: colors.dim, fontSize: 13 },
-  empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 30, lineHeight: 22 },
-  error: { color: colors.bad, fontSize: 14 },
 }));

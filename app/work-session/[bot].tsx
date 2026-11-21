@@ -1,8 +1,9 @@
 import { useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, StyleSheet, Text, View } from 'react-native';
+import { AppState, FlatList, StyleSheet, Text, View } from 'react-native';
 import { Activity, Mine, Reply } from '@/components/ChatView';
 import { useColumnStyle } from '@/components/Column';
+import { EmptyState, ErrorBanner, Loading } from '@/components/States';
 import { fetch } from '@/components/net';
 import { useBotLook } from '@/components/useBotLook';
 import { Sheet } from '@/components/Sheet';
@@ -86,9 +87,9 @@ export default function WorkSessionScreen() {
           </Text>
         </View>
       ) : null}
-      {missing ? <Text style={styles.empty}>That work isn't on {botName} any more.</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!item && !missing && !error ? <ActivityIndicator style={{ marginTop: 30 }} /> : null}
+      {missing ? <EmptyState body={`That work isn't on ${botName} any more.`} /> : null}
+      {error ? <ErrorBanner card text={error} style={{ margin: 16 }} /> : null}
+      {!item && !missing && !error ? <Loading /> : null}
       <FlatList
         data={rows}
         keyExtractor={(r) => r.id}
@@ -114,6 +115,4 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   meta: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   body: { padding: 16, gap: 10 },
   working: { color: colors.dim, fontSize: 15, paddingVertical: 8 },
-  empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 30, paddingHorizontal: 16 },
-  error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingTop: 10 },
 }));

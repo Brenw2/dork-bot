@@ -8,6 +8,7 @@ import { browser } from '@/components/connectorBrowser';
 import { Group, GroupFootnote, GroupHeader, GroupRow } from '@/components/Grouped';
 import { loadManager } from '@/components/manager';
 import { Sheet } from '@/components/Sheet';
+import { ErrorBanner } from '@/components/States';
 import { useBotName } from '@/components/useBotName';
 import { connectorNotes } from '@/lib/connectorNotes';
 import { Connectors, type Connector, type Tool } from '@/lib/connectors';
@@ -95,7 +96,7 @@ export default function ConnectorDetail() {
         </Column>
       ) : (
         <>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorBanner card text={error} style={{ margin: 16, marginBottom: 0 }} /> : null}
           <GroupHeader>Status</GroupHeader>
           <Group>
             <GroupRow label={name} detail={busy ?? detail} detailColor={status.state === 'error' ? colors.bad : undefined} right={status.state === 'checking' || busy ? <ActivityIndicator color={colors.dim} /> : undefined} />
@@ -136,6 +137,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   body: { padding: 16, paddingBottom: 48 },
   center: { alignItems: 'center', padding: 32 },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center' },
-  error: { color: colors.bad, fontSize: 14, lineHeight: 20, marginHorizontal: 16, marginTop: 8 },
   signIn: { marginTop: 16 },
 }));

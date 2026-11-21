@@ -11,6 +11,7 @@ import { whenLabel } from '@/lib/routines';
 import { RoutineCard } from '@/components/RoutineCard';
 import { BotSprite } from '@/components/BotSprite';
 import { JumpPill } from '@/components/JumpPill';
+import { Loading } from '@/components/States';
 import { ScreenFrame } from '@/components/ScreenFrame';
 import { Markdown, StreamingMarkdown, BODY_SIZE } from '@/components/Markdown';
 import { MessageMenu, WEB_SELECT } from '@/components/MessageMenu';
@@ -68,7 +69,7 @@ export function ChatView(props: ChatViewProps) {
   if (!chat) {
     return (
       <View style={styles.screen}>
-        <ActivityIndicator style={{ marginTop: 40 }} />
+        <Loading style={{ marginTop: 40 }} />
       </View>
     );
   }
@@ -534,7 +535,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
             {client ? (
               <Text style={styles.hint}>Say something to {name}.</Text>
             ) : state.error ? null : (
-              <ActivityIndicator style={{ marginTop: 40 }} />
+              <Loading style={{ marginTop: 40 }} />
             )}
           </View>
         }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fetch } from '@/components/net';
 import { Column } from '@/components/Column';
+import { FormError, Loading } from '@/components/States';
 import { syncNow } from '@/components/sync';
 import { saveManagerAuth } from '@/lib/bots';
 import type { FetchLike } from '@/lib/hermes';
@@ -42,7 +43,7 @@ export default function Connect() {
       <Column style={styles.screen}>
         {state === 'checking' ? (
           <>
-            <ActivityIndicator color={colors.text} />
+            <Loading style={{ marginTop: 0 }} />
             <Text style={styles.text}>Signing in to Hermes…</Text>
           </>
         ) : state === 'ok' ? (
@@ -54,7 +55,7 @@ export default function Connect() {
         ) : (
           <>
             <Text style={styles.title}>Couldn't connect</Text>
-            <Text style={styles.error}>{state}</Text>
+            <FormError text={state} style={{ textAlign: 'center' }} />
             <Button label="Close" onPress={() => router.dismissTo('/')} style={styles.button} />
           </>
         )}
@@ -68,6 +69,5 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
   title: { color: colors.text, fontSize: 20, fontWeight: '600' },
   text: { color: colors.dim, fontSize: 15, textAlign: 'center' },
-  error: { color: colors.bad, fontSize: 15, textAlign: 'center' },
   button: { marginTop: 10, paddingHorizontal: 28 },
 }));

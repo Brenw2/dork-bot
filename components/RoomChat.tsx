@@ -1,12 +1,16 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApprovalButtons } from '@/components/ApprovalButtons';
 import { Icon } from '@/components/AppIcons';
 import { Alert, Menu } from '@/components/alert';
 import { Button } from '@/components/Buttons';
 import { approvalOrder, useDesk } from '@/components/ChatStatus';
+import { HeaderButton, PageHeader } from '@/components/ChatHeader';
+import { Badge, Tag } from '@/components/Chips';
+import { JumpPill } from '@/components/JumpPill';
+import { EmptyState, ErrorBanner } from '@/components/States';
+import { distanceFromEnd, jumpVisible } from '@/lib/jumpPill';
 import { Composer } from '@/components/Composer';
 import { isDesktop } from '@/components/desktop';
 import { Markdown } from '@/components/Markdown';
@@ -188,79 +192,17 @@ export function RoomActions({ room }: { room: Room | null }) {
       anchor,
     );
   // The same ⋯ circle button as the 1:1 chat header (ChatHeader), on the phone and on desktop. No gear.
-  const big = !isDesktop;
-  const hit = big ? 44 : 32;
-  return (
-    <Pressable
-      onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
-      accessibilityRole="button"
-      accessibilityLabel={`More for ${room.name}`}
-      style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
-        { width: hit, height: hit, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-        (hovered || pressed) && !big && { backgroundColor: colors.raised },
-        pressed && big && { opacity: 0.6 },
-      ]}
-    >
-      <Icon name="ellipsis" size={big ? 24 : 19} color={colors.accent} />
-    </Pressable>
-  );
+  return <HeaderButton icon="ellipsis" color={colors.accent} label={`More for ${room.name}`} onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} />;
 }
 
-// The room's one-row header, built like ChatHeader (components/ChatHeader.tsx) and drawn by the screen, not the native
-// stack (app/_layout.tsx: room/[id] is headerShown: false). Phone: back "‹ Bots", the title block (member stack, name,
-// members; tap for Members) and ⋯. Two panes (desktop, open Duo landscape): no back, 56 tall with a hairline under it.
+// The room's one-row header is the shared PageHeader (components/ChatHeader.tsx), drawn by the screen, not the native
+// stack (app/_layout.tsx: room/[id] is headerShown: false). Accent instead of a bot color: a room has no bot context.
 export function RoomHeader({ room, pane, list }: { room: Room | null; pane: boolean; list?: { hidden: boolean; toggle: () => void } }) {
   const { colors } = useTheme();
-  const styles = useStyles();
-  const insets = useSafeAreaInsets();
-  const big = !isDesktop;
-  const hit = big ? 44 : 32;
-  // Desktop shortcut, as in ChatHeader: Ctrl+\ shows or hides the bot list.
-  useEffect(() => {
-    if (!isDesktop || !list) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.altKey && !e.metaKey && e.key === '\\') {
-        e.preventDefault();
-        list.toggle();
-      }
-    };
-    globalThis.addEventListener?.('keydown', onKey);
-    return () => globalThis.removeEventListener?.('keydown', onKey);
-  }, [list]);
   return (
-    <View style={[styles.headerBar, pane ? styles.paneHeader : { height: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
-      {pane ? (
-        list ? (
-          <Pressable
-            onPress={list.toggle}
-            accessibilityRole="button"
-            accessibilityLabel={list.hidden ? 'Show the bot list' : 'Hide the bot list'}
-            style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
-              styles.headerIcon,
-              { width: hit, height: hit },
-              (hovered || pressed) && !big && { backgroundColor: colors.raised },
-              pressed && big && { opacity: 0.6 },
-            ]}
-          >
-            <Icon name="sidebar" size={big ? 24 : 19} color={colors.dim} />
-          </Pressable>
-        ) : null
-      ) : (
-        <Pressable
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          accessibilityRole="button"
-          accessibilityLabel="Back to the bots"
-          style={({ pressed }) => [styles.headerBack, pressed && { opacity: 0.6 }]}
-        >
-          <Icon name="back" size={31} color={colors.accent} stroke={2.6} />
-          <Text style={{ color: colors.accent, fontSize: 17 }} maxFontSizeMultiplier={1.4}>Bots</Text>
-        </Pressable>
-      )}
-      <View style={[styles.headerCenter, pane && { alignItems: 'flex-start' }]}>
-        <RoomTitle room={room} />
-      </View>
+    <PageHeader pane={pane} list={list} tint={colors.accent} title={<RoomTitle room={room} />}>
       <RoomActions room={room} />
-    </View>
+    </PageHeader>
   );
 }
 
@@ -361,9 +303,36 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
   const held = useMemo(() => (busy ? [] : heldMembers(events)), [events, busy]);
   const approvals = (state?.pending ?? []).filter((p) => p.kind === 'approval');
 
+  // Follow the end while the reader is at the end; scrolled up, keep their place and offer "Jump to latest" (K13).
+  const pinned = useRef(true);
+  const viewport = useRef(0);
+  const distance = useRef(0);
+  const [unseen, setUnseen] = useState(false);
+  const [farUp, setFarUp] = useState(false);
+  const onScroll = (e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    viewport.current = layoutMeasurement.height;
+    distance.current = distanceFromEnd({ inverted: false, offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height });
+    pinned.current = distance.current < 80;
+    if (pinned.current) setUnseen(false);
+    setFarUp(distance.current > layoutMeasurement.height);
+  };
+  const jumpToLatest = () => {
+    pinned.current = true;
+    setUnseen(false);
+    setFarUp(false);
+    scroll.current?.scrollToEnd({ animated: true });
+  };
+  const newest = items.length ? items[items.length - 1] : null;
   useEffect(() => {
+    if (newest?.type === 'user') pinned.current = true; // your own message always shows
+    if (!pinned.current) {
+      if (items.length || approvals.length) setUnseen(true);
+      return;
+    }
     const t = setTimeout(() => scroll.current?.scrollToEnd({ animated: false }), 30);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length, approvals.length]);
 
   // @-mention autocomplete
@@ -455,7 +424,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
               {sugg.map((s, i) => (
                 <View key={s.handle}>
                   {s.kind === 'all' && i > 0 ? <View style={styles.popLine} /> : null}
-                  <Pressable onPress={() => choose(s.handle)} accessibilityRole="menuitem" style={[styles.popRow, isDesktop && { height: 40 }, i === pick && { backgroundColor: '#2E3238' }]}>
+                  <Pressable onPress={() => choose(s.handle)} accessibilityRole="menuitem" style={[styles.popRow, isDesktop && { height: 40 }, i === pick && { backgroundColor: colors.menuHover }]}>
                     {s.kind === 'all' ? (
                       <View style={[styles.allDisc, isDesktop && { width: 26, height: 26 }]}>
                         <Text style={{ color: colors.accent, fontSize: 13 }}>👥</Text>
@@ -484,15 +453,26 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
         />
       }
     >
-      <ScrollView ref={scroll as never} style={{ flex: 1 }} contentContainerStyle={[styles.transcript, column]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      <View style={{ flex: 1 }}>
+      <ScrollView
+        ref={scroll as never}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.transcript, column]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+      >
         {items.map((it, i) => (
           <Row key={it.seq} roomId={id} it={it} prev={items[i - 1]} info={info} members={members} unanswered={it.type === 'member' && it.needsYou && it.seq > lastUserSeq} />
         ))}
         {approvals.map((a, i) => (
           <ApprovalCard key={`${a.taskId}${i}`} a={a} member={members.find((m) => m.memberId === a.memberId) ?? null} room={room?.name ?? 'the group'} info={info} onAnswer={(c) => answer(a, c)} />
         ))}
-        {!items.length && !busy ? <Text style={styles.empty}>No messages yet. Say something, or @mention a bot to ask just that one.</Text> : null}
+        {!items.length && !busy ? <EmptyState body="No messages yet. Say something, or @mention a bot to ask just that one." /> : null}
       </ScrollView>
+      <JumpPill visible={jumpVisible({ distanceFromEnd: farUp ? distance.current : 0, viewport: viewport.current, unseen })} onPress={jumpToLatest} />
+      </View>
 
       {busy || held.length ? (
         <View style={[styles.strip, column]}>
@@ -521,10 +501,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
                 {held.map((mid) => {
                   const m = members.find((x) => x.memberId === mid || x.profile === mid) ?? null;
                   return (
-                    <View key={mid} style={styles.chip} accessibilityLabel={`${info.name(m, mid)} is held`}>
-                      <MemberDisc bot={m?.profile ?? mid} size={18} mood="sleeping" />
-                      <Text style={styles.chipText}>Held</Text>
-                    </View>
+                    <Tag key={mid} label="Held" accessibilityLabel={`${info.name(m, mid)} is held`} leading={<MemberDisc bot={m?.profile ?? mid} size={18} mood="sleeping" />} />
                   );
                 })}
               </View>
@@ -536,11 +513,7 @@ export function RoomChat({ id, maxWidth, inPane = false, list }: { id: string; m
         </View>
       ) : null}
 
-      {error ? (
-        <Text style={[styles.error, column]} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      ) : null}
+      {error ? <ErrorBanner text={error} /> : null}
     </ScreenFrame>
   );
 }
@@ -585,11 +558,7 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
           <View style={styles.nameLine}>
             <Text style={[styles.speaker, { color }]}>{info.name(it.member, it.actorId)}</Text>
             <Text style={styles.time}>{clockTime(it.at)}</Text>
-            {unanswered ? (
-              <View style={styles.needsBadge}>
-                <Text style={styles.needsText}>Needs you</Text>
-              </View>
-            ) : null}
+            {unanswered ? <Badge label="Needs you" /> : null}
           </View>
         )}
         <MessageMenu text={it.text} raw={!MD.test(it.text)}>
@@ -662,14 +631,8 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   goneTitle: { color: colors.text, fontSize: 20, fontWeight: '600' },
   goneText: { color: colors.dim, fontSize: 15 },
-  headerBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg },
   titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, paddingVertical: 4, paddingHorizontal: 6, maxWidth: '100%' },
-  headerIcon: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  headerBack: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 6 },
-  headerCenter: { flex: 1, alignItems: 'center', minWidth: 0 },
-  paneHeader: { height: 56, paddingHorizontal: isDesktop ? 12 : 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   transcript: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
-  empty: { color: colors.dim, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 48, paddingHorizontal: 24 },
   sep: { alignSelf: 'center', color: colors.dim, fontSize: 12, lineHeight: 16, fontWeight: '500', marginTop: 14 },
   system: { alignSelf: 'center', color: colors.dim, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
   bubble: { alignSelf: 'flex-end', maxWidth: '82%', marginTop: 14, backgroundColor: mix(colors.accent, 0.3), borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
@@ -680,8 +643,6 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 18 },
   speaker: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
   time: { color: colors.dim, fontSize: 12, lineHeight: 16 },
-  needsBadge: { height: 18, borderRadius: 9, paddingHorizontal: 8, backgroundColor: colors.bad, justifyContent: 'center' },
-  needsText: { color: colors.badgeText, fontSize: 11, fontWeight: '700' },
   body: { color: colors.text, fontSize: BODY, lineHeight: 24 },
   approval: { marginTop: 12, marginLeft: 36, padding: 12, gap: 10, borderRadius: 16, borderWidth: 1.5, backgroundColor: colors.card },
   apHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -697,11 +658,8 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   stripName: { color: colors.text, fontSize: 13, fontWeight: '500' },
   stripState: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   stripDot: { color: colors.dim, fontSize: 13, marginHorizontal: 2 },
-  chip: { height: 22, borderRadius: 11, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.card },
-  chipText: { color: colors.dim, fontSize: 12, fontWeight: '500' },
   resume: { color: colors.accent, fontSize: 13, fontWeight: '600' },
-  error: { color: colors.bad, fontSize: 13, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 6 },
-  popover: { position: 'absolute', left: 12, right: 12, bottom: '100%', marginBottom: 4, backgroundColor: colors.raised, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#343840', overflow: 'hidden' },
+  popover: { position: 'absolute', left: 12, right: 12, bottom: '100%', marginBottom: 4, backgroundColor: colors.raised, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.menuBorder, overflow: 'hidden' },
   popRow: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 },
   popLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.menuBorder, marginHorizontal: 12 },
   popName: { color: colors.text, fontSize: 15, fontWeight: '600' },

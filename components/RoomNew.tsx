@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { Alert } from '@/components/alert';
 import { Icon } from '@/components/AppIcons';
 import { Column } from '@/components/Column';
+import { Field } from '@/components/Fields';
+import { FormError, Loading } from '@/components/States';
 import { isDesktop } from '@/components/desktop';
 import { loadManager } from '@/components/manager';
 import { MemberDisc, MemberStack } from '@/components/RoomAvatar';
@@ -71,17 +73,17 @@ export function RoomNew() {
               <MemberStack profiles={picked.length >= 2 ? picked : (bots ?? []).slice(0, 3).map((b) => b.bot)} size={isDesktop ? 64 : 68} />
             </View>
             <View style={isDesktop ? { flex: 1 } : { alignSelf: 'stretch' }}>
-              <TextInput
+              <Field
                 value={name}
                 onChangeText={setName}
                 placeholder="Group name"
-                placeholderTextColor={colors.faint}
-                style={[styles.field, nameTaken && { borderColor: colors.bad, borderWidth: 1 }]}
+                tint={colors.accent}
+                style={nameTaken && { borderColor: colors.bad }}
                 maxLength={60}
                 accessibilityLabel="Group name"
                 returnKeyType="done"
               />
-              {nameTaken ? <Text style={styles.taken}>That name's taken</Text> : null}
+              {nameTaken ? <FormError text="That name's taken" style={styles.taken} /> : null}
             </View>
           </View>
 
@@ -89,7 +91,7 @@ export function RoomNew() {
             MEMBERS · {picked.length} OF {MAX_MEMBERS}
           </Text>
           {bots === null ? (
-            <ActivityIndicator color={colors.dim} style={{ marginTop: 24 }} />
+            <Loading style={{ marginTop: 24 }} />
           ) : bots.length < MIN_MEMBERS ? (
             <Text style={styles.footnote}>Add at least {MIN_MEMBERS} bots first, then make a group.</Text>
           ) : (
@@ -139,8 +141,7 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   picture: { width: 84, height: 84, borderRadius: 42, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   pictureDesk: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
-  field: { height: 44, borderRadius: 12, backgroundColor: colors.card, color: colors.text, fontSize: 17, paddingHorizontal: 16, borderColor: 'transparent', borderWidth: 1 },
-  taken: { color: colors.bad, fontSize: 13, lineHeight: 18, marginTop: 6, marginLeft: 4 },
+  taken: { marginTop: 6, marginLeft: 4 },
   section: { color: colors.dim, fontSize: 13, lineHeight: 18, letterSpacing: 0.3, marginTop: 24, marginBottom: 8, marginLeft: 16 },
   group: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
   member: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 58, paddingHorizontal: 16, paddingVertical: 8 },

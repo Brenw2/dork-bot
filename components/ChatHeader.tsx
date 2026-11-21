@@ -3,15 +3,16 @@
 // Two panes (desktop, open Duo in landscape): a sidebar toggle replaces back, and the row is 56 tall
 // with a hairline under it.
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from '@/components/alert';
 import { BotAvatar } from '@/components/BotSprite';
 import { isDesktop } from '@/components/desktop';
 import { startNewChat } from '@/components/currentChat';
 import { renameOpenChat, deleteOpenChat } from '@/components/chatActions';
-import { Icon } from '@/components/AppIcons';
+import { Icon, type IconName } from '@/components/AppIcons';
+import { ErrorBanner } from '@/components/States';
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import type { ChatModelState } from '@/components/useChatModel';
@@ -28,33 +29,90 @@ export function modelLabel(m: Pick<ChatModelState, 'choice' | 'catalog' | 'error
 
 export const openBotSheet = (bot: string) => router.push({ pathname: '/bot/[bot]', params: { bot } });
 
-export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: boolean; list?: { hidden: boolean; toggle: () => void }; model: ChatModelState }) {
+/** One header icon button: 44 x 44 on the phone, 32 x 32 on desktop with a hover fill (K1). */
+export function HeaderButton({ icon, label, color, onPress }: { icon: IconName; label: string; color: string; onPress: (e: GestureResponderEvent) => void }) {
   const { colors } = useTheme();
   const styles = useStyles();
-  const { color } = useBotLook(bot);
-  const name = useBotName(bot);
-  const work = useWorkingOn(bot);
-  const insets = useSafeAreaInsets();
-  const big = !isDesktop; // 44 pt hit areas on iOS, 32 on desktop
+  const big = !isDesktop;
   const hit = big ? 44 : 32;
-  const iconSize = big ? 24 : 19;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
+        styles.icon,
+        { width: hit, height: hit },
+        (hovered || pressed) && !big && { backgroundColor: colors.raised },
+        pressed && big && { opacity: 0.6 },
+      ]}
+    >
+      <Icon name={icon} size={big ? 24 : 19} color={color} />
+    </Pressable>
+  );
+}
 
-  // Desktop shortcuts shown in the menu: Ctrl+N new chat, Ctrl+\ shows or hides the bot list.
+/**
+ * The one page header (K1), for a bot's chat and a group's: [back or sidebar toggle] [title block] [icons]. `tint` is
+ * the bot's color, or the accent for a room. `title` is the tappable avatar + name + one dim line; `children` are the
+ * icon buttons on the right, ending with the "..." circle.
+ */
+export function PageHeader({ pane, list, tint, title, children }: { pane: boolean; list?: { hidden: boolean; toggle: () => void }; tint: string; title: ReactNode; children: ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const insets = useSafeAreaInsets();
+  // Desktop shortcut: Ctrl+\ shows or hides the bot list.
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!isDesktop || !list) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || e.altKey || e.metaKey) return;
-      if (e.key === 'n' || e.key === 'N') {
-        e.preventDefault();
-        void startNewChat(bot);
-      } else if (e.key === '\\' && list) {
+      if (e.ctrlKey && !e.altKey && !e.metaKey && e.key === '\\') {
         e.preventDefault();
         list.toggle();
       }
     };
     globalThis.addEventListener?.('keydown', onKey);
     return () => globalThis.removeEventListener?.('keydown', onKey);
-  }, [bot, list]);
+  }, [list]);
+  return (
+    <View style={[styles.bar, pane ? styles.barPane : { height: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
+      {pane ? (
+        list ? <HeaderButton icon="sidebar" color={colors.dim} label={list.hidden ? 'Show the bot list' : 'Hide the bot list'} onPress={list.toggle} /> : null
+      ) : (
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the bots"
+          style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
+        >
+          <Icon name="back" size={31} color={tint} stroke={2.6} />
+          <Text style={{ color: tint, fontSize: 17 }} maxFontSizeMultiplier={1.4}>Bots</Text>
+        </Pressable>
+      )}
+      <View style={[styles.center, pane && { alignItems: 'flex-start' }]}>{title}</View>
+      {children}
+    </View>
+  );
+}
+
+export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: boolean; list?: { hidden: boolean; toggle: () => void }; model: ChatModelState }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const { color } = useBotLook(bot);
+  const name = useBotName(bot);
+  const work = useWorkingOn(bot);
+
+  // Desktop shortcut shown in the menu: Ctrl+N new chat.
+  useEffect(() => {
+    if (!isDesktop) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        void startNewChat(bot);
+      }
+    };
+    globalThis.addEventListener?.('keydown', onKey);
+    return () => globalThis.removeEventListener?.('keydown', onKey);
+  }, [bot]);
 
   const more = (anchor?: { x: number; y: number }) =>
     Menu.show(
@@ -69,38 +127,12 @@ export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: bool
       anchor,
     );
 
-  const iconStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
-    styles.icon,
-    { width: hit, height: hit },
-    (hovered || pressed) && !big && { backgroundColor: colors.raised },
-    pressed && big && { opacity: 0.6 },
-  ];
-
   return (
-    <View style={[styles.bar, pane ? styles.barPane : { height: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
-      {pane ? (
-        list ? (
-          <Pressable
-            onPress={list.toggle}
-            accessibilityRole="button"
-            accessibilityLabel={list.hidden ? 'Show the bot list' : 'Hide the bot list'}
-            style={iconStyle}
-          >
-            <Icon name="sidebar" size={iconSize} color={colors.dim} />
-          </Pressable>
-        ) : null
-      ) : (
-        <Pressable
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          accessibilityRole="button"
-          accessibilityLabel="Back to the bots"
-          style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
-        >
-          <Icon name="back" size={31} color={color} stroke={2.6} />
-          <Text style={{ color, fontSize: 17 }} maxFontSizeMultiplier={1.4}>Bots</Text>
-        </Pressable>
-      )}
-      <View style={[styles.center, pane && { alignItems: 'flex-start' }]}>
+    <PageHeader
+      pane={pane}
+      list={list}
+      tint={color}
+      title={
         <Pressable
           onPress={() => openBotSheet(bot)}
           accessibilityRole="button"
@@ -113,49 +145,20 @@ export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: bool
             {work ? <WorkingOn bot={bot} /> : <Text style={styles.model} numberOfLines={1} maxFontSizeMultiplier={1.4}>{modelLabel(model)}</Text>}
           </View>
         </Pressable>
-      </View>
-      <Pressable
-        onPress={() => router.push({ pathname: '/chats/[bot]', params: { bot } })}
-        accessibilityRole="button"
-        accessibilityLabel={`${name}'s chats`}
-        style={iconStyle}
-      >
-        <Icon name="chats" size={iconSize} color={color} />
-      </Pressable>
-      <Pressable
-        onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
-        accessibilityRole="button"
-        accessibilityLabel={`More for this chat with ${name}`}
-        style={iconStyle}
-      >
-        <Icon name="ellipsis" size={iconSize} color={color} />
-      </Pressable>
-    </View>
+      }
+    >
+      <HeaderButton icon="chats" color={color} label={`${name}'s chats`} onPress={() => router.push({ pathname: '/chats/[bot]', params: { bot } })} />
+      <HeaderButton icon="ellipsis" color={color} label={`More for this chat with ${name}`} onPress={(e) => more({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} />
+    </PageHeader>
   );
 }
 
 /** Shown under the header only when the model can't work (useChatModel().problem). */
 export function ModelBanner({ bot, problem }: { bot: string; problem: string }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  return (
-    <View style={styles.banner} accessibilityLiveRegion="polite">
-      <Icon name="warning" size={18} color={colors.bad} />
-      <Text style={styles.bannerText} maxFontSizeMultiplier={1.4}>{problem}</Text>
-      <Pressable
-        onPress={() => router.push({ pathname: '/model/[bot]', params: { bot } })}
-        accessibilityRole="button"
-        accessibilityLabel="Pick model"
-        hitSlop={{ top: 7, bottom: 7 }}
-        style={({ pressed }) => [styles.bannerButton, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={styles.bannerButtonText} maxFontSizeMultiplier={1.4}>Pick model</Text>
-      </Pressable>
-    </View>
-  );
+  return <ErrorBanner text={problem} action={{ label: 'Pick model', onPress: () => router.push({ pathname: '/model/[bot]', params: { bot } }) }} />;
 }
 
-const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg },
   barPane: { height: 56, paddingHorizontal: isDesktop ? 12 : 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 6 },
@@ -165,17 +168,4 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   name: { color: colors.text, fontSize: 16, lineHeight: 20, fontWeight: '600' },
   model: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   icon: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: colors.errorBg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.errorLine,
-  },
-  bannerText: { flex: 1, color: colors.errorText, fontSize: 13, lineHeight: 18 },
-  bannerButton: { height: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
-  bannerButtonText: { color: colors.text, fontSize: 13, fontWeight: '600' },
 }));

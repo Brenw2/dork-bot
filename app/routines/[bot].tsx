@@ -3,6 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Alert } from '@/components/alert';
 import { Icon } from '@/components/AppIcons';
+import { Chip } from '@/components/Chips';
+import { Field } from '@/components/Fields';
+import { EmptyState, ErrorBanner, FormError, Loading } from '@/components/States';
 import { Sheet } from '@/components/Sheet';
 import { useBotName } from '@/components/useBotName';
 import { useColumnStyle } from '@/components/Column';
@@ -108,9 +111,9 @@ export default function RoutinesScreen() {
             }}
           />
         ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {list === null && !error ? <ActivityIndicator style={{ marginTop: 20 }} /> : null}
-        {list?.length === 0 ? <Text style={styles.empty}>No routines yet.</Text> : null}
+        {error ? <ErrorBanner card text={error} /> : null}
+        {list === null && !error ? <Loading /> : null}
+        {list?.length === 0 ? <EmptyState body="No routines yet." /> : null}
         {api && list?.length ? <Group>{list.map((r) => <RoutineCard key={r.id} routine={r} bot={bot} api={api} color={color} notify={notify} onChanged={() => void load(api)} />)}</Group> : null}
       </ScrollView>
     </View>
@@ -172,57 +175,48 @@ function NewRoutine({ bot, api, color, notify, onDone }: { bot: string; api: Rou
   return (
     <View style={styles.card}>
       <Text style={styles.label}>Name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Morning digest" placeholderTextColor={colors.dim} accessibilityLabel="Routine name" maxLength={200} />
+      <Field value={name} onChangeText={setName} placeholder="Morning digest" tint={color} accessibilityLabel="Routine name" maxLength={200} />
       <Text style={styles.label}>What should {botName} do?</Text>
-      <TextInput
-        style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
+      <Field
         value={prompt}
         onChangeText={setPrompt}
         placeholder="Check my calendar and email and write me a short digest of what needs me today."
-        placeholderTextColor={colors.dim}
+        tint={color}
         multiline
         accessibilityLabel="What the routine does"
         maxLength={5000}
       />
       <Text style={styles.label}>When</Text>
       <View style={styles.chips}>
-        {SCHEDULES.map((s) => {
-          const on = !custom && schedule === s.value;
-          return (
-            <Pressable
-              key={s.value}
-              onPress={() => {
-                setCustom(false);
-                setSchedule(s.value);
-              }}
-              style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-            >
-              <Text style={[styles.chipText, on && { color: onColor(color) }]}>{s.label}</Text>
-            </Pressable>
-          );
-        })}
-        <Pressable
+        {SCHEDULES.map((s) => (
+          <Chip
+            key={s.value}
+            label={s.label}
+            tint={color}
+            selected={!custom && schedule === s.value}
+            onPress={() => {
+              setCustom(false);
+              setSchedule(s.value);
+            }}
+          />
+        ))}
+        <Chip
+          label="Other…"
+          tint={color}
+          selected={custom}
           onPress={() => {
             setCustom(true);
             setSchedule('');
           }}
-          style={[styles.chip, custom && { backgroundColor: color, borderColor: color }]}
-          accessibilityRole="button"
-          accessibilityState={{ selected: custom }}
-        >
-          <Text style={[styles.chipText, custom && { color: onColor(color) }]}>Other…</Text>
-        </Pressable>
+        />
       </View>
       {custom ? (
         <>
-          <TextInput
-            style={styles.input}
+          <Field
             value={schedule}
             onChangeText={setSchedule}
             placeholder="every 2h · 30m · 0 7 * * 6 · 2026-11-10T09:00"
-            placeholderTextColor={colors.dim}
+            tint={color}
             autoCapitalize="none"
             autoCorrect={false}
             accessibilityLabel="Custom schedule"
@@ -231,7 +225,7 @@ function NewRoutine({ bot, api, color, notify, onDone }: { bot: string; api: Rou
         </>
       ) : null}
       <NotifySwitch value={notifyMe} disabled={!notify.ready || busy} spacing={16} onChange={setNotifyMe} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <FormError text={error} /> : null}
       <View style={styles.formButtons}>
         <Button kind="secondary" bot={bot} label="Cancel" onPress={() => onDone(false)} style={{ flex: 1 }} />
         <Button bot={bot} label="Add routine" busy={busy} disabled={!ready} onPress={save} style={{ flex: 1 }} />
@@ -307,11 +301,11 @@ function RoutineCard({ routine: r, bot, api, color, notify, onChanged }: { routi
       {open ? (
         <View style={{ gap: 10, marginTop: 4 }}>
           <Text style={styles.prompt}>{r.prompt}</Text>
-          {r.lastError ? <Text style={styles.error}>{r.lastError}</Text> : null}
+          {r.lastError ? <FormError text={r.lastError} /> : null}
           <NotifySwitch value={notify.isOn(r.id)} disabled={!notify.ready || busy !== null} spacing={10} onChange={(on) => void flipNotify(on)} />
           <View style={[styles.result, { borderColor: mix(color, 0.4) }]}>
             <Text style={styles.label}>{result ? `Last result · ${whenLabel(new Date(result.at * 1000).toISOString())}` : 'Last result'}</Text>
-            {result === undefined ? <ActivityIndicator /> : result?.text ? <MessageMenu text={result.text} bot={bot}><Markdown text={result.text} accent={color} /></MessageMenu> : <Text style={styles.sub}>Nothing yet.</Text>}
+            {result === undefined ? <Loading style={{ marginTop: 8 }} /> : result?.text ? <MessageMenu text={result.text} bot={bot}><Markdown text={result.text} accent={color} /></MessageMenu> : <Text style={styles.sub}>Nothing yet.</Text>}
           </View>
           <View style={styles.row}>
             <SmallButton label="Run now" bot={bot} tone="tint" busy={busy === 'Run now'} onPress={() => void act('Run now', () => api.runNow(r.id)).then(() => setResult(undefined))} />
@@ -329,8 +323,6 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 12 },
   intro: { color: colors.dim, fontSize: 14, lineHeight: 20 },
-  empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 12 },
-  error: { color: colors.bad, fontSize: 14 },
   card: { padding: 16, gap: 6 },
   name: { color: colors.text, fontSize: 16, fontWeight: '600' },
   toggle: { color: colors.dim, fontSize: 14 },
@@ -342,10 +334,7 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   notifyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
   notifyLabel: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
   notifyHint: { color: colors.dim, fontSize: 13, lineHeight: 18 },
-  input: { color: colors.text, fontSize: 16, padding: 12, borderRadius: 12, backgroundColor: colors.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 12, height: 32, justifyContent: 'center' },
-  chipText: { color: colors.text, fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   formButtons: { flexDirection: 'row', gap: 10 },
 }));
