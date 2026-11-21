@@ -23,7 +23,7 @@ import { makeStyles, useTheme } from '@/components/theme';
  * Desktop: the panel's footer has Cancel and "Create group chat".
  */
 export function RoomNew() {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
@@ -76,7 +76,7 @@ export function RoomNew() {
               <Field
                 value={name}
                 onChangeText={setName}
-                placeholder="Group name"
+                placeholder={label('Group name')}
                 tint={colors.accent}
                 style={nameTaken && { borderColor: colors.bad }}
                 maxLength={60}

@@ -63,7 +63,7 @@ const MENU_WIDTH = 248;
 const ITEM_H = 32;
 
 function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>; close: () => void }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   const { width, height } = useWindowDimensions();
   useEscape(close);
@@ -105,7 +105,7 @@ function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>
               style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [styles.menuItem, (hovered || pressed || i === active) && styles.menuItemHover]}
             >
               {it.icon ? <Icon name={it.icon} size={16} color={it.style === 'destructive' ? colors.bad : colors.dim} /> : null}
-              <Text style={[styles.menuText, it.style === 'destructive' && { color: colors.bad }]} numberOfLines={1}>{it.text.replace(/…$/, '')}</Text>
+              <Text style={[styles.menuText, it.style === 'destructive' && { color: colors.bad }]} numberOfLines={1}>{label(it.text.replace(/…$/, ''))}</Text>
               {it.shortcut ? <Text style={styles.menuShortcut}>{it.shortcut}</Text> : null}
             </Pressable>
           </View>
@@ -116,7 +116,7 @@ function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>
 }
 
 function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' }>; close: () => void }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   const [typed, setTyped] = useState('');
   const input = useRef<React.ComponentRef<typeof TextInput>>(null);
@@ -137,7 +137,7 @@ function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' 
     <View style={[StyleSheet.absoluteFill, styles.backdrop]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
       <View style={styles.dialog} role="alertdialog" aria-modal aria-label={spec.title}>
-        <Text style={styles.title}>{spec.title}</Text>
+        <Text style={styles.title}>{label(spec.title)}</Text>
         {spec.message ? <Text style={styles.message}>{spec.message}</Text> : null}
         {spec.kind === 'prompt' ? (
           <TextInput

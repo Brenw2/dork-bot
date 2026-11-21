@@ -26,7 +26,7 @@ export function ApprovalButtons({
   dim?: boolean;
   onAnswer: (choice: string) => void;
 }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, label, theme } = useTheme();
   const styles = useStyles();
   const rows: string[][] = [];
   if (desk) rows.push(choices);
@@ -34,6 +34,8 @@ export function ApprovalButtons({
   const height = desk ? 36 : 44;
   const fill = (c: string) => (c === 'once' ? { backgroundColor: color } : c === 'deny' ? { borderColor: colors.bad } : { backgroundColor: mix(color, 0.2) });
   const text = (c: string) => (c === 'once' ? onColor(color) : c === 'deny' ? colors.bad : colors.text);
+  // Terminal: the choices that do something read [ label ]; Deny stays a plain word in its red outline.
+  const shown = (c: string) => (theme.shape.brackets && c !== 'deny' ? `[${label(labels[c] ?? c)}]` : label(labels[c] ?? c));
   return (
     <View style={styles.buttons}>
       {rows.map((row, r) => (
@@ -49,7 +51,7 @@ export function ApprovalButtons({
               style={({ pressed }) => [styles.button, { minHeight: height }, fill(c), (pressed || dim) && { opacity: 0.6 }]}
             >
               <Text style={[styles.text, { color: text(c) }]} numberOfLines={2} maxFontSizeMultiplier={maxScale.chrome}>
-                {labels[c] ?? c}
+                {shown(c)}
               </Text>
             </Pressable>
           ))}

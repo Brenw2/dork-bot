@@ -105,9 +105,10 @@ export function Sheet({
 
 function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const styles = useStyles();
+  const { label } = useTheme();
   return (
     <View style={styles.titleBlock} accessibilityRole="header">
-      <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{title}</Text>
+      <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{label(title)}</Text>
       {subtitle ? <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>{subtitle}</Text> : null}
     </View>
   );
@@ -115,9 +116,10 @@ function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
 
 function TextButton({ label, color, bold, onPress }: { label: string; color: string; bold: boolean; onPress?: () => void }) {
   const styles = useStyles();
+  const { label: say, skin } = useTheme();
   return (
     <Pressable onPress={onPress ?? dismiss} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
-      <Text style={[styles.textButtonText, { color }, bold && { fontWeight: '600' }]} maxFontSizeMultiplier={maxScale.chrome}>{label}</Text>
+      <Text style={[styles.textButtonText, { color }, bold && skin({ fontWeight: '600' })]} maxFontSizeMultiplier={maxScale.chrome}>{say(label)}</Text>
     </Pressable>
   );
 }

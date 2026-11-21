@@ -61,7 +61,7 @@ describe('G13 Dynamic Type: no text turns scaling off or caps itself', () => {
   });
   it('every cap that is set comes from maxScale', () => {
     const bad: string[] = [];
-    for (const f of files) for (const m of strip(readFileSync(join(root, f), 'utf8')).matchAll(/maxFontSizeMultiplier\s*=\s*\{([^}]*)\}/g)) if (!/^\s*maxScale\.(chrome|mono|body)\s*$/.test(m[1])) bad.push(`${f}: ${m[1]}`);
+    for (const f of files) for (const m of strip(readFileSync(join(root, f), 'utf8')).matchAll(/maxFontSizeMultiplier\s*=\s*\{([^}]*)\}/g)) if (!/^\s*(?:[\w.]+\s*\?\s*)?maxScale\.(chrome|mono|body)\s*(?::\s*maxScale\.(chrome|mono|body)\s*)?$/.test(m[1])) bad.push(`${f}: ${m[1]}`);
     expect(bad).toEqual([]);
   });
 });

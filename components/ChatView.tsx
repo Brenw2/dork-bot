@@ -39,6 +39,8 @@ import { leaveAction } from '@/lib/busy';
 import { Composer } from '@/components/Composer';
 import { Activity, ApprovalCard, DecisionChip, TypingRow } from '@/components/ChatStatus';
 import { mono } from '@/lib/theme';
+import { maxScale } from '@/lib/type';
+import { PROMPT } from '@/lib/themeSkin';
 import { makeStyles, useTheme } from '@/components/theme';
 
 export { Activity };
@@ -78,6 +80,7 @@ export function ChatView(props: ChatViewProps) {
 
 function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusNonce }: ChatViewProps & { chat: string }) {
   const styles = useStyles();
+  const { label } = useTheme();
   const [client, setClient] = useState<HermesClient | null>(null);
   const [state, dispatch] = useReducer(chatReducer, initialChat);
   const [draft, setDraft] = useState('');
@@ -471,7 +474,7 @@ function ChatThread({ bot, chat, maxWidth, inPane = false, list, focusAt, focusN
           onChangeText={setDraft}
           onSend={send}
           canSend={canSend}
-          placeholder={disconnected ? "Can't reach b-lab" : `Message ${name}`}
+          placeholder={disconnected ? label("Can't reach b-lab") : label(`Message ${name}`)}
           label={`Message ${name}`}
           color={color}
           stop={running && !remote ? { onPress: stop, disabled: !state.runId } : undefined}
@@ -649,13 +652,14 @@ export function Reply({ text, bot, streaming = false }: { text: string; bot: str
 
 /** What you sent: a bubble tinted with the bot's color, with any pictures above the text. */
 export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
-  const { mix } = useTheme();
+  const { mix, theme, colors } = useTheme();
   const styles = useStyles();
   const { color } = useBotLook(bot);
   const local = message.localImages ?? [];
   const remote = local.length ? [] : (message.images ?? []);
+  const rule = theme.shape.userRule;
   return (
-    <View style={[styles.mine, { maxWidth: isDesktop ? '70%' : '78%' }]}>
+    <View style={[styles.mine, rule ? styles.mineRule : { maxWidth: isDesktop ? '70%' : '78%' }]}>
       {local.length || remote.length ? (
         <View style={styles.pictures}>
           {local.map((uri, i) => (
@@ -667,8 +671,14 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
         </View>
       ) : null}
       {message.content ? (
-        <MessageMenu text={message.content} bot={bot} raw style={[styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
-          <Text style={styles.text} selectable={WEB_SELECT}>
+        // Terminal: your message is a full-width row with a rule at the left and a prompt mark, not a bubble.
+        <MessageMenu text={message.content} bot={bot} raw style={rule ? styles.ruleRow : [styles.bubble, { backgroundColor: mix(color, 0.3) }]}>
+          {rule ? (
+            <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no" maxFontSizeMultiplier={maxScale.mono}>
+              {PROMPT}
+            </Text>
+          ) : null}
+          <Text style={[styles.text, { color: colors.userText }, rule && styles.ruleText]} selectable={WEB_SELECT}>
             {message.content}
           </Text>
         </MessageMenu>
@@ -731,6 +741,10 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   hint: { color: colors.dim, fontSize: 14, textAlign: 'center', marginTop: 8 },
   bubble: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, alignSelf: 'flex-end' },
   mine: { alignSelf: 'flex-end', gap: 4, alignItems: 'flex-end' },
+  mineRule: { alignSelf: 'stretch', alignItems: 'stretch', maxWidth: '100%' },
+  ruleRow: { flexDirection: 'row', gap: 10, backgroundColor: colors.card, borderLeftWidth: 2, borderLeftColor: colors.accent, paddingHorizontal: 12, paddingVertical: 9 },
+  prompt: { color: colors.accent, fontSize: BODY_SIZE, lineHeight: 22, fontWeight: '700' },
+  ruleText: { flex: 1 },
   reply: { alignSelf: 'stretch', paddingRight: 4 },
   pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   picture: { borderRadius: 14, backgroundColor: colors.card },

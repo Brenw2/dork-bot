@@ -56,10 +56,11 @@ export default function AddBot() {
 
 function Labeled(props: React.ComponentProps<typeof Field> & { label: string }) {
   const styles = useStyles();
+  const { label: say } = useTheme();
   const { label, ...input } = props;
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{say(label)}</Text>
       <Field autoCapitalize="none" autoCorrect={false} {...input} />
     </View>
   );

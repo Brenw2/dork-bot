@@ -39,15 +39,16 @@ export function Chip({
   style?: StyleProp<ViewStyle>;
   numberOfLines?: number;
 }) {
-  const { colors } = useTheme();
+  const { colors, label: say, theme } = useTheme();
   const styles = useStyles();
-  const fill = status ? { backgroundColor: colors.card } : selected ? { backgroundColor: tint ?? colors.accent, borderColor: tint ?? colors.accent } : { borderColor: colors.border };
+  // Terminal outlines a status chip (the step and answered-approval chips) with the hairline `border`.
+  const fill = status ? { backgroundColor: colors.card, ...(theme.shape.square ? { borderColor: colors.border } : null) } : selected ? { backgroundColor: tint ?? colors.accent, borderColor: tint ?? colors.accent } : { borderColor: colors.border };
   const text = status ? colors.dim : selected ? onColor(tint ?? colors.accent) : colors.text;
   const body = (
     <>
       {leading}
       <Text style={[styles.chipText, { color: text }]} numberOfLines={numberOfLines} maxFontSizeMultiplier={maxScale.chrome}>
-        {label}
+        {say(label)}
       </Text>
       {trailing}
     </>
@@ -78,10 +79,11 @@ export function Chip({
 /** "Needs you": 20 tall, radius 10, `bad` fill, 12 bold, `badgeText` color. List rows, room rows and the transcript. */
 export function Badge({ label }: { label: string }) {
   const styles = useStyles();
+  const { label: say } = useTheme();
   return (
     <View style={styles.badge}>
       <Text style={styles.badgeText} maxFontSizeMultiplier={maxScale.chrome}>
-        {label}
+        {say(label)}
       </Text>
     </View>
   );

@@ -363,7 +363,7 @@ export function UpdatedLine({ text, loading, failed, onRetry }: { text: string |
 
 /** 7 / 30 / 90 days. 36 tall, radius 10, padding 2; selected fill is mix(color, .30); each segment is a 44 tall target. */
 export function Segmented({ value, onChange, color: given }: { value: Days; onChange: (d: Days) => void; color?: string }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, skin } = useTheme();
   const styles = useStyles();
   const color = given ?? colors.accent;
   return (
@@ -378,7 +378,7 @@ export function Segmented({ value, onChange, color: given }: { value: Days; onCh
           accessibilityLabel={`${d} days`}
           style={[styles.segment, d === value && { backgroundColor: mix(color, 0.3) }]}
         >
-          <Text style={[styles.segmentText, d === value ? { color: colors.text, fontWeight: '600' } : { fontWeight: '500' }]} maxFontSizeMultiplier={maxScale.chrome}>
+          <Text style={[styles.segmentText, d === value ? skin({ color: colors.text, fontWeight: '600' }) : skin({ fontWeight: '500' })]} maxFontSizeMultiplier={maxScale.chrome}>
             {d} days
           </Text>
         </Pressable>
@@ -488,7 +488,7 @@ const PLOT = isDesktop ? 168 : 132;
  * labels in a 36 gutter on the right. Tap or drag anywhere on the chart to pick a day; the rest dim to mix(c, .45).
  */
 export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now: number }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, skin } = useTheme();
   const styles = useStyles();
   const [plotW, setPlotW] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -522,7 +522,7 @@ export function DailyChart({ u, color, now }: { u: BotUsage; color: string; now:
         {point ? (
           <View style={[styles.callout, { left: Math.max(0, Math.min(plotW - 190, (picked ?? 0) * slot + slot / 2 - 95)) }]}>
             <Text style={styles.calloutText}>
-              <Text style={{ fontWeight: '600', color: colors.text }}>{calloutText(point.day, point.tokens).split(' · ')[0]}</Text> · {formatTokens(point.tokens)} tokens
+              <Text style={skin({ fontWeight: '600', color: colors.text })}>{calloutText(point.day, point.tokens).split(' · ')[0]}</Text> · {formatTokens(point.tokens)} tokens
             </Text>
           </View>
         ) : null}
@@ -593,12 +593,13 @@ export function EmptyChart({ days }: { days: number }) {
 
 export function ModelRow({ m, u, providers, color }: { m: ModelUsage; u: BotUsage; providers: ProviderUsage[]; color: string }) {
   const styles = useStyles();
+  const { skin } = useTheme();
   const share = shareOf(m, u);
   const provider = providerOfModel(m.model, providers);
   return (
     <View style={styles.modelRow} accessible accessibilityLabel={`${m.model}${provider ? `, ${provider}` : ''}, ${spokenTokens(m.input)} tokens in, ${spokenTokens(m.output)} out, ${formatCount(m.apiCalls)} calls, ${share} percent, ${formatCost(m.cost)}`}>
       <View style={styles.line}>
-        <Text style={[styles.botName, { fontWeight: '400' }]} numberOfLines={1}>
+        <Text style={[styles.botName, skin({ fontWeight: '400' })]} numberOfLines={1}>
           {m.model}
         </Text>
         <Text style={[styles.windowPercent, TABULAR]}>

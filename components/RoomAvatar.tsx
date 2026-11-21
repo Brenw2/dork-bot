@@ -6,13 +6,13 @@ import { makeStyles, useTheme } from '@/components/theme';
 
 /** One bot as a disc: its sprite at 76% on mix(color, tint). The room's own animation state, not the 1:1 chat's. */
 export function MemberDisc({ bot, size, tint = 0.18, mood = 'idle', ring = false }: { bot: string; size: number; tint?: number; mood?: Mood; ring?: boolean }) {
-  const { colors, mix } = useTheme();
+  const { colors, mix, skin } = useTheme();
   const look = useBotLook(bot);
   const seed = [...bot].reduce((a, c) => a + c.charCodeAt(0), 0) % 11;
   return (
     <View
       style={[
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: mix(look.color, tint), alignItems: 'center', justifyContent: 'center' },
+        skin({ width: size, height: size, borderRadius: size / 2, backgroundColor: mix(look.color, tint), alignItems: 'center', justifyContent: 'center' }),
         ring && { borderWidth: 2, borderColor: colors.bg },
       ]}
     >

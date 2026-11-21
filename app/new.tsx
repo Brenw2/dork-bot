@@ -22,6 +22,7 @@ import { makeStyles, useTheme } from '@/components/theme';
 // Create a bot (a new Hermes profile, on any model), or connect one that's already on Hermes.
 export default function NewBot() {
   const styles = useStyles();
+  const { label: say } = useTheme();
   const [manager, setManager] = useState<HermesManager | null | undefined>(undefined);
   const [name, setName] = useState('');
   const [job, setJob] = useState('');
@@ -114,7 +115,7 @@ export default function NewBot() {
         multiline
       />
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Look</Text>
+        <Text style={styles.label}>{say('Look')}</Text>
         <Pressable
           style={styles.row}
           onPress={() => setPicking(!picking)}
@@ -155,7 +156,7 @@ export default function NewBot() {
       ) : null}
 
       <Link href="/add" style={styles.link}>
-        Add with a pairing code instead
+        {say('Add with a pairing code instead')}
       </Link>
     </ScrollView>
   );
@@ -163,10 +164,11 @@ export default function NewBot() {
 
 function Labeled(props: React.ComponentProps<typeof Field> & { label: string }) {
   const styles = useStyles();
+  const { label: say } = useTheme();
   const { label, ...input } = props;
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{say(label)}</Text>
       <Field autoCapitalize="none" autoCorrect={false} {...input} />
     </View>
   );

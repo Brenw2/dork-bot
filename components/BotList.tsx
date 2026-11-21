@@ -39,14 +39,14 @@ function useApprovalTick(): number {
 import { RoomListRow } from '@/components/RoomRow';
 import { useRoomRows } from '@/components/roomsClient';
 import { makeStyles, useTheme } from '@/components/theme';
-import { THEME_IDS } from '@/lib/themes';
+import { PICKER_THEMES } from '@/lib/themes';
 
 /**
  * The saved bots. onSelect opens a chat (pushes a screen on phones, fills the chat pane in two panes).
  * compact: the sidebar next to a chat (desktop and the open Duo in landscape).
  */
 export function BotList({ onSelect, selected, compact = false, onSelectRoom, selectedRoom }: { onSelect: (bot: string) => void; selected?: string | null; compact?: boolean; onSelectRoom?: (room: string) => void; selectedRoom?: string | null }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [status, setStatus] = useState<Record<string, ConnectState>>({});
@@ -117,7 +117,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
         { text: 'Usage…', icon: 'clock', onPress: () => router.push('/usage') },
         { text: 'Notifications…', icon: 'chats', onPress: () => router.push('/notifications') },
         // Only once there is a choice (Classic alone has nothing to pick).
-        ...(THEME_IDS.length > 1 ? [{ text: 'Appearance…', icon: 'palette' as const, onPress: () => router.push('/appearance') }] : []),
+        ...(PICKER_THEMES.length > 1 ? [{ text: 'Appearance…', icon: 'palette' as const, onPress: () => router.push('/appearance') }] : []),
         { text: 'Add with a code…', icon: 'plus', onPress: () => router.push('/add') },
         { text: 'Show hidden bots', icon: 'info', onPress: () => router.push('/new') },
         { text: 'Cancel', style: 'cancel' },
@@ -168,8 +168,8 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
           <EmptyState
             style={{ marginTop: 0 }}
             icon={<Icon name="compose" size={26} color={colors.accent} />}
-            title="No bots yet"
-            body="Tap New bot to make one, or to add a bot that's already on Hermes."
+            title={label('No bots yet')}
+            body={label("Tap New bot to make one, or to add a bot that's already on Hermes.")}
           />
         }
         renderItem={({ item }) => (
@@ -181,17 +181,37 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
 }
 
 function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boolean; top: number; usage: UsageSnapshot | null; onMenu: (anchor?: { x: number; y: number }) => void; onCompose: (anchor?: { x: number; y: number }) => void }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useStyles();
   const hit = isDesktop ? 32 : 44;
   const icon = isDesktop ? 19 : 24;
+  const term = theme.shape.brackets;
+  // Terminal: each header action is text (see textButton), so there is no icon box to size.
   const buttonStyle = ({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
     styles.headerButton,
     { width: hit, height: hit },
     (hovered || pressed) && isDesktop && { backgroundColor: colors.raised },
     pressed && !isDesktop && { opacity: 0.6 },
   ];
-  const buttons = (
+  // Terminal (a1): the two actions are text, "[ ... ]" and "[ + new ]", in the accent; same labels and 44 pt (desktop 32) targets.
+  const textButton = (shown: string, a11y: string, onPress: (e: { nativeEvent: { pageX: number; pageY: number } }) => void) => (
+    <Pressable
+      onPress={(e) => onPress(e)}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [styles.textAction, { minHeight: hit }, (hovered || pressed) && isDesktop && { backgroundColor: colors.raised }, pressed && !isDesktop && { opacity: 0.6 }]}
+    >
+      <Text style={styles.textActionText} maxFontSizeMultiplier={maxScale.mono} numberOfLines={1}>
+        {shown}
+      </Text>
+    </Pressable>
+  );
+  const buttons = term ? (
+    <View style={styles.headerButtons}>
+      {textButton('[ ... ]', 'More', (e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
+      {textButton('[ + new ]', 'New bot', (e) => onCompose({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }))}
+    </View>
+  ) : (
     <View style={styles.headerButtons}>
       <Pressable onPress={(e) => onMenu({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityLabel="More" style={buttonStyle}>
         <Icon name="ellipsis" size={icon} color={colors.accent} />
@@ -205,8 +225,9 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
   if (compact) {
     return (
       <View style={[styles.sidebarHeader, { paddingTop: top, minHeight: 56 + top }]}>
-        <Text style={styles.sidebarTitle} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome}>
-          Dork Bot
+        <Text style={styles.sidebarTitle} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={maxScale.chrome}>
+          {term ? 'dork-bot' : 'Dork Bot'}
+          {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
         </Text>
         <View style={styles.sidebarRight}>
           {gauge}
@@ -221,16 +242,18 @@ function ListHeader({ compact, top, usage, onMenu, onCompose }: { compact: boole
         <View style={styles.gaugeSlot}>{gauge}</View>
         {buttons}
       </View>
-      <Text style={styles.largeTitle} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome}>
-        Dork Bot
+      <Text style={[styles.largeTitle, term && styles.largeTitleTerm]} accessibilityRole="header" accessibilityLabel="Dork Bot" maxFontSizeMultiplier={term ? maxScale.mono : maxScale.chrome}>
+        {term ? 'dork-bot' : 'Dork Bot'}
+        {term ? <Text style={{ color: colors.accent }}>█</Text> : null}
       </Text>
     </View>
   );
 }
 
 function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: SavedBot; compact: boolean; selected: boolean; state: ConnectState | undefined; preview: BotPreview | undefined; onOpen: () => void }) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useStyles();
+  const term = theme.shape.brackets;
   const bot = saved.bot;
   const name = nameOf(bot, saved.displayName);
   const mood = useBotMood(bot);
@@ -248,12 +271,14 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   } else if (needs) line = `Wants to run a command: ${needs.command || needs.description}`;
   else if (doing) {
     line = doing;
-    lineStyle = { color: colors.text };
+    lineStyle = { color: term ? colors.accent : colors.text };
   } else line = preview ? (preview.text ?? 'No messages yet') : '';
+  const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
+  // Terminal marks a problem line like a console does.
+  if (term && broken) line = `! ${line}`;
 
   const big = !isDesktop; // phone, and the Duo's sidebar on iOS: larger text and 44 pt targets
   const [hovered, setHovered] = useState(false);
-  const label = `${name}, ${needs ? 'needs you, ' : ''}${line}${time ? `, ${time}` : ''}`;
 
   const badge = needs ? <Badge label="Needs you" /> : null;
 
@@ -331,7 +356,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
   );
 }
 
-const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix, theme: { shape: { dashed } } }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   list: { paddingBottom: 24 },
   listCompact: { paddingHorizontal: 8, paddingBottom: 12, gap: 2 },
@@ -339,16 +364,21 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   // Header
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: isDesktop ? 4 : 0 },
   headerButton: { alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  // Terminal text actions: [ ... ] [ + new ]
+  textAction: { minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  textActionText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   largeButtons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingLeft: 16, paddingRight: 8 },
   gaugeSlot: { flexDirection: 'row', alignItems: 'center' },
   sidebarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   largeTitle: { color: colors.text, fontSize: 34, lineHeight: 41, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 8 },
+  // Terminal: a 26 mono title (dork-bot and the block cursor), per the a1 comp.
+  largeTitleTerm: { fontSize: 26, lineHeight: 32 },
   sidebarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 18, paddingRight: isDesktop ? 12 : 4 },
   sidebarTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   // Phone rows: full-bleed, 76 tall at least, hairline from x 80
   row: { flexDirection: 'row', minHeight: 76 },
   rowAvatar: { width: 80, paddingLeft: 16, paddingTop: 12 },
-  rowBody: { flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowBody: { flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, ...(dashed ? { borderStyle: 'dashed' as const } : null) },
   rowInner: { paddingTop: 10, paddingBottom: 10, paddingRight: 16, gap: 1 },
   line1: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   line2: { flexDirection: 'row', alignItems: 'center', gap: 8 },

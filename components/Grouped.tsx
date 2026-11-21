@@ -67,14 +67,14 @@ export function GroupRow({
   chevron?: boolean;
   accessibilityLabel?: string;
 }) {
-  const { colors } = useTheme();
+  const { colors, label: say } = useTheme();
   const styles = useStyles();
   const body = (
     <>
       {leading}
       <View style={styles.text}>
         <Text style={[styles.label, destructive && { color: colors.bad }]} numberOfLines={1}>
-          {label}
+          {say(label)}
         </Text>
         {detail ? (
           <Text style={[styles.detail, detailColor ? { color: detailColor } : null]} numberOfLines={2}>

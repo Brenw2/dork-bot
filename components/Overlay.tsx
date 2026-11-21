@@ -17,7 +17,7 @@ import { makeStyles, useTheme } from '@/components/theme';
  * `popover`: the bot sheet, a 360 wide popover under the chat title instead of a centered panel.
  */
 export function Overlay({ title, bot, popover = false, children }: { title: string; bot?: string; popover?: boolean; children: ReactNode }) {
-  const { colors } = useTheme();
+  const { colors, label } = useTheme();
   const styles = useStyles();
   const { width, height } = useWindowDimensions();
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -59,7 +59,7 @@ export function Overlay({ title, bot, popover = false, children }: { title: stri
           {bot ? <BotAvatar bot={bot} size={32} /> : null}
           <View style={styles.titles}>
             <Text style={styles.title} numberOfLines={1}>
-              {title}
+              {label(title)}
             </Text>
             {bot ? (
               <Text style={styles.subtitle} numberOfLines={1}>
