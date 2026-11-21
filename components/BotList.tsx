@@ -110,10 +110,10 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
     Menu.show(
       'Dork Bot',
       [
-        { text: 'Usage…', onPress: () => router.push('/usage') },
-        { text: 'Notifications…', onPress: () => router.push('/notifications') },
-        { text: 'Add with a code…', onPress: () => router.push('/add') },
-        { text: 'Show hidden bots', onPress: () => router.push('/new') },
+        { text: 'Usage…', icon: 'clock', onPress: () => router.push('/usage') },
+        { text: 'Notifications…', icon: 'chats', onPress: () => router.push('/notifications') },
+        { text: 'Add with a code…', icon: 'plus', onPress: () => router.push('/add') },
+        { text: 'Show hidden bots', icon: 'info', onPress: () => router.push('/new') },
         { text: 'Cancel', style: 'cancel' },
       ],
       anchor,
@@ -122,7 +122,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
   // Compose: New bot, or a menu with New group chat when this Hermes runs rooms and there are 2+ bots.
   const compose = (anchor?: { x: number; y: number }) =>
     roomsSupported && (bots?.length ?? 0) >= 2
-      ? Menu.show('New', [{ text: 'New bot', onPress: () => router.push('/new') }, { text: 'New group chat', onPress: () => router.push('/room-new') }, { text: 'Cancel', style: 'cancel' }], anchor)
+      ? Menu.show('New', [{ text: 'New bot', icon: 'plus', onPress: () => router.push('/new') }, { text: 'New group chat', icon: 'chats', onPress: () => router.push('/room-new') }, { text: 'Cancel', style: 'cancel' }], anchor)
       : router.push('/new');
 
   const header = <ListHeader compact={compact} top={insets.top} usage={usage} onMenu={appMenu} onCompose={compose} />;
@@ -274,7 +274,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
             </Text>
             {isDesktop && hovered ? (
               <Pressable onPress={() => openBotSheet(bot)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`More for ${name}`} style={styles.rowMore}>
-                <Text style={styles.rowMoreText}>⋯</Text>
+                <Icon name="ellipsis" size={19} color={colors.dim} />
               </Pressable>
             ) : (
               <Text style={styles.sideTime} maxFontSizeMultiplier={1.4}>
@@ -314,7 +314,7 @@ function BotRow({ saved, compact, selected, state, preview, onOpen }: { saved: S
             <Text style={styles.time} maxFontSizeMultiplier={1.4}>
               {time}
             </Text>
-            <Text style={styles.chevron}>›</Text>
+            <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
           </View>
           <View style={styles.line2}>
             <Text style={[styles.preview, lineStyle]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
@@ -366,5 +366,4 @@ const styles = StyleSheet.create({
   sideTime: { color: colors.dim, fontSize: 12, lineHeight: 16 },
   sidePreview: { flex: 1, color: colors.dim },
   rowMore: { width: 24, height: 20, alignItems: 'center', justifyContent: 'center' },
-  rowMoreText: { color: colors.dim, fontSize: 16, lineHeight: 16, fontWeight: '700' },
 });
