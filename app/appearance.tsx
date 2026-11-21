@@ -1,5 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColumnStyle } from '@/components/Column';
+import { Icon } from '@/components/AppIcons';
+import { onColor } from '@/lib/color';
 import { Group, GroupFootnote, GroupHeader } from '@/components/Grouped';
 import { Sheet } from '@/components/Sheet';
 import { makeStyles, useTheme } from '@/components/theme';
@@ -58,7 +60,7 @@ export default function AppearanceScreen() {
                   <Text style={styles.desc}>{DESCRIPTION[id]}</Text>
                 </View>
                 <View style={[styles.radio, selected && { backgroundColor: colors.accent, borderColor: colors.accent }]}>
-                  {selected ? <Text style={styles.tick}>✓</Text> : null}
+                  {selected ? <Icon name="check" size={14} color={onColor(colors.accent)} stroke={3} /> : null}
                 </View>
               </Pressable>
             );
@@ -78,6 +80,5 @@ const useStyles = makeStyles(({ colors }) =>
     name: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 22 },
     desc: { color: colors.dim, fontSize: 15, lineHeight: 20, marginTop: 2 },
     radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: colors.chevron, alignItems: 'center', justifyContent: 'center' },
-    tick: { color: '#fff', fontSize: 15, fontWeight: '700' },
   }),
 );
