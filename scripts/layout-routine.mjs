@@ -138,7 +138,7 @@ function measureRoutine({ state, posture }) {
     const rotated = getComputedStyle(chev.parentElement).transform;
     if (open && rotated === 'none') problems.push('the chevron should point down when expanded');
     if (!open && rotated !== 'none' && rotated !== 'matrix(1, 0, 0, 1, 0, 0)') problems.push(`the chevron should point right when collapsed, got ${rotated}`);
-    if (!open && !(near(cw.width, 9, 1) && near(cw.height, 15, 1))) problems.push(`chevron glyph should be 9x15, got ${cw.width}x${cw.height}`);
+    if (!open && !(near(cw.width, 20, 1) && near(cw.height, 20, 1))) problems.push(`chevron icon should be 20x20 (the shared Icon chevron), got ${cw.width}x${cw.height}`);
   }
 
   // Expanded: divider, then the body in the reply's own type.

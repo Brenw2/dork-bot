@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/AppIcons';
 import { useBotLook } from '@/components/useBotLook';
 import { useWorkingOn } from '@/components/workWatch';
 import { workingOnLine } from '@/lib/work';
@@ -26,13 +27,17 @@ export function WorkingOn({ bot }: { bot: string }) {
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       style={({ pressed }) => [{ maxWidth, overflow: 'hidden' }, pressed && { opacity: 0.6 }]}
     >
-      <Text style={[styles.line, { color }]} numberOfLines={1}>
-        {workingOnLine(work.title)} ›
-      </Text>
+      <View style={styles.wrap}>
+        <Text style={[styles.line, { color }]} numberOfLines={1}>
+          {workingOnLine(work.title)}
+        </Text>
+        <Icon name="chevron" size={13} color={color} stroke={2.4} />
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  line: { fontSize: 13, lineHeight: 18 },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  line: { flexShrink: 1, fontSize: 13, lineHeight: 18 },
 });

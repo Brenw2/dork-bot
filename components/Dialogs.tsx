@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Icon, type IconName } from '@/components/AppIcons';
+import { Button } from '@/components/Buttons';
 import { colors } from '@/lib/theme';
 
 export interface DialogButton {
@@ -154,21 +155,15 @@ function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' 
             const danger = b.style === 'destructive';
             const isPrimary = b === primary;
             return (
-              <Pressable
+              <Button
                 key={i}
+                label={b.text}
                 onPress={() => press(b)}
                 disabled={off}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: off }}
-                style={[
-                  styles.button,
-                  b.style === 'cancel' && styles.cancel,
-                  isPrimary && !off && { backgroundColor: danger ? colors.bad : (spec.accent ?? colors.accent), borderColor: 'transparent' },
-                  off && styles.off,
-                ]}
-              >
-                <Text style={[styles.buttonText, isPrimary && !off && { color: '#fff' }, off && { color: colors.dim }]}>{b.text}</Text>
-              </Pressable>
+                kind={isPrimary ? 'primary' : 'secondary'}
+                color={isPrimary ? (danger ? colors.bad : (spec.accent ?? colors.accent)) : (spec.accent ?? colors.accent)}
+                style={styles.button}
+              />
             );
           })}
         </View>
@@ -217,8 +212,5 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
-  button: { height: 38, paddingHorizontal: 18, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  cancel: { backgroundColor: 'transparent' },
-  off: { backgroundColor: colors.card },
-  buttonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  button: { paddingHorizontal: 20 },
 });

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Icon } from '@/components/AppIcons';
+import { Button } from '@/components/Buttons';
 import { BotAvatar } from '@/components/BotSprite';
 import { isDesktop } from '@/components/desktop';
 import { useBotName } from '@/components/useBotName';
@@ -298,11 +299,7 @@ export function Unreachable({ onRetry }: { onRetry: () => void }) {
       <Text style={styles.unreachableText} maxFontSizeMultiplier={1.4}>
         Usage comes from Hermes. Check the connection and try again.
       </Text>
-      <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Try again" style={styles.primary}>
-        <Text style={styles.primaryText} maxFontSizeMultiplier={1.4}>
-          Try again
-        </Text>
-      </Pressable>
+      <Button label="Try again" onPress={onRetry} style={{ marginTop: 12 }} />
     </View>
   );
 }
@@ -434,7 +431,7 @@ export function BotUsageRow({ u, hidden, providers, onPress }: { u: BotUsage; hi
           </Text>
         )}
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Icon name="chevron" size={16} color={colors.disclosure} stroke={2.4} />
     </Pressable>
   );
 }
@@ -655,8 +652,6 @@ const styles = StyleSheet.create({
   unreachable: { alignItems: 'center', gap: 10, paddingVertical: 80, paddingHorizontal: 32 },
   unreachableTitle: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', marginTop: 6 },
   unreachableText: { color: colors.dim, fontSize: 15, lineHeight: 20, textAlign: 'center' },
-  primary: { height: 50, borderRadius: 25, paddingHorizontal: 28, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  primaryText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   updated: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 18 },
   updatedText: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   segmented: { flexDirection: 'row', height: 36, backgroundColor: colors.card, borderRadius: 10, padding: 2 },

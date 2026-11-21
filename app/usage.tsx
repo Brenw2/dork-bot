@@ -92,7 +92,7 @@ export default function UsageScreen() {
           <View style={styles.desktopBar}>
             <UpdatedLine text={snapshot ? updatedLine(snapshot.fetchedAt, now) : null} loading={loading} failed={!!error} onRetry={() => void all()} />
             <Pressable onPress={() => void pull()} accessibilityRole="button" accessibilityLabel="Refresh usage" style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.refresh, hovered && { backgroundColor: colors.raised }]}>
-              <Text style={styles.refreshText}>↻</Text>
+              <Icon name="refresh" size={19} color={colors.accent} />
             </Pressable>
           </View>
         ) : (
