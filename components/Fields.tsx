@@ -58,7 +58,7 @@ export function SearchField({ value, onChangeText, placeholder, accessibilityLab
         {...rest}
       />
       {value ? (
-        <Pressable onPress={() => onChangeText('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search" style={styles.clear}>
+        <Pressable onPress={() => onChangeText('')} hitSlop={12} accessibilityRole="button" accessibilityLabel="Clear search" style={styles.clear}>
           <Icon name="close" size={14} color={colors.dim} stroke={2.4} />
         </Pressable>
       ) : null}

@@ -116,7 +116,7 @@ export function BotList({ onSelect, selected, compact = false, onSelectRoom, sel
         { text: 'Usage…', icon: 'clock', onPress: () => router.push('/usage') },
         { text: 'Notifications…', icon: 'chats', onPress: () => router.push('/notifications') },
         // Only once there is a choice (Classic alone has nothing to pick).
-        ...(THEME_IDS.length > 1 ? [{ text: 'Appearance…', icon: 'info' as const, onPress: () => router.push('/appearance') }] : []),
+        ...(THEME_IDS.length > 1 ? [{ text: 'Appearance…', icon: 'palette' as const, onPress: () => router.push('/appearance') }] : []),
         { text: 'Add with a code…', icon: 'plus', onPress: () => router.push('/add') },
         { text: 'Show hidden bots', icon: 'info', onPress: () => router.push('/new') },
         { text: 'Cancel', style: 'cancel' },
