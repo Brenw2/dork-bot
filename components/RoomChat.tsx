@@ -128,7 +128,7 @@ export function RoomTitle({ room }: { room: Room | null }) {
       style={({ pressed }) => [styles.titleBlock, pressed && { backgroundColor: colors.raised }, isDesktop && ({ cursor: 'pointer' } as object)]}
     >
       <MemberStack profiles={room.members.map((m) => m.profile)} size={32} />
-      <View style={{ flexShrink: 1 }}>
+      <View style={{ flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>
         <Text style={skin({ color: colors.text, fontSize: isDesktop ? 16 : 16, lineHeight: 20, fontWeight: '600' })} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
           {room.name}
         </Text>
