@@ -4,9 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUpIcon, PlusIcon, StopIcon } from '@/components/ChatIcons';
 import { Menu } from '@/components/alert';
 import { useDesk } from '@/components/ChatStatus';
-import { PICK_SOURCES, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
+import { clipboardHasImage, PICK_SOURCES, pasteClipboardImage, pickImages, useImageDrop, type PickSource } from '@/components/pickImages';
 import { MAX_IMAGES, type Attachment } from '@/lib/attachments';
 import { isSendEnter } from '@/lib/enterKey';
+import { runPaste, showPasteChip } from '@/lib/pasteChip';
 import { colors, onColor } from '@/lib/theme';
 
 const WEB = Platform.OS === 'web';
@@ -80,6 +81,24 @@ export function Composer(p: ComposerProps) {
 
   const onImages = p.onImages;
   useImageDrop((more) => onImages?.(more), enabled && !!onImages);
+  // iOS "Paste photo" chip: look at the clipboard once, when the box gets focus.
+  const [clipHasImage, setClipHasImage] = useState(false);
+  const focusedRef = useRef(false);
+  const onFocus = () => {
+    focusedRef.current = true;
+    setFocused(true);
+    if (onImages && enabled) void clipboardHasImage().then((has) => focusedRef.current && setClipHasImage(has));
+  };
+  const onBlur = () => {
+    focusedRef.current = false;
+    setFocused(false);
+    setClipHasImage(false);
+  };
+  const pasteChip = showPasteChip({ accepts: !!onImages, enabled, focused, clipboardHasImage: clipHasImage, attached: images.length });
+  const pastePhoto = () => {
+    setClipHasImage(false); // the picture is attached; the chip comes back on the next focus
+    if (onImages) void runPaste(pasteClipboardImage, images.length, onImages, (m) => p.onAttachError?.(m));
+  };
   const attach = (source: PickSource) => void pickImages(source, images.length).then((m) => onImages?.(m)).catch((e: Error) => p.onAttachError?.(e.message));
   const openAttach = (anchor?: { x: number; y: number }) =>
     PICK_SOURCES.length === 1
@@ -122,6 +141,17 @@ export function Composer(p: ComposerProps) {
       ) : null}
       {p.attachError ? <Text style={[styles.error, p.column]}>{p.attachError}</Text> : null}
       <View style={[{ paddingTop: 8, paddingHorizontal: 12, paddingBottom: Math.max(insets.bottom, 8) }, p.column]}>
+        {pasteChip ? (
+          <Pressable
+            testID="composer-paste-chip"
+            style={({ pressed }) => [styles.chip, pressed && { backgroundColor: colors.raised }]}
+            onPress={pastePhoto}
+            accessibilityRole="button"
+            accessibilityLabel="Paste photo"
+          >
+            <Text style={styles.chipText}>Paste photo</Text>
+          </Pressable>
+        ) : null}
         {p.above}
         <View style={styles.composer}>
           {onImages ? (
@@ -145,8 +175,8 @@ export function Composer(p: ComposerProps) {
                 WEB && inputHeight !== undefined && { height: inputHeight, maxHeight: inputCap ?? 140 },
                 WEB && ({ outlineStyle: 'none' } as object),
               ]}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
+              onFocus={onFocus}
+              onBlur={onBlur}
               value={p.value}
               onChangeText={p.onChangeText}
               onSelectionChange={p.onSelectionChange ? (e) => p.onSelectionChange?.(e.nativeEvent.selection.end) : undefined}
@@ -187,6 +217,9 @@ const styles = StyleSheet.create({
   thumb: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.card },
   thumbRemove: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#000', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   thumbRemoveText: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  // UI kit K9 chip, unselected: 32 tall, radius 16, padding 12, 13/600, `border` outline.
+  chip: { alignSelf: 'flex-start', height: 32, borderRadius: 16, paddingHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  chipText: { color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   attach: { backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingBottom: 6 },
   composer: {

@@ -52,7 +52,21 @@ function readAsDataUrl(file: Blob): Promise<string> {
   });
 }
 
-const imagesIn = (list: DataTransferItemList | FileList | null | undefined): File[] => {
+/**
+ * Desktop: paste is the window's paste event (useImageDrop), so there is no chip. Only the layout suite sets
+ * `__DORK_TEST_CLIPBOARD_IMAGE__` (before the app loads) to draw the chip for a screenshot.
+ */
+declare global {
+  var __DORK_TEST_CLIPBOARD_IMAGE__: boolean | undefined;
+}
+export async function clipboardHasImage(): Promise<boolean> {
+  return globalThis.__DORK_TEST_CLIPBOARD_IMAGE__ === true;
+}
+export async function pasteClipboardImage(_already = 0): Promise<Attachment[]> {
+  return [];
+}
+
+export const imagesIn = (list: DataTransferItemList | FileList | null | undefined): File[] => {
   if (!list) return [];
   const files: File[] = [];
   for (const it of Array.from(list as ArrayLike<DataTransferItem | File>)) {
@@ -62,32 +76,48 @@ const imagesIn = (list: DataTransferItemList | FileList | null | undefined): Fil
   return files;
 };
 
+type Convert = (file: Blob) => Promise<Attachment>;
+
+/**
+ * The window's paste, dragover and drop handlers. A paste with a picture attaches it, except when the clipboard
+ * is rich text (a copied spreadsheet range carries a picture of itself next to its text): then the text pastes.
+ * A paste without a picture is left alone, so text pastes as always.
+ */
+export function imageHandlers(onImages: (images: Attachment[]) => void, convert: Convert = fromFile) {
+  const attach = (files: File[]) => void Promise.all(files.map(convert)).then(onImages);
+  return {
+    onPaste: (e: ClipboardEvent) => {
+      const files = imagesIn(e.clipboardData?.items);
+      if (!files.length) return;
+      const types = Array.from(e.clipboardData?.types ?? []);
+      if (types.includes('text/html') && types.includes('text/plain') && e.clipboardData?.getData('text/plain')) return;
+      e.preventDefault();
+      attach(files);
+    },
+    onDragOver: (e: DragEvent) => {
+      if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault();
+    },
+    onDrop: (e: DragEvent) => {
+      const files = imagesIn(e.dataTransfer?.files);
+      if (!files.length) return;
+      e.preventDefault();
+      attach(files);
+    },
+  };
+}
+
 /** Paste a screenshot or drop pictures anywhere on the open chat to attach them. */
 export function useImageDrop(onImages: (images: Attachment[]) => void, enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
-    const onPaste = (e: ClipboardEvent) => {
-      const files = imagesIn(e.clipboardData?.items);
-      if (!files.length) return;
-      e.preventDefault();
-      void Promise.all(files.map(fromFile)).then(onImages);
-    };
-    const onDragOver = (e: DragEvent) => {
-      if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault();
-    };
-    const onDrop = (e: DragEvent) => {
-      const files = imagesIn(e.dataTransfer?.files);
-      if (!files.length) return;
-      e.preventDefault();
-      void Promise.all(files.map(fromFile)).then(onImages);
-    };
-    window.addEventListener('paste', onPaste);
-    window.addEventListener('dragover', onDragOver);
-    window.addEventListener('drop', onDrop);
+    const h = imageHandlers(onImages);
+    window.addEventListener('paste', h.onPaste);
+    window.addEventListener('dragover', h.onDragOver);
+    window.addEventListener('drop', h.onDrop);
     return () => {
-      window.removeEventListener('paste', onPaste);
-      window.removeEventListener('dragover', onDragOver);
-      window.removeEventListener('drop', onDrop);
+      window.removeEventListener('paste', h.onPaste);
+      window.removeEventListener('dragover', h.onDragOver);
+      window.removeEventListener('drop', h.onDrop);
     };
   }, [onImages, enabled]);
 }

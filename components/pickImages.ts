@@ -1,4 +1,5 @@
 // Picking pictures on the phone: the camera or the photo library, shrunk to MAX_SIDE as JPEG.
+import * as Clipboard from 'expo-clipboard';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
@@ -44,5 +45,34 @@ async function shrink(uri: string, width: number, height: number): Promise<Attac
   return { dataUrl: `data:image/jpeg;base64,${saved.base64}`, width: saved.width, height: saved.height };
 }
 
-/** Phone: nothing to hook (no paste or drop of pictures into the chat). */
+/**
+ * Phone: does the clipboard hold a picture? Ask only when the box gets focus, never in the background.
+ * hasImageAsync doesn't read the picture, so iOS shows no paste prompt for it. Any error means no.
+ */
+export async function clipboardHasImage(): Promise<boolean> {
+  try {
+    return await Clipboard.hasImageAsync();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Phone: attach the clipboard's picture the way camera and library photos are attached (JPEG, shrunk to
+ * MAX_SIDE). Empty when there is none, or when the room for pictures is used up.
+ */
+export async function pasteClipboardImage(already = 0): Promise<Attachment[]> {
+  if (already >= MAX_IMAGES) return [];
+  const clip = await Clipboard.getImageAsync({ format: 'jpeg', jpegQuality: 0.82 });
+  if (!clip) return [];
+  const { width, height } = clip.size;
+  if (fitSize(width, height).width === width) return [{ dataUrl: clip.data, width, height }];
+  try {
+    return [await shrink(clip.data, width, height)];
+  } catch {
+    throw new Error('That picture is too big to paste. Add it from the library instead.');
+  }
+}
+
+/** Phone: nothing to hook (no drop of pictures into the chat). Paste is the chip in the Composer. */
 export function useImageDrop(_onImages: (images: Attachment[]) => void, _enabled: boolean): void {}
