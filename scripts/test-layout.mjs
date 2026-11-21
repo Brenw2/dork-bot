@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { NOTE_AT, ROUTINE_SCREENS } from './layout-routine.mjs';
 import { ROOM_DATA, ROOM_FIXED, ROOM_SCREENS, ROOM_SEEN, roomsMock } from './layout-rooms.mjs';
+import { PASTE_SCREENS } from './layout-paste.mjs';
 import { USAGE_SCREENS } from './layout-usage.mjs';
 import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, checkErrorCard, checkErrorDetails, checkLook, checkNotSent, checkNotifications } from './layout-fixes-69.mjs';
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
@@ -297,6 +298,8 @@ const SCREENS = [
   { name: 'routines-expanded', path: () => '/routines/assistant', click: 'daily_digest,', waitFor: 'daily_digest', then: 'Notify me' },
   // Card 8: group chat (fixtures and the fake rooms socket are in scripts/layout-rooms.mjs).
   ...ROOM_SCREENS,
+  // Card 30: the Paste photo chip.
+  ...PASTE_SCREENS,
   // Fix 3: the message box with text in it (Send inside the field). Fixes 4 and 5: a reply on its way (see fakeHermes).
   { name: 'chat-typing', path: chatPath('assistant'), waitFor: 'Any time.', act: (page) => typeIn(page, 'assistant', 'what time is sunset'), check: checkComposer },
   { name: 'chat-thinking', extraBots: ['thinker'], path: chatPath('thinker'), waitFor: 'Any time.', act: async (page) => (await sendIn(page, 'thinker', 'what time is sunset'), page.getByLabel('Typing').first().waitFor()), check: checkThinking },
