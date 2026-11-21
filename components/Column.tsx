@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isDesktop } from '@/components/desktop';
 import { useLayoutClass } from '@/components/useLayoutClass';
 import { CHAT_MAX_WIDTH, FOLD } from '@/lib/layoutClass';
+import { makeStyles } from '@/components/theme';
 
 /**
  * Where a form or message screen puts its content:
@@ -22,7 +23,8 @@ export function useColumnStyle(): ViewStyle {
 }
 
 export function Column({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
   return <View style={[styles.fill, useColumnStyle(), style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({ fill: { flex: 1 } });
+const useStyles = makeStyles(() => StyleSheet.create({ fill: { flex: 1 } }));

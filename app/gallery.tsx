@@ -1,13 +1,14 @@
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Sprite } from '@/components/BotSprite';
 import { BOT_COLORS, CHARACTER_IDS, MOODS, lookName, looksOf } from '@/lib/sprites';
-import { colors } from '@/lib/theme';
+import { makeStyles } from '@/components/theme';
 
 // Design gallery (not linked from the app): every look of every character in every mood, and the
 // app icon. Open /gallery in the web build to review the art.
 const ROWS = CHARACTER_IDS.flatMap((id) => looksOf(id).map((_, v) => ({ id, v })));
 
 export default function Gallery() {
+  const styles = useStyles();
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.body}>
       <Text style={styles.h}>App icon</Text>
@@ -52,7 +53,7 @@ export default function Gallery() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 14 },
   h: { color: colors.text, fontSize: 18, fontWeight: '600' },
@@ -63,4 +64,4 @@ const styles = StyleSheet.create({
   rowHead: { width: 64, textAlign: 'left' },
   cell: { width: 70, alignItems: 'center', textAlign: 'center' },
   label: { color: colors.dim, fontSize: 12 },
-});
+}));

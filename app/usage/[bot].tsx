@@ -10,11 +10,13 @@ import { DailyChart, EmptyChart, ModelRow, Segmented, Tile } from '@/components/
 import { useBotLook } from '@/components/useBotLook';
 import { useBotName } from '@/components/useBotName';
 import { useBotUsage, useDays, useUsageSnapshot } from '@/components/useUsage';
-import { colors } from '@/lib/theme';
 import { formatCost, formatCount, formatTokens, hasActivity } from '@/lib/usage';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // One bot's usage (Fix 12): the same 7/30/90 control, six tiles, tokens per day with day selection, and by-model rows.
 export default function BotUsageScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const column = useColumnStyle();
   const insets = useSafeAreaInsets();
@@ -107,7 +109,7 @@ export default function BotUsageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 52, paddingHorizontal: 12 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, minWidth: 80 },
@@ -122,4 +124,4 @@ const styles = StyleSheet.create({
   list: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginHorizontal: 16, marginTop: 12 },
-});
+}));

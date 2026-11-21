@@ -2,7 +2,8 @@
 // Phone: a 2 x 2 grid, 44 tall. Desktop: one row, 36 tall. Radius 12, 15/600. Allow once = tint fill, Deny = `bad`
 // outline (1 wide, as in the locked comp 05-approval), the other choices = mix(tint, 0.2).
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, mix, onColor } from '@/lib/theme';
+import { onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 export function ApprovalButtons({
   choices,
@@ -24,6 +25,8 @@ export function ApprovalButtons({
   dim?: boolean;
   onAnswer: (choice: string) => void;
 }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const rows: string[][] = [];
   if (desk) rows.push(choices);
   else for (let i = 0; i < choices.length; i += 2) rows.push(choices.slice(i, i + 2));
@@ -56,9 +59,9 @@ export function ApprovalButtons({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => StyleSheet.create({
   buttons: { gap: 8 },
   row: { flexDirection: 'row', gap: 8 },
   button: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   text: { fontSize: 15, fontWeight: '600' },
-});
+}));

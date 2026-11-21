@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/AppIcons';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /**
  * "Jump to latest" (Design's streaming spec): 32 tall, raised fill, hairline border, quiet. Centred over the
  * transcript, 12 above the message box. Fades in and out over 150 ms; hidden it can't be tapped or read out.
  */
 export function JumpPill({ visible, onPress }: { visible: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const opacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: 150, useNativeDriver: Platform.OS !== 'web' }).start();
@@ -24,8 +26,8 @@ export function JumpPill({ visible, onPress }: { visible: boolean; onPress: () =
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' },
   pill: { height: 32, paddingHorizontal: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.raised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   text: { color: colors.text, fontSize: 13, fontWeight: '600' },
-});
+}));

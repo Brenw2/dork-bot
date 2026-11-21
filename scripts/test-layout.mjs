@@ -11,6 +11,7 @@
 //   node scripts/test-layout.mjs --no-build [--only duo-closed]
 //
 // Sizes: grok-export/design-comps/iphone-duo-2026-10-30 (PLAN.md §1, RESEARCH.md §2; Xcode 27.1 data).
+import { FIXED as FIXED_CLOCK, fixClock } from './fixed-clock.mjs';
 import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -265,6 +266,8 @@ const SCREENS = [
   { name: 'bots', path: () => '/', waitFor: 'assistant' },
   { name: 'bots-empty', bots: false, path: () => '/', waitFor: 'No bots yet' },
   { name: 'chat', path: (p) => (p === 'duo-open-landscape' ? '/?bot=assistant' : '/chat/assistant'), waitFor: 'Any time.' },
+  // Appearance (theme plumbing card): the menu entry is hidden while Classic is the only theme, but the sheet is real.
+  { name: 'appearance', path: () => '/appearance', waitFor: 'Changes right away' },
   { name: 'new-unpaired', path: () => '/new', waitFor: 'Connect to Hermes first' },
   { name: 'new', paired: true, path: () => '/new', waitFor: 'Already on Hermes', check: (p, po) => checkButtons(p, po, 'new') },
   { name: 'add', path: () => '/add', waitFor: 'Hermes address', check: (p, po) => checkButtons(p, po, 'add') },
@@ -607,7 +610,8 @@ function chromiumPath() {
 const DESKTOP = { width: 1280, height: 800 };
 async function composerTest(browser, base) {
   const problems = [];
-  const context = await browser.newContext({ viewport: DESKTOP, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: DESKTOP, deviceScaleFactor: 1, reducedMotion: FIXED_CLOCK ? 'reduce' : 'no-preference' });
+  await fixClock(context);
   const page = await context.newPage();
   page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
   await page.addInitScript(
@@ -701,7 +705,8 @@ const PHONE = POSTURES.iphone;
 const RED = 'rgb(240, 106, 106)';
 
 async function uiPage(browser, base, { desktop, shape = PHONE, viewport, extraBots, paired = true } = {}) {
-  const context = await browser.newContext({ viewport: viewport ?? { width: shape.width, height: shape.height }, deviceScaleFactor: 2 });
+  const context = await browser.newContext({ viewport: viewport ?? { width: shape.width, height: shape.height }, deviceScaleFactor: 2, reducedMotion: FIXED_CLOCK ? 'reduce' : 'no-preference' });
+  await fixClock(context);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`page error: ${e.message}`));
@@ -995,7 +1000,8 @@ async function main() {
     for (const screen of SCREENS) {
       if (screen.postures && !screen.postures.includes(posture)) continue;
       if (shape.roomsOnly && !screen.name.startsWith('room-') && !screen.name.startsWith('routine-') && !screen.name.startsWith('usage')) continue;
-      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2, hasTouch: !!screen.touch, reducedMotion: screen.reducedMotion ? 'reduce' : 'no-preference' });
+      const context = await browser.newContext({ viewport: { width: shape.width, height: shape.height }, deviceScaleFactor: 2, hasTouch: !!screen.touch, reducedMotion: FIXED_CLOCK || screen.reducedMotion ? 'reduce' : 'no-preference' });
+      await fixClock(context);
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));

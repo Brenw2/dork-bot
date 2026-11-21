@@ -4,12 +4,13 @@
 import { Children, isValidElement, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Icon } from '@/components/AppIcons';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** The separator inset for rows that have a leading icon or avatar. */
 export const LEADING_INSET = 60;
 
 export function Group({ children, style, inset = 16 }: { children: ReactNode; style?: StyleProp<ViewStyle>; inset?: number }) {
+  const styles = useStyles();
   const items = Children.toArray(children).filter(isValidElement);
   return (
     <View style={[styles.group, style]}>
@@ -25,6 +26,7 @@ export function Group({ children, style, inset = 16 }: { children: ReactNode; st
 
 /** A section header over a group: 13/18 uppercase dim, +0.3 tracking, 32 from the left, 18 above and 7 below. */
 export function GroupHeader({ children }: { children: string }) {
+  const styles = useStyles();
   return (
     <Text style={styles.header} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
       {children}
@@ -34,6 +36,7 @@ export function GroupHeader({ children }: { children: string }) {
 
 /** The 13 dim note under a group. */
 export function GroupFootnote({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   return <Text style={styles.footnote}>{children}</Text>;
 }
 
@@ -64,6 +67,8 @@ export function GroupRow({
   chevron?: boolean;
   accessibilityLabel?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const body = (
     <>
       {leading}
@@ -99,7 +104,7 @@ export function GroupRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   group: { backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 16, paddingVertical: 8 },
@@ -110,4 +115,4 @@ const styles = StyleSheet.create({
   chevron: { color: colors.disclosure, fontSize: 17 },
   header: { color: colors.dim, fontSize: 13, lineHeight: 18, letterSpacing: 0.3, textTransform: 'uppercase', marginLeft: 32, marginTop: 18, marginBottom: 7 },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginHorizontal: 32, marginTop: 7 },
-});
+}));

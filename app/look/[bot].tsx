@@ -9,10 +9,11 @@ import { useBotLook } from '@/components/useBotLook';
 import { pushMeta } from '@/components/sync';
 import { setLook } from '@/lib/bots';
 import { MOODS, type Look } from '@/lib/sprites';
-import { colors } from '@/lib/theme';
+import { makeStyles } from '@/components/theme';
 
 // Change a bot's look (the bot sheet's Look tile): color, character, and its style. Save is in the sheet header.
 export default function ChangeLook() {
+  const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const current = useBotLook(bot);
   const [picked, setPicked] = useState<Look>(current);
@@ -40,8 +41,8 @@ export default function ChangeLook() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 16, gap: 18 },
   preview: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-});
+}));

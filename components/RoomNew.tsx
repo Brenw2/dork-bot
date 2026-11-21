@@ -13,7 +13,7 @@ import { listBots, type SavedBot } from '@/lib/bots';
 import { onColor } from '@/lib/color';
 import { nameOf } from '@/lib/names';
 import { createProblem, MAX_MEMBERS, MIN_MEMBERS } from '@/lib/rooms';
-import { colors } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /**
  * New group chat (comps g2): a name plus 2 to 6 of this phone's bots. The room is made on Hermes (groups.create); the
@@ -21,6 +21,8 @@ import { colors } from '@/lib/theme';
  * Desktop: the panel's footer has Cancel and "Create group chat".
  */
 export function RoomNew() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
   const [name, setName] = useState('');
@@ -130,7 +132,7 @@ export function RoomNew() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 32 },
   headCol: { alignItems: 'center', gap: 12 },
@@ -147,4 +149,4 @@ const styles = StyleSheet.create({
   memberJob: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.chevron, alignItems: 'center', justifyContent: 'center' },
   footnote: { color: colors.dim, fontSize: 13, lineHeight: 18, marginTop: 12, marginHorizontal: 16 },
-});
+}));

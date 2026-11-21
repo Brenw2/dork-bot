@@ -1,12 +1,14 @@
 // The app's one button set (docs/design/REVIEW.md, fix 9), and the accent rule: inside a bot's context the
-// interactive color is that bot's color; everywhere else (no `bot`) it is the app accent #8B7CF6.
+// interactive color is that bot's color; everywhere else (no `bot`) it is the theme's accent (Classic #8B7CF6).
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { useDesk } from '@/components/ChatStatus';
 import { useBotLook } from '@/components/useBotLook';
-import { colors, mix, onColor } from '@/lib/theme';
+import { onColor } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** The tint for a screen: the bot's color inside its context, the accent outside it. */
 export function useTint(bot?: string): string {
+  const { colors } = useTheme();
   const { color } = useBotLook(bot ?? '');
   return bot ? color : colors.accent;
 }
@@ -37,6 +39,8 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const botTint = useTint(bot);
   const tint = color ?? botTint;
   const desk = useDesk();
@@ -68,6 +72,8 @@ export type SmallTone = 'filled' | 'tint' | 'neutral' | 'danger';
  * danger: Remove. Prefer swipe or ⋯ for destructive row actions.
  */
 export function SmallButton({ label, onPress, bot, tone = 'tint', disabled, busy, accessibilityLabel }: { label: string; onPress: () => void; bot?: string; tone?: SmallTone; disabled?: boolean; busy?: boolean; accessibilityLabel?: string }) {
+  const { colors, mix } = useTheme();
+  const styles = useStyles();
   const tint = useTint(bot);
   const desk = useDesk();
   const bg = tone === 'filled' ? tint : tone === 'tint' ? mix(tint, 0.2) : tone === 'neutral' ? colors.raised : mix(colors.bad, 0.2);
@@ -88,9 +94,9 @@ export function SmallButton({ label, onPress, bot, tone = 'tint', disabled, busy
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => StyleSheet.create({
   big: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   bigText: { fontSize: 17, fontWeight: '600' },
   small: { borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   smallText: { fontSize: 13, fontWeight: '600' },
-});
+}));

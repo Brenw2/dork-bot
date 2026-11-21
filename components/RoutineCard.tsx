@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/AppIcons';
 import { Markdown } from '@/components/Markdown';
-import { colors } from '@/lib/theme';
 import { ROUTINE_MOTION, routineHasBody, routineHint, routineLabel, routinePreview, routineTints } from '@/lib/routineCard';
+import { makeStyles, useTheme } from '@/components/theme';
 
 interface Props {
   name: string;
@@ -38,6 +38,8 @@ function useReduceMotion(): boolean {
 }
 
 export function RoutineCard({ name, when, text, color, expanded, onToggle, highlight, onLayoutHeight }: Props) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const tint = routineTints(color);
   const still = useReduceMotion();
   const body = routineHasBody(text);
@@ -156,7 +158,7 @@ export function RoutineCard({ name, when, text, color, expanded, onToggle, highl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   card: { alignSelf: 'stretch', borderRadius: 16, borderWidth: 0.5, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 4 },
   disc: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
@@ -169,4 +171,4 @@ const styles = StyleSheet.create({
   divider: { height: 0.5 },
   body: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 14 },
   ring: { borderWidth: 1, borderRadius: 16 },
-});
+}));

@@ -11,13 +11,15 @@ import { getConnection } from '@/lib/bots';
 import { chatRows, type ChatRow } from '@/lib/chatState';
 import { HermesClient, toChatMessages, type FetchLike } from '@/lib/hermes';
 import { whenLabel } from '@/lib/routines';
-import { colors } from '@/lib/theme';
 import { SESSION_POLL_MS, statusLabel, WorkSessionView, type WorkItem } from '@/lib/work';
+import { makeStyles, useTheme } from '@/components/theme';
 
 // One piece of outside work, read-only, in the same look as a chat: the task it was given, the tool
 // steps collapsed into one line, and the bot's replies. While it runs this checks Hermes every few
 // seconds; it stops when the session has ended, when the screen is covered, and in the background.
 export default function WorkSessionScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { bot, id } = useLocalSearchParams<{ bot: string; id: string }>();
   const botName = useBotName(bot);
   const column = useColumnStyle();
@@ -104,7 +106,7 @@ function WorkRowView({ row, bot }: { row: ChatRow; bot: string }) {
   return row.message.role === 'user' ? <Mine message={row.message} bot={bot} /> : <Reply text={row.message.content} bot={bot} />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   head: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, gap: 2 },
   title: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
@@ -114,4 +116,4 @@ const styles = StyleSheet.create({
   working: { color: colors.dim, fontSize: 15, paddingVertical: 8 },
   empty: { color: colors.dim, fontSize: 15, textAlign: 'center', marginTop: 30, paddingHorizontal: 16 },
   error: { color: colors.bad, fontSize: 14, paddingHorizontal: 16, paddingTop: 10 },
-});
+}));

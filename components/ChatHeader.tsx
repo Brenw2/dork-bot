@@ -18,7 +18,7 @@ import type { ChatModelState } from '@/components/useChatModel';
 import { useWorkingOn } from '@/components/workWatch';
 import { WorkingOn } from '@/components/WorkingOn';
 import { providerName } from '@/lib/models';
-import { colors, mix } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/components/theme';
 
 /** "gemma4:31b · Dork": the chat's model under the bot's name. */
 export function modelLabel(m: Pick<ChatModelState, 'choice' | 'catalog' | 'error'>): string {
@@ -29,6 +29,8 @@ export function modelLabel(m: Pick<ChatModelState, 'choice' | 'catalog' | 'error
 export const openBotSheet = (bot: string) => router.push({ pathname: '/bot/[bot]', params: { bot } });
 
 export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: boolean; list?: { hidden: boolean; toggle: () => void }; model: ChatModelState }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   const work = useWorkingOn(bot);
@@ -134,6 +136,8 @@ export function ChatHeader({ bot, pane, list, model }: { bot: string; pane: bool
 
 /** Shown under the header only when the model can't work (useChatModel().problem). */
 export function ModelBanner({ bot, problem }: { bot: string; problem: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.banner} accessibilityLiveRegion="polite">
       <Icon name="warning" size={18} color={colors.bad} />
@@ -151,7 +155,7 @@ export function ModelBanner({ bot, problem }: { bot: string; problem: string }) 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg },
   barPane: { height: 56, paddingHorizontal: isDesktop ? 12 : 8, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 6 },
@@ -174,4 +178,4 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, color: colors.errorText, fontSize: 13, lineHeight: 18 },
   bannerButton: { height: 30, borderRadius: 15, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: mix(colors.bad, 0.25) },
   bannerButtonText: { color: colors.text, fontSize: 13, fontWeight: '600' },
-});
+}));
