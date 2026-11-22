@@ -9,6 +9,12 @@ const FILES: Record<string, number> = {
   'JetBrainsMono-Regular': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
   'JetBrainsMono-SemiBold': require('../assets/fonts/JetBrainsMono-SemiBold.ttf'),
   'JetBrainsMono-Bold': require('../assets/fonts/JetBrainsMono-Bold.ttf'),
+  // Arcade: Space Grotesk 400, 600, 700 (static, Latin) and Silkscreen Regular and Bold (OFL files beside them)
+  'SpaceGrotesk-Regular': require('../assets/fonts/SpaceGrotesk-Regular.ttf'),
+  'SpaceGrotesk-SemiBold': require('../assets/fonts/SpaceGrotesk-SemiBold.ttf'),
+  'SpaceGrotesk-Bold': require('../assets/fonts/SpaceGrotesk-Bold.ttf'),
+  'Silkscreen-Regular': require('../assets/fonts/Silkscreen-Regular.ttf'),
+  'Silkscreen-Bold': require('../assets/fonts/Silkscreen-Bold.ttf'),
   // Paper: Inter 400, 600, 700 and Instrument Serif Regular (Latin subsets, OFL; JetBrains Mono 400 is shared).
   'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
   'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),

@@ -294,7 +294,10 @@ const SCREENS = [
   { name: 'chat-streaming', extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: (page) => sendIn(page, 'streamer', 'plan my morning', 'for (const step of') },
   // Switching the theme with a reply on screen and a half-typed draft: nothing remounts (the same DOM nodes), the text
   // and the draft stay. Opens the sheet from the sidebar menu and taps the theme that isn't selected.
-  { name: 'theme-switch-midstream', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: switchThemeKeepsChat, anyTheme: true },
+  { name: 'theme-switch-midstream', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: (page) => switchThemeKeepsChat(page), anyTheme: true },
+  // The same, switching to Arcade (from Classic, or from whichever theme the run is in), and checking that Arcade's
+  // font files arrive and its look is applied: the page background becomes Arcade's #120F24 with the stream intact.
+  { name: 'theme-switch-midstream-arcade', postures: ['duo-open-landscape'], extraBots: ['streamer'], path: chatPath('streamer'), waitFor: 'Any time.', act: markThenDraft, check: (page) => switchThemeKeepsChat(page, /^Arcade/), anyTheme: true },
   // The reader scrolls up, then the reply starts: the 'Jump to latest' pill shows (web: a normal list; the phone's
   // inverted list is not covered here). The second screen taps it: back at the end, pill gone.
   { name: 'chat-stream-pill', extraBots: ['scroller'], path: (p) => (resetScroller(), chatPath('scroller')(p)), waitFor: 'That is all.', act: scrollUpThenStream },
@@ -381,19 +384,19 @@ async function markThenDraft(page) {
     if (text) text.__kept = true;
   });
 }
-async function switchThemeKeepsChat(page) {
+async function switchThemeKeepsChat(page, to) {
   const problems = [];
   await page.getByLabel('More', { exact: true }).first().click();
   await page.getByRole('menuitem', { name: /appearance/i }).click();
-  // LAYOUT_SWITCH_TO=<name> picks the row to tap (default: the other of Classic and Terminal), so Classic -> Paper is covered too.
-  const other = process.env.LAYOUT_SWITCH_TO ? new RegExp(`^${process.env.LAYOUT_SWITCH_TO}`, 'i') : THEME ? /^Classic/ : /^Terminal/;
+  // `to` (a regexp) picks the row for the Arcade screen; LAYOUT_SWITCH_TO=<name> picks it for the default screen (default: the other of Classic and Terminal), so Classic -> Paper is covered too.
+  const other = to ?? (process.env.LAYOUT_SWITCH_TO ? new RegExp(`^${process.env.LAYOUT_SWITCH_TO}`, 'i') : THEME ? /^Classic/ : /^Terminal/);
   await page.getByRole('radio', { name: other }).click();
   await page.waitForTimeout(600);
   const after = await page.evaluate(
     ({ draft }) => {
       const box = document.querySelector('textarea');
       const text = [...document.querySelectorAll('div,span')].find((e) => e.children.length === 0 && (e.textContent || '').includes('for (const step of'));
-      return { boxKept: !!box?.__kept, value: box?.value, textKept: !!text?.__kept, text: !!text, bg: getComputedStyle(document.body).backgroundColor, draft };
+      return { boxKept: !!box?.__kept, value: box?.value, textKept: !!text?.__kept, text: !!text, bg: (() => { const all = []; for (let e = box; e; e = e.parentElement) all.push(getComputedStyle(e).backgroundColor); return all.join('; '); })(), draft };
     },
     { draft: DRAFT },
   );
@@ -401,6 +404,7 @@ async function switchThemeKeepsChat(page) {
   if (after.value !== DRAFT) problems.push(`the draft changed: ${JSON.stringify(after.value)}`);
   if (!after.text) problems.push('the streaming text is gone after the switch');
   else if (!after.textKept) problems.push('the streaming text was remounted by the theme switch');
+  if (to && /Arcade/.test(String(to)) && !after.bg.includes('rgb(18, 15, 36)')) problems.push(`Arcade's background didn't apply: ${after.bg}`);
   await page.getByRole('button', { name: 'Done' }).first().click().catch(() => undefined);
   await page.waitForTimeout(300);
   return problems;

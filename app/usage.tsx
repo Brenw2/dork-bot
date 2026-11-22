@@ -14,8 +14,10 @@ import { maxScale } from '@/lib/type';
 
 const Header = ({ children }: { children: string }) => {
 const styles = useStyles();
+const { px } = useTheme();
+const pixel = !!px();
 return (
-  <Text style={styles.header} accessibilityRole="header">
+  <Text style={[styles.header, px()]} accessibilityRole="header" maxFontSizeMultiplier={pixel ? maxScale.mono : maxScale.body}>
     {children}
   </Text>
 );
@@ -25,7 +27,8 @@ return (
 // used. Everything comes from `hermes serve` (lib/usage.ts); nothing is stored. Refreshes once on open, on pull (↻ on
 // desktop), on returning to the app after 5 minutes, and once for each window that shows "Reset due". No timer.
 export default function UsageScreen() {
-  const { colors } = useTheme();
+  const { colors, px, caps } = useTheme();
+  const pixelTitle = !!px('display');
   const styles = useStyles();
   const column = useColumnStyle();
   const insets = useSafeAreaInsets();
@@ -83,7 +86,7 @@ export default function UsageScreen() {
             </Text>
           </Pressable>
           {scrolled ? (
-            <Text style={styles.navTitle} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome} pointerEvents="none">
+            <Text style={[styles.navTitle, caps]} accessibilityRole="header" maxFontSizeMultiplier={maxScale.chrome} pointerEvents="none">
               Usage
             </Text>
           ) : null}
@@ -104,7 +107,7 @@ export default function UsageScreen() {
           </View>
         ) : (
           <>
-            <Text style={[styles.title, scrolled && { opacity: 0 }]} accessibilityRole={scrolled ? undefined : 'header'} maxFontSizeMultiplier={maxScale.chrome}>
+            <Text style={[styles.title, scrolled && { opacity: 0 }, px('display') && { fontSize: 26, lineHeight: 34 }, px('display')]} accessibilityRole={scrolled ? undefined : 'header'} maxFontSizeMultiplier={pixelTitle ? maxScale.mono : maxScale.chrome}>
               Usage
             </Text>
             <View style={styles.updatedWrap}>

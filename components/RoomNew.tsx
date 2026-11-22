@@ -16,6 +16,7 @@ import { onColor } from '@/lib/color';
 import { nameOf } from '@/lib/names';
 import { createProblem, MAX_MEMBERS, MIN_MEMBERS } from '@/lib/rooms';
 import { makeStyles, useTheme } from '@/components/theme';
+import { maxScale } from '@/lib/type';
 
 /**
  * New group chat (comps g2): a name plus 2 to 6 of this phone's bots. The room is made on Hermes (groups.create); the
@@ -23,7 +24,8 @@ import { makeStyles, useTheme } from '@/components/theme';
  * Desktop: the panel's footer has Cancel and "Create group chat".
  */
 export function RoomNew() {
-  const { colors, label } = useTheme();
+  const { colors, label, px } = useTheme();
+  const arc = !!px();
   const styles = useStyles();
   const [bots, setBots] = useState<SavedBot[] | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
@@ -87,7 +89,7 @@ export function RoomNew() {
             </View>
           </View>
 
-          <Text style={styles.section}>
+          <Text style={[styles.section, px()]} maxFontSizeMultiplier={arc ? maxScale.mono : maxScale.body}>
             MEMBERS · {picked.length} OF {MAX_MEMBERS}
           </Text>
           {bots === null ? (

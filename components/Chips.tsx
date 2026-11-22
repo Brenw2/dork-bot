@@ -39,15 +39,19 @@ export function Chip({
   style?: StyleProp<ViewStyle>;
   numberOfLines?: number;
 }) {
-  const { colors, label: say, theme } = useTheme();
+  const { colors, label: say, theme, px } = useTheme();
   const styles = useStyles();
+  const arc = !!theme.pixel;
   // Terminal outlines a status chip (the step and answered-approval chips) with the hairline `border`.
-  const fill = status ? { backgroundColor: colors.card, ...(theme.shape.square ? { borderColor: colors.border } : null) } : selected ? { backgroundColor: tint ?? colors.accent, borderColor: tint ?? colors.accent } : { borderColor: colors.border };
+  // Arcade draws a status chip as the kit's tool chip: Silkscreen 10, no outline, radius 9.
+  const fill = status ? { backgroundColor: colors.card, ...(theme.shape.square ? { borderColor: colors.border } : null), ...(arc ? { borderWidth: 0, borderRadius: 9, paddingVertical: 4 } : null) } : selected ? { backgroundColor: tint ?? colors.accent, borderColor: tint ?? colors.accent } : { borderColor: colors.border };
   const text = status ? colors.dim : selected ? onColor(tint ?? colors.accent) : colors.text;
+  const pixelLabel = arc && status ? [{ fontSize: 10, lineHeight: 14 }, px()] : null;
+  const pixelChip = arc && status;
   const body = (
     <>
       {leading}
-      <Text style={[styles.chipText, { color: text }]} numberOfLines={numberOfLines} maxFontSizeMultiplier={maxScale.chrome}>
+      <Text style={[styles.chipText, { color: text }, pixelLabel]} numberOfLines={numberOfLines} maxFontSizeMultiplier={pixelChip ? maxScale.mono : maxScale.chrome}>
         {say(label)}
       </Text>
       {trailing}
@@ -79,10 +83,11 @@ export function Chip({
 /** "Needs you": 20 tall, radius 10, `bad` fill, 12 bold, `badgeText` color. List rows, room rows and the transcript. */
 export function Badge({ label }: { label: string }) {
   const styles = useStyles();
-  const { label: say } = useTheme();
+  const { label: say, theme, px, depth, colors } = useTheme();
+  const arc = !!theme.pixel;
   return (
-    <View style={styles.badge}>
-      <Text style={styles.badgeText} maxFontSizeMultiplier={maxScale.chrome}>
+    <View style={[styles.badge, arc && { backgroundColor: colors.needsYou ?? colors.bad, borderRadius: 6, paddingVertical: 4, paddingHorizontal: 6 }, depth()]}>
+      <Text style={[styles.badgeText, arc && { fontSize: 9, lineHeight: 12 }, px()]} maxFontSizeMultiplier={arc ? maxScale.mono : maxScale.chrome}>
         {say(label)}
       </Text>
     </View>

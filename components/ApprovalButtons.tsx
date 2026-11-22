@@ -26,7 +26,7 @@ export function ApprovalButtons({
   dim?: boolean;
   onAnswer: (choice: string) => void;
 }) {
-  const { colors, mix, label, theme } = useTheme();
+  const { colors, mix, label, theme, caps, depth } = useTheme();
   const styles = useStyles();
   const rows: string[][] = [];
   if (desk) rows.push(choices);
@@ -36,6 +36,8 @@ export function ApprovalButtons({
   const text = (c: string) => (c === 'once' ? onColor(color) : c === 'deny' ? colors.bad : colors.text);
   // Terminal: the choices that do something read [ label ]; Deny stays a plain word in its red outline.
   const shown = (c: string) => (theme.shape.brackets && c !== 'deny' ? `[${label(labels[c] ?? c)}]` : label(labels[c] ?? c));
+  // Arcade (kit): the small button corner (10) and, on the choices that do something, the pressable edge.
+  const look = (c: string) => (theme.pixel ? [{ borderRadius: theme.pixel.radii.small }, c === 'deny' ? null : depth()] : null);
   return (
     <View style={styles.buttons}>
       {rows.map((row, r) => (
@@ -48,9 +50,9 @@ export function ApprovalButtons({
               accessibilityRole="button"
               accessibilityLabel={labels[c] ?? c}
               testID={`approval-${c}`}
-              style={({ pressed }) => [styles.button, { minHeight: height }, fill(c), (pressed || dim) && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.button, { minHeight: height }, fill(c), look(c), (pressed || dim) && { opacity: 0.6 }]}
             >
-              <Text style={[styles.text, { color: text(c) }]} numberOfLines={2} maxFontSizeMultiplier={maxScale.chrome}>
+              <Text style={[styles.text, { color: text(c) }, caps]} numberOfLines={2} maxFontSizeMultiplier={maxScale.chrome}>
                 {shown(c)}
               </Text>
             </Pressable>

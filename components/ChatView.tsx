@@ -641,8 +641,12 @@ function RoutineNoteView({ note, bot, ctx }: { note: NonNullable<ChatMessage['ro
 export function Reply({ text, bot, streaming = false }: { text: string; bot: string; streaming?: boolean }) {
   const styles = useStyles();
   const { color } = useBotLook(bot);
+  const { theme, depth } = useTheme();
+  // Arcade: the reply sits in a card with a 2 pt border, a 6 pt top-left corner and the pressable edge.
+  const px = theme.pixel;
+  const card = px ? [styles.replyCard, { borderRadius: 20, borderColor: px.replyBorder, borderTopLeftRadius: px.radii.tail }, depth()] : null;
   return (
-    <View style={styles.reply}>
+    <View style={[styles.reply, card]}>
       <MessageMenu text={text} bot={bot}>
         {streaming ? <StreamingMarkdown text={text} accent={color} /> : <Markdown text={text} accent={color} />}
       </MessageMenu>
@@ -652,15 +656,18 @@ export function Reply({ text, bot, streaming = false }: { text: string; bot: str
 
 /** What you sent: a bubble tinted with the bot's color, with any pictures above the text. */
 export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
-  const { mix, theme, colors } = useTheme();
+  const { mix, theme, colors, skin, depth } = useTheme();
   const styles = useStyles();
   const { color } = useBotLook(bot);
   const local = message.localImages ?? [];
   const remote = local.length ? [] : (message.images ?? []);
   const rule = theme.shape.userRule;
+  // Arcade: the bubble is the theme's `user` cyan (not the bot's color), a 6 pt tail corner, a darker edge, semibold text.
+  const px = theme.pixel;
   // Paper: your bubble is the theme's ink (not the bot's color) with a small tail corner at the bottom right.
   const solid = !!theme.shape.solidBubble;
   const tail = theme.shape.tail ?? 18;
+  const bubble = px ? [styles.bubble, { backgroundColor: colors.user, borderBottomRightRadius: px.radii.tail }, depth(px.userDepth)] : [styles.bubble, { backgroundColor: solid ? colors.user : mix(color, 0.3) }, solid && { borderBottomRightRadius: tail }];
   return (
     <View style={[styles.mine, rule ? styles.mineRule : { maxWidth: isDesktop ? '70%' : '78%' }]}>
       {local.length || remote.length ? (
@@ -675,13 +682,13 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
       ) : null}
       {message.content ? (
         // Terminal: your message is a full-width row with a rule at the left and a prompt mark, not a bubble.
-        <MessageMenu text={message.content} bot={bot} raw style={rule ? styles.ruleRow : [styles.bubble, { backgroundColor: solid ? colors.user : mix(color, 0.3) }, solid && { borderBottomRightRadius: tail }]}>
+        <MessageMenu text={message.content} bot={bot} raw style={rule ? styles.ruleRow : bubble}>
           {rule ? (
             <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no" maxFontSizeMultiplier={maxScale.mono}>
               {PROMPT}
             </Text>
           ) : null}
-          <Text style={[styles.text, { color: colors.userText }, rule && styles.ruleText]} selectable={WEB_SELECT}>
+          <Text style={[styles.text, { color: colors.userText }, rule && styles.ruleText, px && skin({ fontWeight: '600' })]} selectable={WEB_SELECT}>
             {message.content}
           </Text>
         </MessageMenu>
@@ -749,6 +756,8 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   prompt: { color: colors.accent, fontSize: BODY_SIZE, lineHeight: 22, fontWeight: '700' },
   ruleText: { flex: 1 },
   reply: { alignSelf: 'stretch', paddingRight: 4 },
+  // Arcade: the reply card (colors and the 6 pt corner come from the theme at the use site)
+  replyCard: { backgroundColor: colors.card, borderWidth: 2, padding: 12, paddingRight: 12 },
   pictures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   picture: { borderRadius: 14, backgroundColor: colors.card },
   picturePlaceholder: { alignItems: 'center', justifyContent: 'center' },

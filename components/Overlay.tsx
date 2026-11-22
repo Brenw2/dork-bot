@@ -17,7 +17,7 @@ import { makeStyles, useTheme } from '@/components/theme';
  * `popover`: the bot sheet, a 360 wide popover under the chat title instead of a centered panel.
  */
 export function Overlay({ title, bot, popover = false, children }: { title: string; bot?: string; popover?: boolean; children: ReactNode }) {
-  const { colors, label } = useTheme();
+  const { colors, label, theme, caps } = useTheme();
   const styles = useStyles();
   const { width, height } = useWindowDimensions();
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -38,7 +38,7 @@ export function Overlay({ title, bot, popover = false, children }: { title: stri
     return (
       <View style={StyleSheet.absoluteFill}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" accessible={false} />
-        <View style={[styles.popover, { left, width: Math.min(360, width - 32), maxHeight: height - 72 }]} accessibilityRole="none" aria-modal role="dialog" aria-label={title}>
+        <View style={[styles.popover, theme.pixel && { borderRadius: theme.pixel.radii.menu }, { left, width: Math.min(360, width - 32), maxHeight: height - 72 }]} accessibilityRole="none" aria-modal role="dialog" aria-label={title}>
           {children}
         </View>
       </View>
@@ -49,7 +49,7 @@ export function Overlay({ title, bot, popover = false, children }: { title: stri
     <View style={styles.backdrop}>
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" accessible={false} />
       <View
-        style={[styles.panel, { width: Math.min(560, width - 32), height: Math.min(760, height - 48) }]}
+        style={[styles.panel, theme.pixel && { borderRadius: theme.pixel.radii.sheet }, { width: Math.min(560, width - 32), height: Math.min(760, height - 48) }]}
         accessibilityRole="none"
         aria-modal
         role="dialog"
@@ -58,7 +58,7 @@ export function Overlay({ title, bot, popover = false, children }: { title: stri
         <View style={styles.header}>
           {bot ? <BotAvatar bot={bot} size={32} /> : null}
           <View style={styles.titles}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text style={[styles.title, caps]} numberOfLines={1}>
               {label(title)}
             </Text>
             {bot ? (

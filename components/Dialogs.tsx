@@ -63,7 +63,7 @@ const MENU_WIDTH = 248;
 const ITEM_H = 32;
 
 function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>; close: () => void }) {
-  const { colors, label } = useTheme();
+  const { colors, label, theme } = useTheme();
   const styles = useStyles();
   const { width, height } = useWindowDimensions();
   useEscape(close);
@@ -92,7 +92,7 @@ function MenuView({ spec, close }: { spec: Extract<DialogSpec, { kind: 'menu' }>
   return (
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
-      <View style={[styles.menu, { left, top, width: MENU_WIDTH }]} role="menu" aria-label={spec.title}>
+      <View style={[styles.menu, theme.pixel && { borderRadius: theme.pixel.radii.menu }, { left, top, width: MENU_WIDTH }]} role="menu" aria-label={spec.title}>
         {items.map((it, i) => (
           <View key={i}>
             {it.sepBefore ? <View style={styles.menuSep} /> : null}

@@ -37,7 +37,7 @@ export function FailureBanner({ failure, name, secondsToRetry, onRetry, onPair }
  * Hermes's raw error, selectable, with Copy. Never paraphrases Hermes: its message is quoted after "Hermes said:".
  */
 export function FailureCard({ failure, bot, name, onAgain, onNewChat, onRetryUnsent }: { failure: Failure; bot: string; name: string; onAgain: () => void; onNewChat: () => void; onRetryUnsent: () => void }) {
-  const { colors, label } = useTheme();
+  const { colors, label, caps, theme } = useTheme();
   const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -48,16 +48,16 @@ export function FailureCard({ failure, bot, name, onAgain, onNewChat, onRetryUns
         <View style={styles.bang}>
           <Text style={styles.bangText}>!</Text>
         </View>
-        <Text style={styles.unsentText}>{view.text}</Text>
+        <Text style={[styles.unsentText, caps]}>{view.text}</Text>
       </Pressable>
     );
   }
   if (view.place !== 'card') return null;
   return (
-    <View style={styles.card} accessibilityLiveRegion="polite" testID="failure-card">
+    <View style={[styles.card, theme.pixel && { borderRadius: theme.pixel.radii.card }]} accessibilityLiveRegion="polite" testID="failure-card">
       <View style={styles.cardTitle}>
         <Icon name="warning" size={18} color={colors.bad} />
-        <Text style={styles.title} maxFontSizeMultiplier={maxScale.chrome}>
+        <Text style={[styles.title, caps]} maxFontSizeMultiplier={maxScale.chrome}>
           {label(view.title)}
         </Text>
       </View>

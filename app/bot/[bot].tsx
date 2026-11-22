@@ -24,7 +24,7 @@ type Path = '/look/[bot]' | '/chats/[bot]' | '/routines/[bot]' | '/connectors/[b
 // tapping the chat's title, long-pressing a bot in the list, or "Bot settings" in the chat's ⋯.
 // iPhone and Duo: a sheet with Done. Desktop: a 360 wide popover under the title.
 export default function BotSheet() {
-  const { colors, switchProps, label } = useTheme();
+  const { colors, switchProps, label, caps, depth } = useTheme();
   const styles = useStyles();
   const { bot } = useLocalSearchParams<{ bot: string }>();
   const name = useBotName(bot);
@@ -86,9 +86,9 @@ export default function BotSheet() {
         </View>
         <View style={styles.tiles}>
           {tiles.map((t) => (
-            <Pressable key={t.label} onPress={() => go(t.path)} accessibilityRole="button" accessibilityLabel={`${t.label} for ${name}`} style={({ pressed }) => [styles.tile, pressed && { backgroundColor: colors.raised }]}>
+            <Pressable key={t.label} onPress={() => go(t.path)} accessibilityRole="button" accessibilityLabel={`${t.label} for ${name}`} style={({ pressed }) => [styles.tile, depth(), pressed && { backgroundColor: colors.raised }]}>
               <Icon name={t.icon} size={22} color={color} />
-              <Text style={styles.tileLabel} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
+              <Text style={[styles.tileLabel, caps]} numberOfLines={1} maxFontSizeMultiplier={maxScale.chrome}>
                 {label(t.label)}
               </Text>
             </Pressable>

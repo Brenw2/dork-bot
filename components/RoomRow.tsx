@@ -25,7 +25,8 @@ export function RoomListRow({
   selected?: boolean;
   compact?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, theme, caps, depth } = useTheme();
+  const arc = !!theme.pixel;
   const styles = useStyles();
   const [hovered, setHovered] = useState(false);
   const big = !isDesktop;
@@ -88,22 +89,22 @@ export function RoomListRow({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       accessibilityHint="Opens the group chat."
-      style={({ pressed }) => [styles.row, (pressed || selected) && { backgroundColor: colors.raised }]}
+      style={({ pressed }) => [styles.row, arc && styles.rowCard, arc && depth(), (pressed || selected) && { backgroundColor: colors.raised }]}
     >
-      <View style={styles.rowAvatar}>
+      <View style={[styles.rowAvatar, arc && styles.rowAvatarCard]}>
         <MemberStack profiles={row.members.map((m) => m.profile)} size={52} />
       </View>
-      <View style={styles.rowBody}>
-        <View style={styles.rowInner}>
+      <View style={[styles.rowBody, arc && styles.rowBodyCard]}>
+        <View style={[styles.rowInner, arc && styles.rowInnerCard]}>
           <View style={styles.line1}>
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={[styles.name, arc && styles.nameArc, caps]} numberOfLines={1}>
               {row.name}
               <Text style={styles.count}> · {row.count}</Text>
             </Text>
             <Text style={styles.time}>
               {time}
             </Text>
-            <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />
+            {arc ? null : <Icon name="chevron" size={14} color={colors.chevron} stroke={2.4} />}
           </View>
           <View style={styles.line2}>
             <Text style={styles.preview} numberOfLines={2}>
@@ -118,8 +119,14 @@ export function RoomListRow({
 }
 
 // Numbers copied from BotList.tsx so room rows and bot rows line up.
-const useStyles = makeStyles(({ colors }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, theme: { pixel } }) => StyleSheet.create({
   row: { flexDirection: 'row', minHeight: 76 },
+  // Arcade: a card like the bot rows (see BotList.tsx).
+  rowCard: { alignItems: 'center', minHeight: 0, marginHorizontal: 12, marginBottom: 8, paddingVertical: 9, paddingLeft: 9, paddingRight: 12, backgroundColor: colors.card, borderRadius: pixel?.radii.row ?? 12 },
+  rowAvatarCard: { width: 64, paddingLeft: 0, paddingTop: 0 },
+  rowBodyCard: { borderBottomWidth: 0 },
+  rowInnerCard: { paddingTop: 0, paddingBottom: 0, paddingRight: 0 },
+  nameArc: { fontWeight: '700', fontSize: 16, lineHeight: 22, letterSpacing: 0.3 },
   rowAvatar: { width: 80, paddingLeft: 16, paddingTop: 12 },
   rowBody: { flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowInner: { paddingTop: 10, paddingBottom: 10, paddingRight: 16, gap: 1 },

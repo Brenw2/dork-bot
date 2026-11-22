@@ -15,6 +15,7 @@ import { splitStreaming } from '@/lib/streamBlocks';
 import { decodeEntities } from '@/lib/plainText';
 import { makeStyles, useTheme } from '@/components/theme';
 import type { Colors } from '@/lib/themes';
+import { maxScale } from '@/lib/type';
 
 // Code shows the exact characters: no ligatures (">=" must not turn into "≥"), and a real
 // programming font where the desktop has one.
@@ -56,7 +57,7 @@ export const Markdown = memo(function Markdown({ text, accent }: { text: string;
     }
   }, [text]);
   if (!tokens) return <Text style={styles.p}>{text}</Text>;
-  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets, serif: theme.fonts?.display, ink: botText })}</View>;
+  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets, arc: !!theme.pixel, serif: theme.pixel ? undefined : theme.fonts?.display, ink: botText })}</View>;
 });
 
 function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): ReactNode[] {
@@ -88,7 +89,7 @@ function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): Re
         const h = t as Tokens.Heading;
         // Terminal: a heading is the accent color behind its "##" marks, like markdown source.
         out.push(
-          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1], look.marks && { color: colors.accent }, look.serif && h.depth <= 2 && { fontFamily: look.serif, fontSize: 28, lineHeight: 32, marginTop: 8 }]} selectable={SELECTABLE} accessibilityRole="header">
+          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1], look.arc && h.depth === 1 && { fontSize: 19, lineHeight: 26 }, look.marks && { color: colors.accent }, look.serif && h.depth <= 2 && { fontFamily: look.serif, fontSize: 28, lineHeight: 32, marginTop: 8 }]} selectable={SELECTABLE} accessibilityRole="header">
             {look.marks ? `${'#'.repeat(Math.min(h.depth, 6))} ` : null}
             {inline(h.tokens, accent, look)}
           </Text>,
@@ -231,9 +232,12 @@ const decode = decodeEntities;
 
 /** `plain`: no colouring (a fence still being written: colours would flicker as the code grows). */
 export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: string; plain?: boolean }) {
-  const { colors, theme, label: say } = useTheme();
+  const { colors, theme, label: say, px } = useTheme();
   const styles = useStyles();
   const term = theme.shape.brackets;
+  // Arcade: the code header is Silkscreen 9 in caps (the language and Copy); the block keeps Classic's 12 corner.
+  const arc = !!theme.pixel;
+  const header = arc ? [{ fontSize: 9, lineHeight: 12 }, px()] : null;
   const [copied, setCopied] = useState(false);
   const lines = useMemo(() => highlight(code.replace(/\n$/, ''), plain ? undefined : lang), [code, lang, plain]);
   const label = languageFor(lang) ?? (lang?.trim() || 'text');
@@ -243,12 +247,12 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <View style={styles.code}>
+    <View style={[styles.code, arc && { borderRadius: 12 }]}>
       <View style={styles.codeHeader}>
-        <Text style={styles.codeLang}>{label}</Text>
+        <Text style={[styles.codeLang, header]} maxFontSizeMultiplier={arc ? maxScale.mono : maxScale.body}>{label}</Text>
         <Pressable onPress={copy} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={copied ? 'Copied' : 'Copy code'} style={styles.copy}>
-          {copied || term || theme.shape.circleButtons ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
-          <Text style={[styles.copyText, term && { color: colors.accent }]}>{say(copied ? 'Copied' : 'Copy')}</Text>
+          {copied || term || arc || theme.shape.circleButtons ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
+          <Text style={[styles.copyText, (term || arc) && { color: colors.accent }, header]} maxFontSizeMultiplier={arc ? maxScale.mono : maxScale.body}>{say(copied ? 'Copied' : 'Copy')}</Text>
         </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.codeScroll}>
@@ -307,7 +311,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
   );
 }
 
-type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. */ marks?: boolean; /** Paper: the serif for h1 and h2 (28). */ serif?: string; /** A bot-colored link as the theme reads it (Paper darkens it). */ ink?: (hex: string) => string };
+type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. Arcade: the first heading level is the kit's 19 (Space Grotesk bold). */ marks?: boolean; arc?: boolean; /** Paper: the serif for h1 and h2 (28). */ serif?: string; /** A bot-colored link as the theme reads it (Paper darkens it). */ ink?: (hex: string) => string };
 const BODY = BODY_SIZE;
 const heading = (colors: Colors): TextStyle[] => [
   { fontSize: 22, marginTop: 6 },

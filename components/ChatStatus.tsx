@@ -180,19 +180,21 @@ function useSecondsLeft(): number {
  * bot's next step would be, and scrolls with the chat. One tap answers; while it's in flight the buttons dim.
  */
 export function ApprovalCard({ request, bot, busy, onAnswer }: { request: ApprovalRequest; bot: string; busy: boolean; onAnswer: (choice: ApprovalChoice) => void }) {
-  const { colors, mix, label } = useTheme();
+  const { colors, mix, label, theme, caps, depth } = useTheme();
   const styles = useStyles();
   const { color } = useBotLook(bot);
   const name = useBotName(bot);
   const desk = useDesk();
   const left = useSecondsLeft();
   const buttons = approvalOrder(request.choices, desk);
+  // Arcade (kit): the card's line is the plain `border` and it has the pressable edge.
+  const arc = !!theme.pixel;
   return (
-    <View testID="approval-card" style={[styles.approval, { borderColor: mix(color, 0.55) }, desk && { maxWidth: 560 }]} accessibilityLiveRegion="polite">
+    <View testID="approval-card" style={[styles.approval, { borderColor: arc ? colors.border : mix(color, 0.55) }, depth(), desk && { maxWidth: 560 }]} accessibilityLiveRegion="polite">
       <View style={styles.approvalHead}>
         <BotSprite bot={bot} size={24} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.approvalTitle} maxFontSizeMultiplier={maxScale.chrome}>
+          <Text style={[styles.approvalTitle, caps]} maxFontSizeMultiplier={maxScale.chrome}>
             {label('Run this command?')}
           </Text>
           <Text style={styles.approvalSub} maxFontSizeMultiplier={maxScale.chrome} numberOfLines={1}>
