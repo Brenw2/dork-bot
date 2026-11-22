@@ -17,6 +17,18 @@ describe('Select Text wiring', () => {
     expect(src).toMatch(/fontFamily: mono/); // code stays monospaced
   });
 
+  it('does not cap the input with numberOfLines (card 34: on iOS that showed only the first line)', () => {
+    const src = read('app/select-text.tsx');
+    expect(src).not.toMatch(/numberOfLines=\{(?!Platform\.OS === 'web' \? 1 : undefined\})/); // only web rows=1, never a cap on the phone
+    // the height comes from the full content size, snapped to whole lines
+    expect(src).toContain('onContentSizeChange');
+    expect(src).toContain('contentSize.height / lineHeight');
+    // the layout suite renders a long message and checks every line is shown
+    const layout = read('scripts/test-layout.mjs');
+    expect(layout).toContain("name: 'select-text-long'");
+    expect(layout).toContain('checkSelectLong');
+  });
+
   it('is a registered sheet route', () => {
     const layout = read('app/_layout.tsx');
     expect(layout).toContain("'select-text'");
