@@ -90,7 +90,7 @@ export function PageHeader({ pane, list, tint, title, children }: { pane: boolea
     return () => globalThis.removeEventListener?.('keydown', onKey);
   }, [list]);
   return (
-    <View style={[styles.bar, pane ? styles.barPane : { minHeight: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4 }]}>
+    <View style={[styles.bar, pane ? styles.barPane : { minHeight: 52 + insets.top, paddingTop: insets.top, paddingLeft: 4, paddingRight: theme.shape.circleButtons ? 10 : 0 }]}>
       {pane ? (
         list ? <HeaderButton icon="sidebar" color={colors.dim} label={list.hidden ? 'Show the bot list' : 'Hide the bot list'} onPress={list.toggle} /> : null
       ) : (

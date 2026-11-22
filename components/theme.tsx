@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { applyScrollbars } from '@/components/webStyles';
 import { loadThemeFonts } from '@/components/themeFonts';
 import { mix as mixOn } from '@/lib/color';
+import { readableOn } from '@/lib/botInk';
 import * as SecureStore from '@/lib/secureStore';
 import { DEFAULT_THEME, parseTheme, THEMES, type Theme, type ThemeId } from '@/lib/themes';
 import { skinSheet, skinStyle, themed } from '@/lib/themeSkin';
@@ -23,6 +24,8 @@ export interface ThemeApi {
   label: (text: string) => string;
   /** An inline style (one written in a component, not in makeStyles) drawn for this theme: its font, its corners. */
   skin: <T>(style: T) => T;
+  /** Text in a bot's color: as is, except on Paper, where it is darkened until it reads (4.5:1; pass 3 for bold names). */
+  botText: (hex: string, min?: number) => string;
 }
 
 function api(theme: Theme, setTheme: (id: ThemeId) => void): ThemeApi {
@@ -35,6 +38,7 @@ function api(theme: Theme, setTheme: (id: ThemeId) => void): ThemeApi {
     setTheme,
     label: (text) => themed(theme, text),
     skin: (style) => skinStyle(style, theme),
+    botText: (hex, min) => (theme.shape.inkBotText ? readableOn(hex, min) : hex),
   };
 }
 

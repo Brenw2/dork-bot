@@ -76,6 +76,8 @@ export interface Shape {
   listCard?: boolean;
   /** Header icon buttons sit in a circle: white with a hairline, and the primary one (+) in the accent. */
   circleButtons?: boolean;
+  /** Bot-colored text (links, member names, @mentions, "Working on") is darkened until it reads on the light surfaces. */
+  inkBotText?: boolean;
 }
 
 export interface Theme {
@@ -220,7 +222,7 @@ export const THEMES: Record<ThemeId, Theme> = {
       send: 'accent',
     },
     fonts: { regular: 'Inter-Regular', semibold: 'Inter-SemiBold', bold: 'Inter-Bold', mono: 'JetBrainsMono-Regular', display: 'InstrumentSerif-Regular' },
-    shape: { square: false, lowercase: false, userRule: false, brackets: false, dashed: false, radii: { 12: 22, 14: 22, 16: 22, 18: 20 }, solidBubble: true, tail: 6, ring: 1.5, listCard: true, circleButtons: true },
+    shape: { square: false, lowercase: false, userRule: false, brackets: false, dashed: false, radii: { 12: 22, 14: 22, 16: 22, 18: 20 }, solidBubble: true, tail: 6, ring: 1.5, listCard: true, circleButtons: true, inkBotText: true },
   },
 };
 

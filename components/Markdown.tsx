@@ -46,7 +46,7 @@ export function StreamingMarkdown({ text, accent }: { text: string; accent: stri
 }
 
 export const Markdown = memo(function Markdown({ text, accent }: { text: string; accent: string }) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, botText } = useTheme();
   const styles = useStyles();
   const tokens = useMemo(() => {
     try {
@@ -56,7 +56,7 @@ export const Markdown = memo(function Markdown({ text, accent }: { text: string;
     }
   }, [text]);
   if (!tokens) return <Text style={styles.p}>{text}</Text>;
-  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets, serif: theme.fonts?.display })}</View>;
+  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets, serif: theme.fonts?.display, ink: botText })}</View>;
 });
 
 function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): ReactNode[] {
@@ -194,7 +194,7 @@ function inline(tokens: Token[] | undefined, accent: string, look: Look): ReactN
         return (
           <Text
             key={i}
-            style={[styles.link, { color: accent }]}
+            style={[styles.link, { color: look.ink?.(accent) ?? accent }]}
             numberOfLines={bare ? 1 : undefined}
             onPress={() => void Linking.openURL(l.href)}
             onLongPress={() => void Clipboard.setStringAsync(l.href)}
@@ -208,7 +208,7 @@ function inline(tokens: Token[] | undefined, accent: string, look: Look): ReactN
       case 'image': {
         const im = t as Tokens.Image;
         return (
-          <Text key={i} style={[styles.link, { color: accent }]} onPress={() => void Linking.openURL(im.href)} accessibilityRole="link">
+          <Text key={i} style={[styles.link, { color: look.ink?.(accent) ?? accent }]} onPress={() => void Linking.openURL(im.href)} accessibilityRole="link">
             {im.text || im.href}
           </Text>
         );
@@ -274,9 +274,9 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
 }
 
 function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
-  const { colors } = useTheme();
+  const { colors, botText } = useTheme();
   const styles = useStyles();
-  const look = { styles, colors };
+  const look = { styles, colors, ink: botText };
   // Column width from its longest cell, within limits, so wide tables scroll sideways.
   const widths = table.header.map((h, c) => {
     const longest = Math.max(h.text.length, ...table.rows.map((r) => r[c]?.text.length ?? 0));
@@ -307,7 +307,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
   );
 }
 
-type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. */ marks?: boolean; /** Paper: the serif for h1 and h2 (28). */ serif?: string };
+type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. */ marks?: boolean; /** Paper: the serif for h1 and h2 (28). */ serif?: string; /** A bot-colored link as the theme reads it (Paper darkens it). */ ink?: (hex: string) => string };
 const BODY = BODY_SIZE;
 const heading = (colors: Colors): TextStyle[] => [
   { fontSize: 22, marginTop: 6 },
