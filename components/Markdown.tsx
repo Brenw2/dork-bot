@@ -46,7 +46,7 @@ export function StreamingMarkdown({ text, accent }: { text: string; accent: stri
 }
 
 export const Markdown = memo(function Markdown({ text, accent }: { text: string; accent: string }) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, botText } = useTheme();
   const styles = useStyles();
   const tokens = useMemo(() => {
     try {
@@ -56,7 +56,7 @@ export const Markdown = memo(function Markdown({ text, accent }: { text: string;
     }
   }, [text]);
   if (!tokens) return <Text style={styles.p}>{text}</Text>;
-  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets })}</View>;
+  return <View style={styles.doc}>{blocks(tokens, accent, { styles, colors, marks: theme.shape.brackets, serif: theme.fonts?.display, ink: botText })}</View>;
 });
 
 function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): ReactNode[] {
@@ -88,7 +88,7 @@ function blocks(tokens: Token[], accent: string, look: Look, keyPrefix = ''): Re
         const h = t as Tokens.Heading;
         // Terminal: a heading is the accent color behind its "##" marks, like markdown source.
         out.push(
-          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1], look.marks && { color: colors.accent }]} selectable={SELECTABLE} accessibilityRole="header">
+          <Text key={key} style={[styles.h, heading(colors)[Math.min(h.depth, 4) - 1], look.marks && { color: colors.accent }, look.serif && h.depth <= 2 && { fontFamily: look.serif, fontSize: 28, lineHeight: 32, marginTop: 8 }]} selectable={SELECTABLE} accessibilityRole="header">
             {look.marks ? `${'#'.repeat(Math.min(h.depth, 6))} ` : null}
             {inline(h.tokens, accent, look)}
           </Text>,
@@ -194,7 +194,7 @@ function inline(tokens: Token[] | undefined, accent: string, look: Look): ReactN
         return (
           <Text
             key={i}
-            style={[styles.link, { color: accent }]}
+            style={[styles.link, { color: look.ink?.(accent) ?? accent }]}
             numberOfLines={bare ? 1 : undefined}
             onPress={() => void Linking.openURL(l.href)}
             onLongPress={() => void Clipboard.setStringAsync(l.href)}
@@ -208,7 +208,7 @@ function inline(tokens: Token[] | undefined, accent: string, look: Look): ReactN
       case 'image': {
         const im = t as Tokens.Image;
         return (
-          <Text key={i} style={[styles.link, { color: accent }]} onPress={() => void Linking.openURL(im.href)} accessibilityRole="link">
+          <Text key={i} style={[styles.link, { color: look.ink?.(accent) ?? accent }]} onPress={() => void Linking.openURL(im.href)} accessibilityRole="link">
             {im.text || im.href}
           </Text>
         );
@@ -247,7 +247,7 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
       <View style={styles.codeHeader}>
         <Text style={styles.codeLang}>{label}</Text>
         <Pressable onPress={copy} hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={copied ? 'Copied' : 'Copy code'} style={styles.copy}>
-          {copied || term ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
+          {copied || term || theme.shape.circleButtons ? null : <Icon name="copy" size={15} color={colors.text} stroke={2.88} />}
           <Text style={[styles.copyText, term && { color: colors.accent }]}>{say(copied ? 'Copied' : 'Copy')}</Text>
         </Pressable>
       </View>
@@ -257,7 +257,7 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
             <Text key={i}>
               {line.map((tok, j) =>
                 tok.scope ? (
-                  <Text key={j} style={{ color: colorFor(tok.scope) }}>
+                  <Text key={j} style={{ color: colorFor(tok.scope, theme.statusBar === 'dark') }}>
                     {tok.text}
                   </Text>
                 ) : (
@@ -274,9 +274,9 @@ export function CodeBlock({ code, lang, plain = false }: { code: string; lang?: 
 }
 
 function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
-  const { colors } = useTheme();
+  const { colors, botText } = useTheme();
   const styles = useStyles();
-  const look = { styles, colors };
+  const look = { styles, colors, ink: botText };
   // Column width from its longest cell, within limits, so wide tables scroll sideways.
   const widths = table.header.map((h, c) => {
     const longest = Math.max(h.text.length, ...table.rows.map((r) => r[c]?.text.length ?? 0));
@@ -307,7 +307,7 @@ function Table({ table, accent }: { table: Tokens.Table; accent: string }) {
   );
 }
 
-type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. */ marks?: boolean };
+type Look = { styles: ReturnType<typeof useStyles>; colors: Colors; /** Terminal: headings show their ## marks, in the accent. */ marks?: boolean; /** Paper: the serif for h1 and h2 (28). */ serif?: string; /** A bot-colored link as the theme reads it (Paper darkens it). */ ink?: (hex: string) => string };
 const BODY = BODY_SIZE;
 const heading = (colors: Colors): TextStyle[] => [
   { fontSize: 22, marginTop: 6 },
@@ -316,7 +316,7 @@ const heading = (colors: Colors): TextStyle[] => [
   { fontSize: 16, color: colors.dim },
 ];
 
-const useStyles = makeStyles(({ colors }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, theme: { shape } }) => StyleSheet.create({
   doc: { gap: 10 },
   p: { color: colors.text, fontSize: BODY, lineHeight: 24 },
   h: { color: colors.text, fontWeight: '700', lineHeight: 28 },
@@ -339,7 +339,8 @@ const useStyles = makeStyles(({ colors }) => StyleSheet.create({
   number: { minWidth: 22, fontVariant: ['tabular-nums'] },
   itemBody: { flex: 1, gap: 6 },
   hr: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 6 },
-  code: { backgroundColor: colors.code, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
+  // Paper: a code block's corners are 15 (the skin would make Classic's 12 into 22), per the kit.
+  code: { backgroundColor: colors.code, borderRadius: shape.radii ? 15 : 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, overflow: 'hidden' },
   codeHeader: {
     flexDirection: 'row',
     alignItems: 'center',

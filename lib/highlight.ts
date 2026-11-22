@@ -155,7 +155,60 @@ export const CODE_COLORS: Record<string, string> = {
   'template-tag': '#C792EA',
 };
 
-export function colorFor(scope: string | null): string | undefined {
+export function colorFor(scope: string | null, light = false): string | undefined {
   if (!scope) return undefined;
-  return CODE_COLORS[scope] ?? CODE_COLORS[scope.split('.')[0]];
+  const set = light ? LIGHT_CODE_COLORS : CODE_COLORS;
+  return set[scope] ?? set[scope.split('.')[0]];
 }
+
+/**
+ * Syntax colors for a light code block (Paper, THEMES.md: keyword #8A3FD1, function #1F5FD1, number #C2410C; the rest
+ * follow the same roles, darkened to read on white). No yellow or gold: types and classes are teal.
+ */
+export const LIGHT_CODE_COLORS: Record<string, string> = {
+  keyword: '#8A3FD1',
+  built_in: '#1F5FD1',
+  type: '#0E7490',
+  literal: '#C2410C',
+  number: '#C2410C',
+  string: '#2F7D4F',
+  regexp: '#0E7490',
+  subst: '#141414',
+  symbol: '#C2410C',
+  class: '#0E7490',
+  function: '#1F5FD1',
+  title: '#1F5FD1',
+  'title.class': '#0E7490',
+  'title.function': '#1F5FD1',
+  params: '#141414',
+  comment: '#8A8A82',
+  doctag: '#8A3FD1',
+  meta: '#0E7490',
+  'meta keyword': '#0E7490',
+  'meta string': '#2F7D4F',
+  section: '#1F5FD1',
+  tag: '#B4281E',
+  name: '#B4281E',
+  attr: '#0E7490',
+  attribute: '#0E7490',
+  variable: '#B4281E',
+  'variable.language': '#B4281E',
+  property: '#0F766E',
+  operator: '#475569',
+  punctuation: '#6E6E68',
+  bullet: '#0E7490',
+  code: '#2F7D4F',
+  emphasis: '#141414',
+  strong: '#141414',
+  formula: '#8A3FD1',
+  link: '#1F5FD1',
+  quote: '#8A8A82',
+  addition: '#1F7A52',
+  deletion: '#D63A2F',
+  selector: '#8A3FD1',
+  'selector-tag': '#8A3FD1',
+  'selector-class': '#0E7490',
+  'selector-id': '#C2410C',
+  'template-variable': '#B4281E',
+  'template-tag': '#8A3FD1',
+};

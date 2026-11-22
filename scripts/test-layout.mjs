@@ -26,7 +26,9 @@ import { checkBanner, checkButtons, checkConnectorDetail, checkConnectors, check
 import { checkAnswered, checkApproval, checkComposer, checkThinking, checkWorking, checkWorkingLong } from './layout-fixes-345.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const DIST = join(ROOT, 'dist-web');
+// LAYOUT_DIST=<folder> exports to and serves from another folder (default dist-web), so a run never has to delete one.
+const DIST_NAME = process.env.LAYOUT_DIST || 'dist-web';
+const DIST = join(ROOT, DIST_NAME);
 // LAYOUT_THEME=terminal runs every screen in that theme (the stored Appearance choice is seeded); its screenshots go to
 // artifacts/layout-terminal so Classic's artifacts/layout stays comparable run to run.
 const THEME = process.env.LAYOUT_THEME || '';
@@ -383,7 +385,8 @@ async function switchThemeKeepsChat(page) {
   const problems = [];
   await page.getByLabel('More', { exact: true }).first().click();
   await page.getByRole('menuitem', { name: /appearance/i }).click();
-  const other = THEME === 'terminal' ? /^Classic/ : /^Terminal/;
+  // LAYOUT_SWITCH_TO=<name> picks the row to tap (default: the other of Classic and Terminal), so Classic -> Paper is covered too.
+  const other = process.env.LAYOUT_SWITCH_TO ? new RegExp(`^${process.env.LAYOUT_SWITCH_TO}`, 'i') : THEME ? /^Classic/ : /^Terminal/;
   await page.getByRole('radio', { name: other }).click();
   await page.waitForTimeout(600);
   const after = await page.evaluate(
@@ -1221,7 +1224,7 @@ async function uiPolishTests(browser, base) {
 
 async function main() {
   if (!args.includes('--no-build')) {
-    execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', 'dist-web'], { cwd: ROOT, stdio: 'inherit' });
+    execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', DIST_NAME], { cwd: ROOT, stdio: 'inherit' });
   }
   mkdirSync(OUT, { recursive: true });
   const server = await serve(DIST);

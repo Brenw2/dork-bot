@@ -176,15 +176,16 @@ function DialogView({ spec, close }: { spec: Exclude<DialogSpec, { kind: 'menu' 
   );
 }
 
-const useStyles = makeStyles(({ colors }) => StyleSheet.create({
+const useStyles = makeStyles(({ colors, theme: { shape } }) => StyleSheet.create({
   menu: {
     position: 'absolute',
     backgroundColor: colors.raised,
-    borderRadius: 12,
+    // Paper: the menu is radius 16 (the skin would make Classic's 12 into 22) with a soft shadow on the light page.
+    borderRadius: shape.radii ? 15 : 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.menuBorder,
     padding: 6,
-    boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+    boxShadow: shape.radii ? '0 12px 40px rgba(0,0,0,0.18)' : '0 12px 40px rgba(0,0,0,0.5)',
   },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, height: ITEM_H, borderRadius: 7 },
   menuItemHover: { backgroundColor: colors.menuHover },

@@ -116,9 +116,9 @@ function SheetTitle({ title, subtitle }: { title: string; subtitle?: string }) {
 
 function TextButton({ label, color, bold, onPress }: { label: string; color: string; bold: boolean; onPress?: () => void }) {
   const styles = useStyles();
-  const { label: say, skin } = useTheme();
+  const { label: say, skin, theme } = useTheme();
   return (
-    <Pressable onPress={onPress ?? dismiss} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.6 }]}>
+    <Pressable onPress={onPress ?? dismiss} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={({ pressed }) => [styles.textButton, theme.shape.circleButtons && { marginHorizontal: 6 }, pressed && { opacity: 0.6 }]}>
       <Text style={[styles.textButtonText, { color }, bold && skin({ fontWeight: '600' })]} maxFontSizeMultiplier={maxScale.chrome}>{say(label)}</Text>
     </Pressable>
   );
