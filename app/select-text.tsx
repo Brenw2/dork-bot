@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTint } from '@/components/Buttons';
 import { useColumnStyle } from '@/components/Column';
@@ -80,7 +80,9 @@ function ReadOnlyBox({ text, code, tint }: { text: string; code: boolean; tint: 
         value={text}
         multiline
         editable={false}
-        numberOfLines={1}
+        // No numberOfLines on the phone: on iOS it caps a multiline input at that many lines (card 34), so only the first
+        // line showed. The web textarea needs rows=1, or a one-line box measures two rows tall.
+        numberOfLines={Platform.OS === 'web' ? 1 : undefined}
         scrollEnabled={false}
         caretHidden
         selectionColor={tint}

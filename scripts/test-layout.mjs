@@ -90,6 +90,23 @@ const MESSAGES = [
 
 // A reply with everything a bot writes: headings, lists, a table, inline code and long code lines
 // that must scroll sideways instead of running off screen. Plus a sent picture (a file on Hermes).
+// Card 34: Select Text showed only the first line on iOS. Numbered lines so a missing one is easy to name.
+const LONG_CODE_LINES = Array.from({ length: 120 }, (_, i) => `const line${i + 1} = compute(${i + 1}); // code line ${i + 1}`);
+const SELECT_LONG_REPLY = [
+  'First paragraph of the long reply. It has two sentences so it wraps on a narrow phone.',
+  '',
+  'Second paragraph, with its own words.',
+  '',
+  'Third paragraph.',
+  'It has a hard line break inside it.',
+  '',
+  '```typescript',
+  ...LONG_CODE_LINES,
+  '```',
+  '',
+  'Last paragraph after the code block.',
+].join('\n');
+
 const RICH_REPLY = [
   '## Fix for the flaky test',
   '',
@@ -307,6 +324,8 @@ const SCREENS = [
   { name: 'chat-rich', paired: true, extraBots: ['coder'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=coder' : '/chat/coder'), waitFor: 'Ping me if' },
   // Card 32: the Select Text sheet (phone): the rich reply as plain text, code in its own monospace box, Copy All.
   { name: 'select-text', extraBots: ['coder'], path: () => `/select-text?bot=coder&text=${encodeURIComponent(RICH_REPLY)}`, waitFor: 'The race is in', check: checkSelectSheet },
+  // Card 34: a long message (several paragraphs, a 120-line code block, a closing paragraph): every line is shown and the page scrolls.
+  { name: 'select-text-long', extraBots: ['coder'], path: () => `/select-text?bot=coder&text=${encodeURIComponent(SELECT_LONG_REPLY)}`, waitFor: 'First paragraph', check: checkSelectLong },
   // A routine's result in the chat (card, no bot name above it), and a routine expanded with its Notify me row.
   { name: 'chat-routine-card', paired: true, extraBots: ['newsie'], path: (p) => (p === 'duo-open-landscape' ? '/?bot=newsie' : '/chat/newsie'), waitFor: 'Three stories today.' },
   // Card 24: the routine card collapsed, expanded, and opened from a notification (scripts/layout-routine.mjs).
@@ -632,6 +651,36 @@ function measureChats() {
 }
 
 // Card 32: the Select Text sheet. The message is plain text in read-only boxes (values, not DOM text), each as tall as its text.
+// Card 34: every line of a long message is in a box that is tall enough to show it, and the page scrolls to the end.
+async function checkSelectLong(page) {
+  await page.waitForTimeout(300);
+  return page.evaluate(({ codeLines }) => {
+    const out = [];
+    const boxes = [...document.querySelectorAll('textarea')];
+    if (boxes.length < 3) out.push(`expected prose, code and closing prose boxes, found ${boxes.length}`);
+    let shownLines = 0;
+    for (const t of boxes) {
+      const lh = parseFloat(getComputedStyle(t).lineHeight);
+      const own = t.value.split('\n').length; // hard lines; wrapping can only add more
+      if (t.clientHeight < own * lh - 2) out.push(`a text box shows ${Math.round(t.clientHeight / lh)} lines of ${own} ("${t.value.slice(0, 24)}")`);
+      if (t.scrollHeight > t.clientHeight + 1) out.push(`a text box is cut off (${t.scrollHeight} > ${t.clientHeight}) ("${t.value.slice(0, 24)}")`);
+      shownLines += Math.round(t.clientHeight / lh);
+    }
+    const all = boxes.map((t) => t.value).join('\n');
+    for (const l of ['First paragraph of the long reply', 'Second paragraph', 'Third paragraph.', 'It has a hard line break inside it.', 'Last paragraph after the code block.', ...codeLines]) if (!all.includes(l)) out.push(`missing from the text: ${l}`);
+    if (shownLines < 120 + 6) out.push(`only ${shownLines} lines are shown`);
+    const last = boxes[boxes.length - 1];
+    const scroller = [...document.querySelectorAll('*')].find((el) => el.contains(last) && el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY));
+    if (!scroller) out.push('the page does not scroll, so a long message cannot be read to the end');
+    else {
+      scroller.scrollTop = scroller.scrollHeight;
+      const r = last.getBoundingClientRect(), s = scroller.getBoundingClientRect();
+      if (r.bottom > s.bottom + 1) out.push('the last line is still below the page after scrolling to the end');
+    }
+    return out;
+  }, { codeLines: ['const line1 = compute(1);', 'const line60 = compute(60);', 'const line120 = compute(120); // code line 120'] });
+}
+
 async function checkSelectSheet(page) {
   await page.waitForTimeout(300); // the boxes measure their text, then set their height
   return page.evaluate(() => {
@@ -664,7 +713,7 @@ async function checkSelectSheet(page) {
   });
 }
 
-const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'select-text': ['Copy All', 'Done'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-error': ['Message failer'], 'chat-not-sent': ['Message unsender'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
+const FIXED = { chat: ['Message assistant', 'Bot settings', 'Add a picture', "assistant's chats", 'More for this chat'], 'chat-list-hidden': ['Show the bot list', 'Message assistant', "assistant's chats", 'More for this chat'], 'chat-rich': ['Message coder', 'Add a picture'], 'select-text': ['Copy All', 'Done'], 'select-text-long': ['Copy All', 'Done'], 'chat-typing': ['Message assistant', 'Send', 'Add a picture'], 'chat-thinking': ['Message thinker', 'Stop', 'Add a picture'], 'chat-working': ['Message worker', 'Stop'], 'chat-working-long': ['Stop'], 'chat-approval': ['Allow once', 'Deny', 'Allow in this chat', 'Always allow', 'Stop'], 'chat-approval-answered': ['Message approver', 'Stop'], 'chat-error': ['Message failer'], 'chat-not-sent': ['Message unsender'], 'chat-model-problem': ['Message chief', 'Pick model'], bots: ['New bot', 'More'], chats: ['New chat', "assistant's work", 'Search chats'], work: [], 'work-session': [], routines: ['New routine'], 'bots-empty': ['New bot'], new: ['Create bot'], add: ['Add'], connectors: ['Search connectors'], model: ['Search models'], 'bot-sheet': ['Done', 'Chats for assistant', 'Routines for assistant', 'Connectors for assistant', 'Look for assistant', 'Model:'] };
 const SEEN = { chat: ['Any time.'], 'chat-list-hidden': ['Any time.'], 'chat-rich': ['Ping me if'], 'chat-approval': ['Run this command?', 'Hermes flagged it'], 'work-session': ['The test reads the clock'], 'work-session-done': ['Three themes'] };
 
 Object.assign(FIXED, ROOM_FIXED);
