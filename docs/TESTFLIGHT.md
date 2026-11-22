@@ -44,6 +44,7 @@ Minutes: the free plan's 2,000 minutes a month (macOS billed at 10x) apply to pr
 
 ## Release log
 
+- 0.10.1 (build 15): Dynamic Type, so text follows the system text size (card 33, #70), and the Terminal (#71), Paper (#72) and Arcade (#73) themes in the Appearance sheet. Same version, new build number. Not built yet.
 - 0.10.1 (build 14): photo paste into chat (card 30, #65), select part of a message (card 32, #67), uniform UI kit across screens (card 31, #66, #68), theme plumbing + Appearance sheet, Classic only (#64). Same version, new build number. Not built yet.
 - 0.10.1 (build 13): DM streaming polish and the Jump to latest pill (#58), routine card opens at natural height (#59). Same version, new build number. Not built yet.
 - 0.10.1 (build 12): group chat keyboard offset for the native header and shared message box (card 28, #56), Usage screen (25), Enter sends in group chat on desktop (#54). Same version, new build number. Uploaded to TestFlight.
