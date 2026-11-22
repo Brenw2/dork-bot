@@ -664,7 +664,10 @@ export function Mine({ message, bot }: { message: ChatMessage; bot: string }) {
   const rule = theme.shape.userRule;
   // Arcade: the bubble is the theme's `user` cyan (not the bot's color), a 6 pt tail corner, a darker edge, semibold text.
   const px = theme.pixel;
-  const bubble = px ? [styles.bubble, { backgroundColor: colors.user, borderBottomRightRadius: px.radii.tail }, depth(px.userDepth)] : [styles.bubble, { backgroundColor: mix(color, 0.3) }];
+  // Paper: your bubble is the theme's ink (not the bot's color) with a small tail corner at the bottom right.
+  const solid = !!theme.shape.solidBubble;
+  const tail = theme.shape.tail ?? 18;
+  const bubble = px ? [styles.bubble, { backgroundColor: colors.user, borderBottomRightRadius: px.radii.tail }, depth(px.userDepth)] : [styles.bubble, { backgroundColor: solid ? colors.user : mix(color, 0.3) }, solid && { borderBottomRightRadius: tail }];
   return (
     <View style={[styles.mine, rule ? styles.mineRule : { maxWidth: isDesktop ? '70%' : '78%' }]}>
       {local.length || remote.length ? (

@@ -540,7 +540,7 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
       {it.type === 'system' ? (
         <Text style={styles.system}>{it.text}</Text>
       ) : it.type === 'user' ? (
-        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : arcBubble}>
+        <MessageMenu text={it.text} raw style={rule ? styles.ruleRow : theme.shape.solidBubble ? [styles.bubble, styles.bubbleSolid] : arcBubble}>
           {rule ? (
             <Text style={styles.prompt} accessibilityElementsHidden importantForAccessibility="no">
               {PROMPT}
@@ -559,7 +559,7 @@ function Row({ roomId, it, prev, info, members, unanswered }: { roomId: string; 
 
 function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: string; it: Extract<Item, { type: 'member' }>; info: MemberInfo; members: RoomMember[]; unanswered: boolean }) {
   const styles = useStyles();
-  const { caps } = useTheme();
+  const { caps, botText } = useTheme();
   const profile = it.member?.profile ?? it.actorId;
   const color = info.color(profile);
   return (
@@ -569,7 +569,7 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
       <View style={{ flex: 1 }}>
         {it.grouped ? null : (
           <View style={styles.nameLine}>
-            <Text style={[styles.speaker, { color }, caps]}>{info.name(it.member, it.actorId)}</Text>
+            <Text style={[styles.speaker, { color: botText(color) }, caps]}>{info.name(it.member, it.actorId)}</Text>
             <Text style={styles.time}>{clockTime(it.at)}</Text>
             {unanswered ? <Badge label="Needs you" /> : null}
           </View>
@@ -590,14 +590,14 @@ function MemberMessage({ roomId, it, info, members, unanswered }: { roomId: stri
 
 /** Text with each known @mention in its bot's color (semibold). @all/@everyone and @user in accent. Unknown @words stay plain. */
 function Mentions({ text, members, info }: { text: string; members: RoomMember[]; info: MemberInfo }) {
-  const { colors, skin } = useTheme();
+  const { colors, skin, botText } = useTheme();
   return (
     <>
       {tokenizeMentions(text, members).map((s, i) =>
         s.kind === 'plain' ? (
           s.text
         ) : (
-          <Text key={i} style={skin({ fontWeight: '600', color: s.kind === 'member' ? info.color(members.find((m) => m.handle === s.handle)?.profile ?? s.handle) : colors.accent })}>
+          <Text key={i} style={skin({ fontWeight: '600', color: s.kind === 'member' ? botText(info.color(members.find((m) => m.handle === s.handle)?.profile ?? s.handle)) : colors.accent })}>
             {s.kind === 'you' ? '@you' : s.text}
           </Text>
         ),
@@ -650,6 +650,8 @@ const useStyles = makeStyles(({ colors, mix }) => StyleSheet.create({
   system: { alignSelf: 'center', color: colors.dim, fontSize: 13, lineHeight: 18, textAlign: 'center', marginTop: 14, paddingHorizontal: 16 },
   bubble: { alignSelf: 'flex-end', maxWidth: '82%', marginTop: 14, backgroundColor: mix(colors.accent, 0.3), borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
   bubbleText: { color: colors.text, fontSize: BODY, lineHeight: isDesktop ? 24 : 22 },
+  // Paper: your bubble is the theme's ink with a 6 tail corner at the bottom right.
+  bubbleSolid: { backgroundColor: colors.user, borderBottomRightRadius: 6 },
   ruleRow: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 14, backgroundColor: colors.card, borderLeftWidth: 2, borderLeftColor: colors.accent, paddingHorizontal: 12, paddingVertical: 9 },
   prompt: { color: colors.accent, fontSize: BODY, lineHeight: isDesktop ? 24 : 22, fontWeight: '700' },
   msg: { flexDirection: 'row', gap: 8 },

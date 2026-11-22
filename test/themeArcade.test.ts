@@ -43,8 +43,8 @@ describe('Arcade tokens (themes.proposed.ts)', () => {
     expect(capsText(classic)).toBeUndefined();
     expect(radiusMap(term)).toBeNull();
   });
-  it('is offered in the picker after Terminal, and Classic is still first', () => {
-    expect(PICKER_THEMES).toEqual(['classic', 'terminal', 'arcade']);
+  it('is offered in the picker last (after Terminal and Paper), and Classic is still first', () => {
+    expect(PICKER_THEMES).toEqual(['classic', 'terminal', 'paper', 'arcade']);
   });
 });
 

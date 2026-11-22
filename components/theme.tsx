@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { applyScrollbars } from '@/components/webStyles';
 import { loadThemeFonts } from '@/components/themeFonts';
 import { mix as mixOn } from '@/lib/color';
+import { readableOn } from '@/lib/botInk';
 import * as SecureStore from '@/lib/secureStore';
 import { DEFAULT_THEME, parseTheme, THEMES, type Theme, type ThemeId } from '@/lib/themes';
 import { capsText, depthStyle, pixelText, skinSheet, skinStyle, themed } from '@/lib/themeSkin';
@@ -29,6 +30,8 @@ export interface ThemeApi {
   caps: ReturnType<typeof capsText>;
   /** Arcade: the 3 pt pressable bottom edge as a style (a hard shadow); `color` overrides the edge color. Undefined in other themes. */
   depth: (color?: string) => ReturnType<typeof depthStyle>;
+  /** Text in a bot's color: as is, except on Paper, where it is darkened until it reads (4.5:1; pass 3 for bold names). */
+  botText: (hex: string, min?: number) => string;
 }
 
 function api(theme: Theme, setTheme: (id: ThemeId) => void): ThemeApi {
@@ -44,6 +47,7 @@ function api(theme: Theme, setTheme: (id: ThemeId) => void): ThemeApi {
     px: (kind) => pixelText(theme, kind),
     caps: capsText(theme),
     depth: (color) => depthStyle(theme, color),
+    botText: (hex, min) => (theme.shape.inkBotText ? readableOn(hex, min) : hex),
   };
 }
 
